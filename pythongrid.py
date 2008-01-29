@@ -7,52 +7,9 @@ import getopt
 import io_pickle
 import random
 import types
+import thread
 
 
-#test code
-######################################################
-
-class Test:
-
-  sideEffect="not set"
-
-  def doSomething(self, a):
-    print "executing test"
-    self.sideEffect="sideeffect set"
-
-    return a+a
-
-
-def makeMethodJobs():
-
-  myobj=Test()
-
-  jobs=[]
-  jobs.append(MethodJob(myobj.doSomething, ["aaaaaXXXXXXXXXXX"]))
-  jobs.append(MethodJob(myobj.doSomething, ["bbbbbbbbbXXXXXXXXXYa"]))
-  jobs.append(MethodJob(myobj.doSomething, ["ccccccccccXXXXXXXXX"]))
-
-  return jobs
-
-
-def makeJobs():
-
-  jobs=[]
-  jobs.append(Job(test, ["aaaaaXXXXXXXXXXX"]))
-  jobs.append(Job(test, ["bbbbbbbbbXXXXXXXXXYa"]))
-  jobs.append(Job(test, ["ccccccccccXXXXXXXXX"]))
-
-  return jobs
-
-
-
-def test(string):
-
-  print string
-  return string+string;
-
-
-######################################################
 
 class Job:
 
@@ -101,6 +58,16 @@ def createFileName():
 
   return "pickle_" + string + ".bz2"
 
+
+
+def processJobsLocally(jobs, numThreads=1):
+  """Run jobs on local machine in a multithreaded manner"""
+  
+  for job in jobs:
+
+
+    #TODO implement
+    print "start new thread"
 
 
 def processJobs(jobs):
