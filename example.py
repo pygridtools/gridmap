@@ -1,4 +1,6 @@
-from pythongrid import *
+import sys
+import getopt
+from pythongrid import Job, MethodJob, processJobs, Usage
 import example_fun
 
 
@@ -41,18 +43,18 @@ def runExample():
   print processedFunctionJobs[0].ret
 
 
-#  print "generating method jobs"
-#
-#  methodJobs = makeMethodJobs()
-#
-#  print methodJobs[0].obj.sideEffect
-#  print methodJobs[0].ret
-#
-#  processedMethodJobs = processJobs(methodJobs)
-# 
-#  print processedMethodJobs[0].obj.sideEffect
-#  print processedMethodJobs[0].ret
-# 
+  print "generating method jobs"
+
+  methodJobs = makeMethodJobs()
+
+  print methodJobs[0].obj.sideEffect
+  print methodJobs[0].ret
+
+  processedMethodJobs = processJobs(methodJobs)
+ 
+  print processedMethodJobs[0].obj.sideEffect
+  print processedMethodJobs[0].ret
+ 
 
 
 def main(argv=None):
