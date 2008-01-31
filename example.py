@@ -1,20 +1,11 @@
 from pythongrid import *
+import example_fun
 
-
-class Test:
-
-  sideEffect="not set"
-
-  def doSomething(self, a):
-    print "executing test"
-    self.sideEffect="sideeffect set"
-
-    return a+a
 
 
 def makeMethodJobs():
 
-  myobj=Test()
+  myobj=example_fun.Test()
 
   jobs=[]
   jobs.append(MethodJob(myobj.doSomething, ["aaaaaXXXXXXXXXXX"]))
@@ -27,18 +18,12 @@ def makeMethodJobs():
 def makeJobs():
 
   jobs=[]
-  jobs.append(Job(test, ["aaaaaXXXXXXXXXXX"]))
-  jobs.append(Job(test, ["bbbbbbbbbXXXXXXXXXYa"]))
-  jobs.append(Job(test, ["ccccccccccXXXXXXXXX"]))
+  jobs.append(Job(example_fun.testFunction, ["aaaaaXXXXXXXXXXX"]))
+  jobs.append(Job(example_fun.testFunction, ["bbbbbbbbbXXXXXXXXXYa"]))
+  jobs.append(Job(example_fun.testFunction, ["ccccccccccXXXXXXXXX"]))
 
   return jobs
 
-
-
-def test(string):
-
-  print string
-  return string+string;
 
 
 
@@ -56,18 +41,18 @@ def runExample():
   print processedFunctionJobs[0].ret
 
 
-  print "generating method jobs"
-
-  methodJobs = makeMethodJobs()
-
-  print methodJobs[0].obj.sideEffect
-  print methodJobs[0].ret
-
-  processedMethodJobs = processJobs(methodJobs)
- 
-  print processedMethodJobs[0].obj.sideEffect
-  print processedMethodJobs[0].ret
- 
+#  print "generating method jobs"
+#
+#  methodJobs = makeMethodJobs()
+#
+#  print methodJobs[0].obj.sideEffect
+#  print methodJobs[0].ret
+#
+#  processedMethodJobs = processJobs(methodJobs)
+# 
+#  print processedMethodJobs[0].obj.sideEffect
+#  print processedMethodJobs[0].ret
+# 
 
 
 def main(argv=None):
