@@ -1,13 +1,28 @@
 import sys
 import getopt
 from pythongrid import Job, MethodJob, processJobs, Usage
-import example_fun
+#import example_fun
 
+class Test:
+
+  sideEffect="not set"
+
+  def doSomething(self, a):
+    print "executing test"
+    self.sideEffect="sideeffect set"
+
+    return a+a
+
+
+def testFunction(string):
+
+  print string
+  return string+string;
 
 
 def makeMethodJobs():
 
-  myobj=example_fun.Test()
+  myobj=Test()
 
   jobs=[]
   jobs.append(MethodJob(myobj.doSomething, ["aaaaaXXXXXXXXXXX"]))
@@ -20,14 +35,11 @@ def makeMethodJobs():
 def makeJobs():
 
   jobs=[]
-  jobs.append(Job(example_fun.testFunction, ["aaaaaXXXXXXXXXXX"]))
-  jobs.append(Job(example_fun.testFunction, ["bbbbbbbbbXXXXXXXXXYa"]))
-  jobs.append(Job(example_fun.testFunction, ["ccccccccccXXXXXXXXX"]))
+  jobs.append(Job(testFunction, ["aaaaaXXXXXXXXXXX"]))
+  jobs.append(Job(testFunction, ["bbbbbbbbbXXXXXXXXXYa"]))
+  jobs.append(Job(testFunction, ["ccccccccccXXXXXXXXX"]))
 
   return jobs
-
-
-
 
 
 def runExample():

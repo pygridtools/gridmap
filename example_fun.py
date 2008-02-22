@@ -1,3 +1,5 @@
+import io_pickle
+
 class Test:
 
   sideEffect="not set"
@@ -15,3 +17,10 @@ def testFunction(string):
   return string+string;
 
 
+def findProblem():
+  
+  f=testFunction
+  print f.__module__
+  print f.func_code
+
+  io_pickle.save("/tmp/mytest.bzip", f)

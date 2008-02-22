@@ -18,16 +18,25 @@ class Job:
   kwlist={}
   ret=None
 
-  def __init__(self, f, args, kwlist={}):
+
+  def __init__(self, f, args, kwlist={}, additionalpath=[]):
  
     self.f=f
     self.args=args
     self.kwlist=kwlist
 
+    #fetch current path
+    self.pythonpath=sys.path
+    self.pythonpath.append(os.getcwd())
+
+    #TODO: set additional path from a config file
+    self.pythonpath.extend(additionalpath)
+
   def execute(self):
     self.ret=apply(self.f,self.args,self.kwlist)
 
 
+#TODO derive this from Job, unify!
 class MethodJob:
 
   methodName=""
@@ -50,13 +59,17 @@ class MethodJob:
 
 
 def createFileName():
-  #TODO: do some hashing here
+  return "pickle_" + randomString(10) + ".bz2"
+
+
+
+def randomString(length):
   alphabet=['a','b','c','d']
 
-  string = [random.choice(alphabet) for j in range(10)]
+  string = [random.choice(alphabet) for j in range(length)]
   string = "".join(string)
 
-  return "pickle_" + string + ".bz2"
+  return string
 
 
 
@@ -88,6 +101,20 @@ def processJobs(jobs):
   fileNames=[]
 
 
+  #set paths
+
+  #fetch current path
+  pythonpath=sys.path
+  pythonpath.append(os.getcwd())
+  #TODO: set additional path from a config file
+  #pythonpath.extend(additionalpath)
+
+  path_file= dir + "pythongrid_paths_" + randomString(5) + ".pkl"
+
+  #write paths to a separate file
+  io_pickle.save(path_file, pythonpath)
+
+
   for job in jobs:
 
     fileName = createFileName()
@@ -112,7 +139,7 @@ def processJobs(jobs):
     command=os.path.expanduser('~/svn/tools/python/pythongrid/pythongrid_runner.sh')
 
     jt.remoteCommand = command
-    jt.args = [path]
+    jt.args = [path, path_file]
     jt.joinFiles=True
 
     #TODO SAVEDIR
@@ -149,16 +176,30 @@ def processJobs(jobs):
 
     retJobs.append(retJob)
 
+
+  #clean up path file
+  os.remove(path_file)
   
   return retJobs
     
 
 
-def runJob(pickleFileName):
+
+################################################################
+#      The following code will be executed on the cluster      #
+################################################################
+
+
+def runJob(pickleFileName, path_file):
   """Runs job which was pickled to a file called pickledFileName
   """
-  
+ 
   dir=""
+
+  #restore pythonpath on cluster node
+  saved_paths = io_pickle.load(path_file)
+  sys.path.extend(saved_paths)
+
 
   inPath = dir + pickleFileName
   job=io_pickle.load(inPath)
@@ -191,7 +232,7 @@ def main(argv=None):
 
       opts, args = getopt.getopt(argv[1:], "h", ["help"])
 
-      runJob(args[0])
+      runJob(args[0], args[1])
 
     except getopt.error, msg:
       raise Usage(msg)
