@@ -1,26 +1,13 @@
 import sys
 import getopt
 from pythongrid import Job, MethodJob, processJobs, Usage
-#import example_fun
-
-class Test:
-
-  sideEffect="not set"
-
-  def doSomething(self, a):
-    print "executing test"
-    self.sideEffect="sideeffect set"
-
-    return a+a
-
-
-def testFunction(string):
-
-  print string
-  return string+string;
+from example_fun import Test, testFunction
 
 
 def makeMethodJobs():
+  '''
+  Creates a list of Method Jobs.
+  '''
 
   myobj=Test()
 
@@ -33,6 +20,9 @@ def makeMethodJobs():
 
 
 def makeJobs():
+  '''
+  Creates a list of regular (function) Jobs.
+  '''
 
   jobs=[]
   jobs.append(Job(testFunction, ["aaaaaXXXXXXXXXXX"]))
@@ -44,29 +34,39 @@ def makeJobs():
 
 def runExample():
 
+  print "====================================="
   print "generating fuction jobs"
 
   functionJobs = makeJobs()
 
-  print functionJobs[0].ret
+  print "output ret field in each job before sending it onto the cluster"
+  for (i, job) in enumerate(functionJobs):
+    print "Job with id: ", i, "- ret: ", job.ret
+
+  print ""
+  print "sending function jobs to cluster"
+  print ""
 
   processedFunctionJobs = processJobs(functionJobs)
 
-  print processedFunctionJobs[0].ret
+  print "ret fields AFTER execution on cluster"
+  for (i, job) in enumerate(processedFunctionJobs):
+    print "Job with id: ", i, "- ret: ", job.ret
 
 
-  print "generating method jobs"
+  print "====================================="
+  #print "generating method jobs"
 
-  methodJobs = makeMethodJobs()
+  #methodJobs = makeMethodJobs()
 
-  print methodJobs[0].obj.sideEffect
-  print methodJobs[0].ret
+  #print methodJobs[0].obj.sideEffect
+  #print methodJobs[0].ret
 
-  processedMethodJobs = processJobs(methodJobs)
- 
-  print processedMethodJobs[0].obj.sideEffect
-  print processedMethodJobs[0].ret
- 
+  #processedMethodJobs = processJobs(methodJobs)
+
+  #print processedMethodJobs[0].obj.sideEffect
+  #print processedMethodJobs[0].ret
+
 
 
 def main(argv=None):
@@ -80,7 +80,7 @@ def main(argv=None):
 
       opts, args = getopt.getopt(argv[1:], "h", ["help"])
 
-      runExample() 
+      runExample()
 
     except getopt.error, msg:
       raise Usage(msg)
@@ -93,7 +93,7 @@ def main(argv=None):
 
     return 2
 
-  
+
 
 if __name__ == "__main__":
 

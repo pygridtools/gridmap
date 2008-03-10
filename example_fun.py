@@ -1,6 +1,13 @@
 import io_pickle
 
+#functions that are used to create Jobs have to be defined in separate module
+#from the one which containes the processJobs function.
+
+
 class Test:
+  '''
+  Dummy class for testing MethodJob
+  '''
 
   sideEffect="not set"
 
@@ -11,16 +18,10 @@ class Test:
     return a+a
 
 
-def testFunction(string):
 
+def testFunction(string):
+  '''
+  Dummy function for testing a regular (function) Job.
+  '''
   print string
   return string+string;
-
-
-def findProblem():
-  
-  f=testFunction
-  print f.__module__
-  print f.func_code
-
-  io_pickle.save("/tmp/mytest.bzip", f)

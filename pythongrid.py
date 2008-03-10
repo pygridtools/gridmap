@@ -299,16 +299,23 @@ def processJobs(jobs):
   retJobs=[]
 
 
-  #collect results
+  #attempt to collect results
   for fileName in fileNames:
 
     path = fileName + ".out"
 
     print path
 
-    retJob=io_pickle.load(path)
+    try:
+      retJob=io_pickle.load(path)
+      retJobs.append(retJob)
+    except Exception, detail:
+      print "error while unpickling file: " + path
+      print "most likely there was an error when executing a Job"
+      print detail
 
-    retJobs.append(retJob)
+
+
 
 
   #clean up path file
