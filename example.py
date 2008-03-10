@@ -1,7 +1,9 @@
 import sys
 import getopt
 from pythongrid import Job, KybJob, MethodJob, processJobs, Usage, processJobsLocally
-from example_fun import Test, testFunction
+from example_fun import Test
+
+import example
 
 
 def makeMethodJobs():
@@ -21,32 +23,21 @@ def makeMethodJobs():
 
 def makeJobs():
   '''
-  Creates a list of regular (function) Jobs.
+  Creates a list of regular (function) Jobs. One needs to use the full identifier
+  such that the module name is saved as well.
   '''
 
   jobs=[]
-  j1 = KybJob(testFunction, ["aaaaaXXXXXXXXXXX"])
+  j1 = KybJob(example.testFunction, ["aaaaaXXXXXXXXXXX"])
   j1.h_vmem="8G"
   jobs.append(j1)
 
-  jobs.append(Job(testFunction, ["bbbbbbbbbXXXXXXXXXYa"]))
-  jobs.append(Job(testFunction, ["ccccccccccXXXXXXXXX"]))
+  jobs.append(Job(example.testFunction, ["bbbbbbbbbXXXXXXXXXYa"]))
+  jobs.append(Job(example.testFunction, ["ccccccccccXXXXXXXXX"]))
 
 
-  jobs.append(Job(testFunction, ["bbbbbbbbbXXXXXXXXXYa"]))
-  jobs.append(Job(testFunction, ["ccccccccccXXXXXXXXX"]))
-
-
-  jobs.append(Job(testFunction, ["bbbbbbbbbXXXXXXXXXYa"]))
-  jobs.append(Job(testFunction, ["ccccccccccXXXXXXXXX"]))
-
-
-  jobs.append(Job(testFunction, ["bbbbbbbbbXXXXXXXXXYa"]))
-  jobs.append(Job(testFunction, ["ccccccccccXXXXXXXXX"]))
-
-
-  jobs.append(Job(testFunction, ["bbbbbbbbbXXXXXXXXXYa"]))
-  jobs.append(Job(testFunction, ["ccccccccccXXXXXXXXX"]))
+  jobs.append(Job(example.testFunction, ["bbbbbbbbbXXXXXXXXXYa"]))
+  jobs.append(Job(example.testFunction, ["ccccccccccXXXXXXXXX"]))
 
   return jobs
 
@@ -73,9 +64,10 @@ def runExample():
     print "Job with id: ", i, "- ret: ", job.ret
 
 
+  print ""
+  print ""
 
   print "====================================="
-  print ""
   print "======= Local Multithreading ========"
   print "====================================="
 
@@ -83,17 +75,17 @@ def runExample():
 
   functionJobs = makeJobs()
 
-  print "output ret field in each job before sending it onto the cluster"
+  print "output ret field in each job before multithreaded computation"
   for (i, job) in enumerate(functionJobs):
     print "Job with id: ", i, "- ret: ", job.ret
 
   print ""
-  print "sending function jobs to cluster"
+  print "sending function jobs to local machine"
   print ""
 
-  processedFunctionJobs = processJobsLocally(functionJobs, 3)
+  processedFunctionJobs = processJobsLocally(functionJobs, 2)
 
-  print "ret fields AFTER execution on cluster"
+  print "ret fields AFTER execution on local machine"
   for (i, job) in enumerate(processedFunctionJobs):
     print "Job with id: ", i, "- ret: ", job.ret
 
@@ -111,6 +103,17 @@ def runExample():
   #print processedMethodJobs[0].obj.sideEffect
   #print processedMethodJobs[0].ret
 
+
+def testFunction(string):
+  '''
+  Dummy function for testing a regular (function) Job.
+  '''
+  print string
+
+  for i in xrange(10000000):
+    i+1
+
+  return string+string;
 
 
 def main(argv=None):

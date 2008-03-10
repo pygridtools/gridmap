@@ -173,7 +173,6 @@ class MethodJob:
 
 
 
-#TODO enhance this using Queues instead of distributing jobs manually
 class JobsThread (threading.Thread):
   '''
   In case jobs are to be computed locally, a number of Jobs (possibly one)
@@ -189,7 +188,6 @@ class JobsThread (threading.Thread):
     @type jobs: list of Job objects
     '''
 
-    print "creating new thread"
     self.jobs = jobs
     threading.Thread.__init__(self)
 
@@ -199,8 +197,6 @@ class JobsThread (threading.Thread):
     '''
     for job in self.jobs:
       job.execute()
-      print "ret: ", job.ret
-
 
 
 
@@ -248,17 +244,15 @@ def processJobsLocally(jobs, maxNumThreads=1):
   #check if there are fewer jobs then allowed threads
   if (maxNumThreads >= numJobs):
     numThreads=numJobs
+    jobsPerThread=1
   else:
     numThreads=maxNumThreads
+    jobsPerThread=(numJobs/numThreads)+1
 
   print "number of threads: ", numThreads
-
-  jobsPerThread=(numJobs/numThreads)+1
-
   print "jobs per thread: ", jobsPerThread
 
   jobList=[]
-
   threadList=[]
 
   #assign jobs to threads
@@ -269,6 +263,7 @@ def processJobsLocally(jobs, maxNumThreads=1):
 
     if ((i%jobsPerThread==0 and i!=0) or i==(numJobs-1) ):
       #create new thread
+      print "starting new thread"
       thread=JobsThread(jobList)
       threadList.append(thread)
       thread.start()
