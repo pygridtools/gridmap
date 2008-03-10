@@ -1,8 +1,9 @@
 import sys
 import getopt
 from pythongrid import Job, KybJob, MethodJob, processJobs, Usage, processJobsLocally
-from example_fun import Test
 
+
+#NOTE: !!this is neccessary in order to be able to use the full function identifier!!
 import example
 
 
@@ -114,6 +115,21 @@ def testFunction(string):
     i+1
 
   return string+string;
+
+
+class Test:
+  '''
+  Dummy class for testing MethodJob
+  '''
+
+  sideEffect="not set"
+
+  def doSomething(self, a):
+    print "executing test"
+    self.sideEffect="sideeffect set"
+
+    return a+a
+
 
 
 def main(argv=None):
