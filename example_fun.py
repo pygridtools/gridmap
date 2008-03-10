@@ -24,4 +24,8 @@ def testFunction(string):
   Dummy function for testing a regular (function) Job.
   '''
   print string
+
+  for i in xrange(10000000):
+    i+1
+
   return string+string;

@@ -7,7 +7,7 @@ import getopt
 import io_pickle
 import random
 import types
-import thread
+import threading
 
 
 
@@ -173,6 +173,37 @@ class MethodJob:
 
 
 
+#TODO enhance this using Queues instead of distributing jobs manually
+class JobsThread (threading.Thread):
+  '''
+  In case jobs are to be computed locally, a number of Jobs (possibly one)
+  are assinged to one thread.
+  '''
+
+  jobs=[]
+
+  def __init__(self, jobs):
+    '''
+    Constructor
+    @param jobs: list of jobs
+    @type jobs: list of Job objects
+    '''
+
+    print "creating new thread"
+    self.jobs = jobs
+    threading.Thread.__init__(self)
+
+  def run (self):
+    '''
+    Executes each job in job list
+    '''
+    for job in self.jobs:
+      job.execute()
+      print "ret: ", job.ret
+
+
+
+
 def createFileName():
   '''
   Generates random filename.
@@ -198,22 +229,59 @@ def randomString(length):
 
 
 
-def processJobsLocally(jobs, numThreads=1):
+def processJobsLocally(jobs, maxNumThreads=1):
   '''
   Run jobs on local machine in a multithreaded manner, providing the same interface.
   NOT finished yet.
 
   @param jobs: list of jobs to be executed locally.
   @type jobs: list of Job objects
-  @param numThreads: defines how many threads should be used to execute the jobs.
-  @type numThreads: integer
+  @param maxNumThreads: defines the maximal number of threads to be used to process jobs
+  @type maxNumThreads: integer
   '''
 
-  for job in jobs:
+  numThreads=1
+  numJobs=len(jobs)
+
+  print "number of jobs: ", numJobs
+
+  #check if there are fewer jobs then allowed threads
+  if (maxNumThreads >= numJobs):
+    numThreads=numJobs
+  else:
+    numThreads=maxNumThreads
+
+  print "number of threads: ", numThreads
+
+  jobsPerThread=(numJobs/numThreads)+1
+
+  print "jobs per thread: ", jobsPerThread
+
+  jobList=[]
+
+  threadList=[]
+
+  #assign jobs to threads
+  #TODO use a queue here
+  for (i, job) in enumerate(jobs):
+
+    jobList.append(job)
+
+    if ((i%jobsPerThread==0 and i!=0) or i==(numJobs-1) ):
+      #create new thread
+      thread=JobsThread(jobList)
+      threadList.append(thread)
+      thread.start()
+      jobList=[]
 
 
-    #TODO implement
-    print "start new thread"
+  #wait for threads to finish
+  for thread in threadList:
+    thread.join()
+
+  return jobs
+
+
 
 
 def processJobs(jobs):

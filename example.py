@@ -1,6 +1,6 @@
 import sys
 import getopt
-from pythongrid import Job, MethodJob, processJobs, Usage
+from pythongrid import Job, KybJob, MethodJob, processJobs, Usage, processJobsLocally
 from example_fun import Test, testFunction
 
 
@@ -25,7 +25,26 @@ def makeJobs():
   '''
 
   jobs=[]
-  jobs.append(Job(testFunction, ["aaaaaXXXXXXXXXXX"]))
+  j1 = KybJob(testFunction, ["aaaaaXXXXXXXXXXX"])
+  j1.h_vmem="8G"
+  jobs.append(j1)
+
+  jobs.append(Job(testFunction, ["bbbbbbbbbXXXXXXXXXYa"]))
+  jobs.append(Job(testFunction, ["ccccccccccXXXXXXXXX"]))
+
+
+  jobs.append(Job(testFunction, ["bbbbbbbbbXXXXXXXXXYa"]))
+  jobs.append(Job(testFunction, ["ccccccccccXXXXXXXXX"]))
+
+
+  jobs.append(Job(testFunction, ["bbbbbbbbbXXXXXXXXXYa"]))
+  jobs.append(Job(testFunction, ["ccccccccccXXXXXXXXX"]))
+
+
+  jobs.append(Job(testFunction, ["bbbbbbbbbXXXXXXXXXYa"]))
+  jobs.append(Job(testFunction, ["ccccccccccXXXXXXXXX"]))
+
+
   jobs.append(Job(testFunction, ["bbbbbbbbbXXXXXXXXXYa"]))
   jobs.append(Job(testFunction, ["ccccccccccXXXXXXXXX"]))
 
@@ -54,8 +73,33 @@ def runExample():
     print "Job with id: ", i, "- ret: ", job.ret
 
 
+
   print "====================================="
-  #print "generating method jobs"
+  print ""
+  print "======= Local Multithreading ========"
+  print "====================================="
+
+  print "generating fuction jobs"
+
+  functionJobs = makeJobs()
+
+  print "output ret field in each job before sending it onto the cluster"
+  for (i, job) in enumerate(functionJobs):
+    print "Job with id: ", i, "- ret: ", job.ret
+
+  print ""
+  print "sending function jobs to cluster"
+  print ""
+
+  processedFunctionJobs = processJobsLocally(functionJobs, 3)
+
+  print "ret fields AFTER execution on cluster"
+  for (i, job) in enumerate(processedFunctionJobs):
+    print "Job with id: ", i, "- ret: ", job.ret
+
+
+  print "====================================="
+ #print "generating method jobs"
 
   #methodJobs = makeMethodJobs()
 
