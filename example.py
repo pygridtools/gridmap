@@ -3,7 +3,7 @@ import getopt
 from pythongrid import Job, KybJob, MethodJob, processJobs, Usage, processJobsLocally
 
 
-#NOTE: !!this is neccessary in order to be able to use the full function identifier!!
+#NOTE: !!this is necessary in order to be able to use the full function identifier!!
 import example
 
 
