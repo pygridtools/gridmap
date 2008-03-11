@@ -117,9 +117,10 @@ def testFunction(string):
   return string+string;
 
 
+
 class Test:
   '''
-  Dummy class for testing MethodJob
+  Dummy class for testing MethodJob. Might now work ATM, will be fixed, soon.
   '''
 
   sideEffect="not set"

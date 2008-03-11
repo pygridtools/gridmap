@@ -173,31 +173,6 @@ class MethodJob:
 
 
 
-class JobsThread (threading.Thread):
-  '''
-  In case jobs are to be computed locally, a number of Jobs (possibly one)
-  are assinged to one thread.
-  '''
-
-  jobs=[]
-
-  def __init__(self, jobs):
-    '''
-    Constructor
-    @param jobs: list of jobs
-    @type jobs: list of Job objects
-    '''
-
-    self.jobs = jobs
-    threading.Thread.__init__(self)
-
-  def run (self):
-    '''
-    Executes each job in job list
-    '''
-    for job in self.jobs:
-      job.execute()
-
 
 
 def createFileName():
@@ -225,6 +200,33 @@ def randomString(length):
 
 
 
+class JobsThread (threading.Thread):
+  '''
+  In case jobs are to be computed locally, a number of Jobs (possibly one)
+  are assinged to one thread.
+  '''
+
+  jobs=[]
+
+  def __init__(self, jobs):
+    '''
+    Constructor
+    @param jobs: list of jobs
+    @type jobs: list of Job objects
+    '''
+
+    self.jobs = jobs
+    threading.Thread.__init__(self)
+
+  def run (self):
+    '''
+    Executes each job in job list
+    '''
+    for job in self.jobs:
+      job.execute()
+
+
+
 def processJobsLocally(jobs, maxNumThreads=1):
   '''
   Run jobs on local machine in a multithreaded manner, providing the same interface.
@@ -236,7 +238,6 @@ def processJobsLocally(jobs, maxNumThreads=1):
   @type maxNumThreads: integer
   '''
 
-  numThreads=1
   numJobs=len(jobs)
 
   print "number of jobs: ", numJobs
