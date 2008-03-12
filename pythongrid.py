@@ -24,7 +24,7 @@ class Job (object):
   kwlist={}
   ret=None
 
-  nativeResources=""
+  nativeSpecification=""
 
 
   def __init__(self, f, args, kwlist={}, additionalpaths=[]):
@@ -92,7 +92,7 @@ class KybJob(Job):
 
   #http://www.python.org/download/releases/2.2.3/descrintro/#property
 
-  def getNativeResources(self):
+  def getNativeSpecification(self):
     '''
     define python-style getter
     '''
@@ -106,21 +106,21 @@ class KybJob(Job):
 
     return ret
 
-  def setNativeResources(self, x):
+  def setNativeSpecification(self, x):
     '''
     define python-style setter
-    @param x: nativeResources string to be set
+    @param x: nativeSpecification string to be set
     @type x: string
     '''
 
-    self.__nativeResources=x
+    self.__nativeSpecification=x
 
-  nativeResources=property(getNativeResources, setNativeResources)
+  nativeSpecification=property(getNativeSpecification, setNativeSpecification)
 
 
 #  def __getattribute__(self, name):
 #
-#    if (name == "nativeResources"):
+#    if (name == "nativeSpecification"):
 #
 #      ret=""
 #
@@ -339,6 +339,9 @@ def processJobs(jobs):
     jt.remoteCommand = command
     jt.args = [path, path_file]
     jt.joinFiles=True
+
+    #resources
+    jt.setNativeSpecification(job.nativeSpecification)
 
     #TODO SAVEDIR
     homeDir = os.path.expanduser("~/")

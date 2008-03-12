@@ -31,6 +31,10 @@ def makeJobs():
   jobs=[]
   j1 = KybJob(example.testFunction, ["aaaaaXXXXXXXXXXX"])
   j1.h_vmem="8G"
+
+  print "job #1: ", j1.nativeSpecification
+
+
   jobs.append(j1)
 
   jobs.append(Job(example.testFunction, ["bbbbbbbbbXXXXXXXXXYa"]))
@@ -111,7 +115,7 @@ def testFunction(string):
   '''
   print string
 
-  for i in xrange(10000000):
+  for i in xrange(100000000000):
     i+1
 
   return string+string;
