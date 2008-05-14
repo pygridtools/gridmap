@@ -101,8 +101,10 @@ class KybJob(Job):
     #TODO
     value="TODO"
 
-    if (value!=""):
+    if (self.h_vmem != ""):
       ret=ret + " -l " + "h_vmem" + "=" + self.h_vmem
+    if (self.express!=""):
+      ret=ret + " -l " + "express" + "=" + self.express
 
     return ret
 
@@ -115,7 +117,7 @@ class KybJob(Job):
 
     self.__nativeSpecification=x
 
-  nativeSpecification=property(getNativeSpecification, setNativeSpecification)
+  nativeSpecification = property(getNativeSpecification, setNativeSpecification)
 
 
 #  def __getattribute__(self, name):
