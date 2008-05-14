@@ -1,0 +1,7 @@
+TODO
+
+
++ Complete remaining member flags for KybJob
++ Unify method jobs
++ Specifiy temp directory
++ Solve issue with environment variable (pythongrid_runner.sh)
