@@ -1,14 +1,23 @@
 #! /usr/bin/env python
 
-import DRMAA
+#TODO query this flag accordingly
+
+drmaa_present=1
+
+try:
+  import DRMAA
+except:
+  print "Error importing DRMAA. Only local multi-threading supported. Please check your installation."
+  drmaa_present=0
+
 import os
 import sys
 import getopt
-import io_pickle
 import random
 import types
 import threading
 
+import io_pickle
 
 
 class Job (object):
@@ -63,8 +72,8 @@ class Job (object):
 
     #TODO make this optional!
     #remove input data
-    self.args=[]
-    self.kwlist={}
+    #self.args=[]
+    #self.kwlist={}
 
 
 
@@ -228,8 +237,20 @@ class JobsThread (threading.Thread):
       job.execute()
 
 
+def processJobs(jobs, locally=0):
+  """
+  Director method to decide whether to run on cluster or locally
+  """
 
-def processJobsLocally(jobs, maxNumThreads=1):
+  if (locally==0 and drmaa_present):
+    return __processJobsOnCluster__(jobs)
+  if (locally==0 and not drmaa_present):
+    return __processJobsLocally__(jobs, 1)
+  else:
+    return __processJobsLocally__(jobs, locally)
+ 
+
+def __processJobsLocally__(jobs, maxNumThreads=1):
   '''
   Run jobs on local machine in a multithreaded manner, providing the same interface.
   NOT finished yet.
@@ -281,8 +302,7 @@ def processJobsLocally(jobs, maxNumThreads=1):
 
 
 
-
-def processJobs(jobs):
+def __processJobsOnCluster__(jobs):
   '''
   Method used to send a list of jobs onto the cluster. Method will wait for all jobs to finish and return
   the list of jobs with the respective ret field set.
@@ -350,6 +370,10 @@ def processJobs(jobs):
     jt.outputPath=":" + homeDir
     jobid = s.runJob(jt)
     print 'Your job has been submitted with id ' + str(jobid)
+
+    print "file:", dir + fileName
+    print os.system("du -h " + dir + fileName)
+    
 
     joblist.append(jobid)
 
@@ -427,6 +451,9 @@ def runJob(pickleFileName, path_file):
   outPath = dir + pickleFileName + ".out"
 
   io_pickle.save(outPath, job)
+
+  print "outfile:"
+  print os.system("du -h " + outPath)
 
 
 class Usage(Exception):

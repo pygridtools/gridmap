@@ -1,6 +1,6 @@
 import sys
 import getopt
-from pythongrid import Job, KybJob, MethodJob, processJobs, Usage, processJobsLocally
+from pythongrid import Job, KybJob, MethodJob, processJobs, Usage
 
 
 #NOTE: !!this is necessary in order to be able to use the full function identifier!!
@@ -39,8 +39,6 @@ def makeJobs():
 
   jobs.append(Job(example.testFunction, ["bbbbbbbbbXXXXXXXXXYa"]))
   jobs.append(Job(example.testFunction, ["ccccccccccXXXXXXXXX"]))
-
-
   jobs.append(Job(example.testFunction, ["bbbbbbbbbXXXXXXXXXYa"]))
   jobs.append(Job(example.testFunction, ["ccccccccccXXXXXXXXX"]))
 
@@ -88,7 +86,7 @@ def runExample():
   print "sending function jobs to local machine"
   print ""
 
-  processedFunctionJobs = processJobsLocally(functionJobs, 2)
+  processedFunctionJobs = processJobs(functionJobs, locally=2)
 
   print "ret fields AFTER execution on local machine"
   for (i, job) in enumerate(processedFunctionJobs):

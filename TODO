@@ -5,3 +5,5 @@ TODO
 + Unify method jobs
 + Specifiy temp directory
 + Solve issue with environment variable (pythongrid_runner.sh)
++ de-hardcode path to pythongrid_runner.sh (migrate to python-only version)
++ add queue to local multithreading
