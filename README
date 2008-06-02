@@ -1,3 +1,3 @@
-- To use a method within the module itself, one has to import the
+- To use a function within the module itself, one has to import the
   module explicitly from within the module. This is to resolve
   namespaces in python
