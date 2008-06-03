@@ -355,6 +355,7 @@ def __processJobsOnCluster__(jobs):
   #TODO: set additional path from a config file
   #pythonpath.extend(additionalpath)
 
+  #TODO use unique filename
   path_file= dir + "pythongrid_paths_" + randomString(5) + ".pkl"
 
   #write paths to a separate file
