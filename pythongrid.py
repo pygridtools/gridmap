@@ -1,15 +1,5 @@
 #! /usr/bin/env python
 
-#TODO query this flag accordingly
-
-drmaa_present=1
-
-try:
-  import DRMAA
-except:
-  print "Error importing DRMAA. Only local multi-threading supported. Please check your installation."
-  drmaa_present=0
-
 import os
 import sys
 import getopt
@@ -18,6 +8,17 @@ import types
 import threading
 
 import io_pickle
+
+
+#try to import DRMAA
+drmaa_present=1
+
+try:
+  import DRMAA
+except:
+  print "Error importing DRMAA. Only local multi-threading supported. Please check your installation."
+  drmaa_present=0
+
 
 
 class Job (object):
@@ -107,13 +108,37 @@ class KybJob(Job):
     '''
 
     ret=""
-    #TODO
-    value="TODO"
 
     if (self.h_vmem != ""):
-      ret=ret + " -l " + "h_vmem" + "=" + self.h_vmem
-    if (self.express!=""):
-      ret=ret + " -l " + "express" + "=" + self.express
+      ret=ret + " -l " + "h_vmem" + "=" + str(self.h_vmem)
+    if (self.arch != ""):
+      ret=ret + " -l " + "arch" + "=" + str(self.arch)
+    if (self.tmpfree != ""):
+      ret=ret + " -l " + "tmpfree" + "=" + str(self.tmpfree)
+    if (self.h_cpu != ""):
+      ret=ret + " -l " + "h_cpu" + "=" + str(self.h_cpu)
+    if (self.h_rt != ""):
+      ret=ret + " -l " + "h_rt" + "=" + str(self.h_rt)
+    if (self.express != ""):
+      ret=ret + " -l " + "express" + "=" + str(self.express)
+    if (self.matlab != ""):
+      ret=ret + " -l " + "matlab" + "=" + str(self.matlab)
+    if (self.simulink != ""):
+      ret=ret + " -l " + "simulink" + "=" + str(self.simulink)
+    if (self.compiler != ""):
+      ret=ret + " -l " + "compiler" + "=" + str(self.compiler)
+    if (self.imagetb != ""):
+      ret=ret + " -l " + "imagetb" + "=" + str(self.imagetb)
+    if (self.opttb != ""):
+      ret=ret + " -l " + "opttb" + "=" + str(self.opttb)
+    if (self.stattb != ""):
+      ret=ret + " -l " + "stattb" + "=" + str(self.stattb)
+    if (self.sigtb != ""):
+      ret=ret + " -l " + "sigtb" + "=" + str(self.sigtb)
+    if (self.cplex != ""):
+      ret=ret + " -l " + "cplex" + "=" + str(self.cplex)
+    if (self.nicetohave != ""):
+      ret=ret + " -l " + "nicetohave" + "=" + str(self.nicetohave)
 
     return ret
 
