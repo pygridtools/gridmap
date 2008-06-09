@@ -435,12 +435,148 @@ def __processJobsOnCluster__(jobs):
 
 
 
+def __submitJobsToCluster__(jobs):
+  '''
+  Method used to send a list of jobs onto the cluster. Wait and forget. 
+  @param jobs: list of jobs to be executed
+  @type jobs: list of Job objects
+  '''
+  
+  #TODO get from config
+  dir=os.path.expanduser("~/")
+
+  s=DRMAA.Session()
+  s.init()
+
+
+  joblist=[]
+
+  fileNames=[]
+
+
+  #set paths
+
+  #fetch current path
+  pythonpath=sys.path
+  pythonpath.append(os.getcwd())
+  #TODO: set additional path from a config file
+  #pythonpath.extend(additionalpath)
+
+  #TODO use unique filename
+  path_file= dir + "pythongrid_paths_" + randomString(5) + ".pkl"
+
+  #write paths to a separate file
+  io_pickle.save(path_file, pythonpath)
+
+
+  for job in jobs:
+
+    fileName = createFileName()
+
+    path = dir + fileName
+    print "path: " + path
+
+    try:
+      io_pickle.save(path, job)
+      fileNames.append(path)
+    except Exception, detail:
+      print "error while pickling file: " + dir + fileName
+      print detail
+
+
+
+    print 'Creating job template'
+    jt = s.createJobTemplate()
+
+    #TODO FILENAME!
+    command=os.path.expanduser('~/svn/tools/python/pythongrid/pythongrid_runner.sh')
+
+    jt.remoteCommand = command
+    jt.args = [path, path_file]
+    jt.joinFiles=True
+
+    #resources
+    jt.setNativeSpecification(job.nativeSpecification)
+
+    #TODO SAVEDIR
+    homeDir = os.path.expanduser("~/")
+    jt.outputPath=":" + homeDir
+    jobid = s.runJob(jt)
+    print 'Your job has been submitted with id ' + str(jobid)
+
+    print "file:", dir + fileName
+    print os.system("du -h " + dir + fileName)
+    
+
+    joblist.append(jobid)
+
+    #To clean things up, we delete the job template. This frees the memory DRMAA
+    #set aside for the job template, but has no effect on submitted jobs.
+    #s.deleteJobTemplate(jt)
 
 
   #clean up path file
   os.remove(path_file)
 
-  return retJobs
+  return s.getSessionId #pseudocode
+
+
+
+def __collectResultsFromCluster__(sessionId, wait=0):
+  '''
+
+  '''
+
+  #TODO figure out syntax
+  session=DRAMA.getsession(sessionId) #PSEUDOCODE!
+  joblist=session.getJobs() #pseudocode
+
+
+  dramaaWait=DRMAA.Session.TIMEOUT_WAIT_FOREVER
+
+  if not wait:
+    dramaaWait=0 #TODO correct
+
+
+  s.synchronize(joblist, dramaaWait, True)
+
+  print "success: all jobs finished"
+
+  #close session
+  s.exit()
+
+
+
+  #attempt to collect results
+  retJobs=[]
+
+  for fileName in fileNames:
+
+    path = fileName + ".out"
+
+    print path
+
+    try:
+      retJob=io_pickle.load(path)
+      retJobs.append(retJob)
+    except Exception, detail:
+      print "error while unpickling file: " + path
+      print "most likely there was an error during jobs execution"
+      print detail
+
+
+  return retJobs  
+
+
+def __futureProcessJobsOnCluster__(jobs):
+  """
+  draft how the processJobs function could be implemented
+  without code duplication...
+  """
+
+  sid=__submitJobsToCluster__(jobs)
+
+  return __collectResultsFromCluster__(sid, wait=true)
 
 
 ################################################################
