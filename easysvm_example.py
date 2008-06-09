@@ -87,7 +87,8 @@ def demo(gcfilename, plot=False):
     #####################################################################
     # on the same computer
     processJobs(myjobs, local=True)
-
+    sid=submitJobs(myjobs, local=True)
+    jobs=collectJobs(sid)
     # use the cluster
     #processJobs(myjobs, local=False, wait=True)
 
