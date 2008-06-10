@@ -60,50 +60,99 @@ def demo(gcfilename, plot=False):
     # initialise splits
     #####################################################################
     partitions = getPartitionedSet(len(gc_labels), num_fold_cv)
+
+
+    demo_forloop(num_fold_cv,partitions,svmout,gc_labels,gc_examples)
+    demo_jobslocal(num_fold_cv,partitions,svmout,gc_labels,gc_examples)
+    demo_jobswait(num_fold_cv,partitions,svmout,gc_labels,gc_examples)
+    demo_session(num_fold_cv,partitions,svmout,gc_labels,gc_examples)
+
+
+
+def demo_forloop(num_fold_cv,partitions,svmout,gc_labels,gc_examples\
+                 kernelname,kparam):
+    """
+    normal for loop
+    """
+    print 'demo for loop'
     svmout = []
     for fold in xrange(num_fold_cv):
         svmout.append(numpy.zeros(len(partitions[fold])))
 
-
-    #####################################################################
-    # normal for loop
-    #####################################################################
     for fold in xrange(num_fold_cv):
         XT, LT, XTE, LTE = getCurrentSplit(fold, partitions, gc_labels, gc_examples)
         svmout[fold] = train_and_test(XT, LT, XTE, C, kernelname, kparam)
     report_error(partitions,svmout,gc_labels)
 
 
-    #####################################################################
-    # create jobs
-    #####################################################################
+
+def demo_jobslocal(num_fold_cv,partitions,gc_labels,gc_examples,\
+                   kernelname,kparam):
+    """
+    Use pythongrid, but run jobs locally on the same machine.
+    This doesn't need DRMAA.
+    """
+    print 'demo jobs local'
+    myjobs = create_jobs(num_fold_cv,partitions,gc_labels,gc_examples,\
+                         kernelname,kparam)
+    processJobs(myjobs, local=True)
+    collect_results(myjobs)
+
+
+def demo_jobswait(num_fold_cv,partitions,svmout,gc_labels,gc_examples,\
+                  kernelname,kparam):
+    """
+    Use pythongrid to submit jobs to the cluster,
+    and wait for them to complete.
+    Needs DRMAA, but code looks like normal for loop.
+    """
+    print 'demo jobs wait'
+    myjobs = create_jobs(num_fold_cv,partitions,gc_labels,gc_examples,\
+                         kernelname,kparam)
+    processJobs(myjobs, local=False)
+    collect_results(myjobs)
+
+
+    
+def demo_session(num_fold_cv,partitions,svmout,gc_labels,gc_examples,\
+                 kernelname,kparam):                 
+    """
+    Use pythongrid to submit jobs to the cluster.
+    Submission returns a session id which is used later to
+    collect the results.
+    Needs DRMAA, and user code has to take care of job completion.
+    """
+    print 'demo session'
+    myjobs = create_jobs(num_fold_cv,partitions,gc_labels,gc_examples,\
+                         kernelname,kparam)
+    sid=submitJobs(myjobs)
+    sleep 10
+    myjobs=collectJobs(sid)
+    collect_results(myjobs)
+
+
+def create_jobs(num_fold_cv,partitions,gc_labels,gc_examples,\
+                kernelname,kparam):
+    """create jobs"""
     myjobs = []
     for fold in xrange(num_fold_cv):
         XT, LT, XTE, LTE = getCurrentSplit(fold, partitions, gc_labels, gc_examples)
         myjobs.append(KybJob(train_and_test,(XT, LT, XTE, C, kernelname, kparam)))
 
-    #####################################################################
-    # do the computation
-    #####################################################################
-    # on the same computer
-    processJobs(myjobs, local=True)
-    sid=submitJobs(myjobs, local=True)
-    jobs=collectJobs(sid)
-    # use the cluster
-    #processJobs(myjobs, local=False, wait=True)
+    return myjobs
 
-    # use the cluster, but check back later
-    #mySessionID = processJobs(myjobs, local=False, wait=False)
-    #sleep 10
-    #processJobs(myjobs, local=False, wait=False, sessionid=mySessionID)
-    
 
-    #####################################################################
-    # collect results
-    #####################################################################
+def collect_results(myjobs):
+    """collect results"""
+    num_fold_cv = len(myjobs)
+    svmout = []
+    for fold in xrange(num_fold_cv):
+        svmout.append(numpy.zeros(len(partitions[fold])))
+
     for fold in xrange(num_fold_cv):
         svmout[fold] = myjobs[fold].ret
     report_error(partitions,svmout,gc_labels)
+
 
 
 def report_error(partitions,svmout,labels):
