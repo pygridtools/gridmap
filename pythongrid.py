@@ -1,23 +1,48 @@
 #! /usr/bin/env python
+"""
+pythongrid provides a nice frontend to DRMAA
+"""
 
-import os
+#paths on cluster file system
+PYTHONPATH = ["~/svn/tools/python/", "~/svn/tools/python/pythongrid/"]
+
+
+#location of pythongrid.py on cluster file system
+DRAMAAPATH = "/usr/local/sge/lib/lx26-amd64/"
+LOCATION = "~/svn/tools/python/pythongrid/pythongrid.py"
+
+#define tmp directories
+TMPHOST = "~/tmp/"
+TMPCLIENT = "~/tmp/"
+
+
+
 import sys
+import os
+import bz2
+import cPickle
 import getopt
-import random
-import types
 import threading
-
-import io_pickle
 
 
 #try to import DRMAA
+
+#os.putenv("LD_LIBRARY_PATH", str(os.getenv("LD_LIBRARY_PATH")) + ":" + os.path.expanduser(DRAMAAPATH))
+
+#os.environ['LD_LIBRARY_PATH'] = os.getenv("LD_LIBRARY_PATH") + ":" + DRAMAAPATH
+#os.environ['LD_LIBRARY_PATH'] = DRAMAAPATH
+
+#print "env:", os.getenv("LD_LIBRARY_PATH")
+
+
 drmaa_present=1
 
 try:
-  import DRMAA
-except:
-  print "Error importing DRMAA. Only local multi-threading supported. Please check your installation."
-  drmaa_present=0
+    import DRMAA
+except ImportError, detail:
+    print "Error importing DRMAA. Only local multi-threading supported. Please check your installation."
+    print detail
+    drmaa_present=0
 
 
 
@@ -33,11 +58,12 @@ class Job (object):
   args=()
   kwlist={}
   ret=None
+  cleanup=1
 
   nativeSpecification=""
 
 
-  def __init__(self, f, args, kwlist={}, additionalpaths=[]):
+  def __init__(self, f, args, kwlist={}, additionalpaths=[], cleanup=1):
     '''
     constructor of Job
 
@@ -55,10 +81,11 @@ class Job (object):
     self.args=args
     self.kwlist=kwlist
 
-    #fetch current path
+    #fetch current pythonpath
     self.pythonpath=sys.path
     self.pythonpath.append(os.getcwd())
 
+    self.cleanup=cleanup
 
     #TODO: set additional path from a config file
     #self.pythonpath.extend(additionalpaths)
@@ -69,12 +96,7 @@ class Job (object):
     Executes function f with given arguments and writes return value to field ret.
     Input data is removed after execution to save space.
     '''
-    self.ret=apply(self.f,self.args,self.kwlist)
-
-    #TODO make this optional!
-    #remove input data
-    #self.args=[]
-    #self.kwlist={}
+    self.ret=apply(self.f, self.args, self.kwlist)
 
 
 
@@ -154,6 +176,7 @@ class KybJob(Job):
   nativeSpecification = property(getNativeSpecification, setNativeSpecification)
 
 
+#TODO make read-only
 #  def __getattribute__(self, name):
 #
 #    if (name == "nativeSpecification"):
@@ -205,34 +228,7 @@ class MethodJob:
 
   def execute(self):
     m=getattr(self.obj, self.methodName)
-    self.ret=apply(m,self.args,self.kwlist)
-
-
-
-
-
-def createFileName():
-  '''
-  Generates random filename.
-  '''
-  return "pickle_" + randomString(10) + ".bz2"
-
-
-
-def randomString(length):
-  '''
-  Generates random string of specified length. Only a 4-letter alphabet is used atm.
-  @param length: length of random string
-  @type length: integer
-  '''
-  alphabet=['a','b','c','d']
-
-  string = [random.choice(alphabet) for j in range(length)]
-  string = "".join(string)
-
-
-
-  return string
+    self.ret=apply(m, self.args, self.kwlist)
 
 
 
@@ -273,7 +269,7 @@ def processJobs(jobs, locally=0):
     return __processJobsLocally__(jobs, 1)
   else:
     return __processJobsLocally__(jobs, locally)
- 
+
 
 def __processJobsLocally__(jobs, maxNumThreads=1):
   '''
@@ -310,7 +306,7 @@ def __processJobsLocally__(jobs, maxNumThreads=1):
 
     jobList.append(job)
 
-    if ((i%jobsPerThread==0 and i!=0) or i==(numJobs-1) ):
+    if ((i%jobsPerThread==0 and i!=0) or i==(numJobs-1)):
       #create new thread
       print "starting new thread"
       thread=JobsThread(jobList)
@@ -336,7 +332,11 @@ def __processJobsOnCluster__(jobs):
   @type jobs: list of Job objects
   '''
 
-  dir=os.path.expanduser("~/")
+  dir=os.path.expanduser(TMPHOST)
+
+  if not os.path.isdir(dir):
+      raise Exception()
+
 
   s=DRMAA.Session()
   s.init()
@@ -349,31 +349,30 @@ def __processJobsOnCluster__(jobs):
 
   #set paths
 
+
   #fetch current path
   pythonpath=sys.path
   pythonpath.append(os.getcwd())
-  #TODO: set additional path from a config file
-  #pythonpath.extend(additionalpath)
+  pythonpath.extend([os.path.expanduser(item) for item in PYTHONPATH])
 
-  #TODO use unique filename
-  path_file= dir + "pythongrid_paths_" + randomString(5) + ".pkl"
+  path_file= os.tempnam(dir, "paths_")
 
   #write paths to a separate file
-  io_pickle.save(path_file, pythonpath)
+  save(path_file, pythonpath)
 
 
   for job in jobs:
 
-    fileName = createFileName()
 
-    path = dir + fileName
+    path = os.tempnam(dir, "pkl_") + ".bz2"
+
     print "path: " + path
 
     try:
-      io_pickle.save(path, job)
+      save(path, job)
       fileNames.append(path)
     except Exception, detail:
-      print "error while pickling file: " + dir + fileName
+      print "error while pickling file: " + path
       print detail
 
 
@@ -381,8 +380,12 @@ def __processJobsOnCluster__(jobs):
     print 'Creating job template'
     jt = s.createJobTemplate()
 
-    #TODO FILENAME!
-    command=os.path.expanduser('~/svn/tools/python/pythongrid/pythongrid_runner.sh')
+    #TODO figure this out
+    jt.setEnvironment({"LD_LIBRARY_PATH": "/usr/local/sge/lib/lx26-amd64/"})
+
+
+    command = os.path.expanduser(LOCATION)
+    print command
 
     jt.remoteCommand = command
     jt.args = [path, path_file]
@@ -391,15 +394,14 @@ def __processJobsOnCluster__(jobs):
     #resources
     jt.setNativeSpecification(job.nativeSpecification)
 
-    #TODO SAVEDIR
-    homeDir = os.path.expanduser("~/")
-    jt.outputPath=":" + homeDir
+    #set output directory
+    #fn = path.replace(os.path.expanduser(TMPHOST), )
+    jt.outputPath=":" + os.path.expanduser(TMPCLIENT)
     jobid = s.runJob(jt)
     print 'Your job has been submitted with id ' + str(jobid)
 
-    print "file:", dir + fileName
-    print os.system("du -h " + dir + fileName)
-    
+    #display file size
+    print os.system("du -h " + path)
 
     joblist.append(jobid)
 
@@ -410,6 +412,8 @@ def __processJobsOnCluster__(jobs):
 
   #wait for jobs to finish
   s.synchronize(joblist, DRMAA.Session.TIMEOUT_WAIT_FOREVER, True)
+
+
 
   print "success: all jobs finished"
 
@@ -423,25 +427,41 @@ def __processJobsOnCluster__(jobs):
 
     path = fileName + ".out"
 
-    print path
+    print "reading output file:", path
 
     try:
-      retJob=io_pickle.load(path)
+      retJob=load(path)
       retJobs.append(retJob)
+
+      #clean up
+      if retJob.cleanup:
+          os.remove(path)
+
     except Exception, detail:
       print "error while unpickling file: " + path
       print "most likely there was an error when executing a Job"
       print detail
 
 
+  #clean up paths file
+  try:
+      os.remove(path_file)
+  except Exception, detail:
+      print detail
+
+
+  return retJobs
+
+
+
 
 def __submitJobsToCluster__(jobs):
   '''
-  Method used to send a list of jobs onto the cluster. Wait and forget. 
+  Method used to send a list of jobs onto the cluster. Wait and forget.
   @param jobs: list of jobs to be executed
   @type jobs: list of Job objects
   '''
-  
+
   #TODO get from config
   dir=os.path.expanduser("~/")
 
@@ -466,7 +486,7 @@ def __submitJobsToCluster__(jobs):
   path_file= dir + "pythongrid_paths_" + randomString(5) + ".pkl"
 
   #write paths to a separate file
-  io_pickle.save(path_file, pythonpath)
+  save(path_file, pythonpath)
 
 
   for job in jobs:
@@ -477,7 +497,7 @@ def __submitJobsToCluster__(jobs):
     print "path: " + path
 
     try:
-      io_pickle.save(path, job)
+      save(path, job)
       fileNames.append(path)
     except Exception, detail:
       print "error while pickling file: " + dir + fileName
@@ -506,7 +526,7 @@ def __submitJobsToCluster__(jobs):
 
     print "file:", dir + fileName
     print os.system("du -h " + dir + fileName)
-    
+
 
     joblist.append(jobid)
 
@@ -518,7 +538,7 @@ def __submitJobsToCluster__(jobs):
   #clean up path file
   os.remove(path_file)
 
-  return s.getSessionId #pseudocode
+  return s.getSessionId() #pseudocode
 
 
 
@@ -557,15 +577,17 @@ def __collectResultsFromCluster__(sessionId, wait=0):
     print path
 
     try:
-      retJob=io_pickle.load(path)
+      retJob=load(path)
       retJobs.append(retJob)
+
+
     except Exception, detail:
       print "error while unpickling file: " + path
       print "most likely there was an error during jobs execution"
       print detail
 
 
-  return retJobs  
+  return retJobs
 
 
 def __futureProcessJobsOnCluster__(jobs):
@@ -578,6 +600,45 @@ def __futureProcessJobsOnCluster__(jobs):
 
   return __collectResultsFromCluster__(sid, wait=true)
 
+
+
+def save(filename,myobj):
+    """save the myobj to filename using pickle"""
+    try:
+        f = bz2.BZ2File(filename,'wb')
+    except IOError, details:
+        sys.stderr.write('File ' + filename + ' cannot be written\n')
+        sys.stderr.write(details)
+        return
+
+    cPickle.dump(myobj,f,protocol=2)
+    f.close()
+
+
+def load(filename):
+    """load the myobj from filename using pickle"""
+    try:
+        f = bz2.BZ2File(filename,'rb')
+    except IOError, details:
+        sys.stderr.write('File ' + filename + ' cannot be read\n')
+        sys.stderr.write(details)
+        return
+
+    myobj = cPickle.load(f)
+    f.close()
+    return myobj
+
+
+def creat_shell(file_name):
+    """
+    creates temporary shell script
+    """
+
+    try:
+        f=open(file_name, mode=777)
+
+    except:
+        print "muhahahaha"
 
 ################################################################
 #      The following code will be executed on the cluster      #
@@ -595,27 +656,24 @@ def runJob(pickleFileName, path_file):
   @type path_file: string
   '''
 
-  dir=""
 
   #restore pythonpath on cluster node
-  saved_paths = io_pickle.load(path_file)
+  saved_paths = load(path_file)
   sys.path.extend(saved_paths)
 
-
-  inPath = dir + pickleFileName
-  job=io_pickle.load(inPath)
+  inPath = pickleFileName
+  job=load(inPath)
 
   job.execute()
 
   #remove input file
-  os.remove(dir + pickleFileName)
+  if job.cleanup:
+      os.remove(pickleFileName)
 
-  outPath = dir + pickleFileName + ".out"
 
-  io_pickle.save(outPath, job)
+  outPath = pickleFileName + ".out"
 
-  print "outfile:"
-  print os.system("du -h " + outPath)
+  save(outPath, job)
 
 
 class Usage(Exception):
