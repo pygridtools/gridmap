@@ -62,15 +62,15 @@ def demo(gcfilename, plot=False):
     partitions = getPartitionedSet(len(gc_labels), num_fold_cv)
 
 
-    demo_forloop(num_fold_cv,partitions,svmout,gc_labels,gc_examples)
-    demo_jobslocal(num_fold_cv,partitions,svmout,gc_labels,gc_examples)
-    demo_jobswait(num_fold_cv,partitions,svmout,gc_labels,gc_examples)
-    demo_session(num_fold_cv,partitions,svmout,gc_labels,gc_examples)
+    #demo_forloop(num_fold_cv,partitions,gc_labels,gc_examples,kernelname,kparam,C)
+    #demo_jobslocal(num_fold_cv,partitions,gc_labels,gc_examples,kernelname,kparam,C)
+    demo_jobswait(num_fold_cv,partitions,gc_labels,gc_examples,kernelname,kparam,C)
+    #demo_session(num_fold_cv,partitions,gc_labels,gc_examples,kernelname,kparam,C)
 
 
 
-def demo_forloop(num_fold_cv,partitions,svmout,gc_labels,gc_examples\
-                 kernelname,kparam):
+def demo_forloop(num_fold_cv,partitions,gc_labels,gc_examples,\
+                 kernelname,kparam,C):
     """
     normal for loop
     """
@@ -87,20 +87,20 @@ def demo_forloop(num_fold_cv,partitions,svmout,gc_labels,gc_examples\
 
 
 def demo_jobslocal(num_fold_cv,partitions,gc_labels,gc_examples,\
-                   kernelname,kparam):
+                   kernelname,kparam,C):
     """
     Use pythongrid, but run jobs locally on the same machine.
     This doesn't need DRMAA.
     """
     print 'demo jobs local'
     myjobs = create_jobs(num_fold_cv,partitions,gc_labels,gc_examples,\
-                         kernelname,kparam)
+                         kernelname,kparam,C)
     processJobs(myjobs, local=True)
-    collect_results(myjobs)
+    collect_results(myjobs,partitions,gc_labels)
 
 
-def demo_jobswait(num_fold_cv,partitions,svmout,gc_labels,gc_examples,\
-                  kernelname,kparam):
+def demo_jobswait(num_fold_cv,partitions,gc_labels,gc_examples,\
+                  kernelname,kparam,C):
     """
     Use pythongrid to submit jobs to the cluster,
     and wait for them to complete.
@@ -108,14 +108,14 @@ def demo_jobswait(num_fold_cv,partitions,svmout,gc_labels,gc_examples,\
     """
     print 'demo jobs wait'
     myjobs = create_jobs(num_fold_cv,partitions,gc_labels,gc_examples,\
-                         kernelname,kparam)
+                         kernelname,kparam,C)
     processJobs(myjobs, local=False)
-    collect_results(myjobs)
+    collect_results(myjobs,partitions,gc_labels)
 
 
     
-def demo_session(num_fold_cv,partitions,svmout,gc_labels,gc_examples,\
-                 kernelname,kparam):                 
+def demo_session(num_fold_cv,partitions,gc_labels,gc_examples,\
+                 kernelname,kparam,C):                 
     """
     Use pythongrid to submit jobs to the cluster.
     Submission returns a session id which is used later to
@@ -124,15 +124,15 @@ def demo_session(num_fold_cv,partitions,svmout,gc_labels,gc_examples,\
     """
     print 'demo session'
     myjobs = create_jobs(num_fold_cv,partitions,gc_labels,gc_examples,\
-                         kernelname,kparam)
-    sid=submitJobs(myjobs)
-    sleep 10
-    myjobs=collectJobs(sid)
-    collect_results(myjobs)
+                         kernelname,kparam,C)
+    (sid,jobids)=submitJobs(myjobs)
+    time.sleep(10)
+    myjobs=collectJobs(sid,jobids)
+    collect_results(myjobs,partitions,gc_labels)
 
 
 def create_jobs(num_fold_cv,partitions,gc_labels,gc_examples,\
-                kernelname,kparam):
+                kernelname,kparam,C):
     """create jobs"""
     myjobs = []
     for fold in xrange(num_fold_cv):
@@ -142,7 +142,7 @@ def create_jobs(num_fold_cv,partitions,gc_labels,gc_examples,\
     return myjobs
 
 
-def collect_results(myjobs):
+def collect_results(myjobs,partitions,gc_labels):
     """collect results"""
     num_fold_cv = len(myjobs)
     svmout = []
