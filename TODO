@@ -9,3 +9,4 @@ DRMAA on cluster
 + hold interface
 + Need a better way to set job and file names. Preferably human
 readable and unique.
++ Set additional path from a config file, self.pythonpath.extend(additionalpaths)

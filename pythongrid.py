@@ -1,6 +1,8 @@
 #! /usr/bin/env python
 """
-pythongrid provides a nice frontend to DRMAA
+pythongrid provides a high level front end to DRMAA-python.
+This module provides wrappers that simplify submission and collection of jobs,
+in a more 'pythonic' fashion.
 """
 
 #paths on cluster file system
@@ -41,45 +43,6 @@ except ImportError, detail:
     
 
 
-def getStatus(sid,joblist):
-    """
-    Get the status of all jobs in joblist.
-    """
-    _decodestatus = {
-        -42: 'sge and drmaa not in sync',
-        DRMAA.Session.UNDETERMINED: 'process status cannot be determined',
-        DRMAA.Session.QUEUED_ACTIVE: 'job is queued and active',
-        DRMAA.Session.SYSTEM_ON_HOLD: 'job is queued and in system hold',
-        DRMAA.Session.USER_ON_HOLD: 'job is queued and in user hold',
-        DRMAA.Session.USER_SYSTEM_ON_HOLD: 'job is queued and in user and system hold',
-        DRMAA.Session.RUNNING: 'job is running',
-        DRMAA.Session.SYSTEM_SUSPENDED: 'job is system suspended',
-        DRMAA.Session.USER_SUSPENDED: 'job is user suspended',
-        DRMAA.Session.DONE: 'job finished normally',
-        DRMAA.Session.FAILED: 'job finished, but failed',
-        }
-
-    s = DRMAA.Session()
-    s.init(sid)
-    status_summary = {}.fromkeys(_decodestatus,0)
-    for jobid in joblist:
-        try:
-            curstat = s.getJobProgramStatus(jobid)
-        except DRMAA.InvalidJobError, message:
-            print message
-            status_summary[-42] += 1
-        else:
-            status_summary[curstat] += 1
-
-    print 'Status of %s at %s' % (sid,time.strftime('%d/%m/%Y - %H.%M:%S'))
-    for curkey in status_summary.keys():
-        if status_summary[curkey]>0:
-            print '%s: %d' % (_decodestatus[curkey],status_summary[curkey])
-    s.exit()
-
-    return ((status_summary[DRMAA.Session.DONE]+status_summary[-42])==len(joblist))
-
-
 
 class Job (object):
     """
@@ -89,16 +52,7 @@ class Job (object):
     the execute method gets called
     """
 
-    f=None
-    args=()
-    kwlist={}
-    ret=None
-    cleanup=True
-
-    nativeSpecification=""
-
-
-    def __init__(self, f, args, kwlist={}, additionalpaths=[], cleanup=True):
+    def __init__(self, f, args, kwlist={}, cleanup=True):
         """
         constructor of Job
 
@@ -108,23 +62,15 @@ class Job (object):
         @type args: list
         @param kwlist: dictionary of keyword arguments
         @type kwlist: dict
-        @param additionalpaths: additional paths for use on cluster nodes
-        @type additionalpaths: list of strings
         """
-
         self.f=f
         self.args=args
         self.kwlist=kwlist
-
-        #fetch current pythonpath
-        self.pythonpath=sys.path
-        self.pythonpath.append(os.getcwd())
-
         self.cleanup=cleanup
-
-        #TODO: set additional path from a config file
-        #self.pythonpath.extend(additionalpaths)
-
+        self.ret=None
+        self.nativeSpecification=""
+        self.inputfile=""
+        self.outputfile=""
 
     def __repr__(self):
         return ('%s\nargs=%s\nkwlist=%s\nret=%s\ncleanup=%s\nnativeSpecification=%s\n' %\
@@ -141,28 +87,31 @@ class Job (object):
 
 class KybJob(Job):
     """
-    Specialization of generic Job that provides an interface to Kyb-specific options.
-    Not quite finished yet, interface will most likely change in the near future. (march 2008)
+    Specialization of generic Job that provides an interface to
+    the system at MPI Biol. Cyber. Tuebingen.
     """
 
-    name=""
-    h_vmem=""
-    arch=""
-    tmpfree=""
-    h_cpu=""
-    h_rt=""
-    express=""
-    matlab=""
-    simulink=""
-    compiler=""
-    imagetb=""
-    opttb=""
-    stattb=""
-    sigtb=""
-    cplex=""
-    nicetohave=""
-
-    #http://www.python.org/download/releases/2.2.3/descrintro/#property
+    def __init__(self, f, args, kwlist={}, cleanup=True):
+        """
+        constructor of KybJob
+        """
+        Job.__init__(self,f, args, kwlist={}, cleanup)
+        self.name=""
+        self.h_vmem=""
+        self.arch=""
+        self.tmpfree=""
+        self.h_cpu=""
+        self.h_rt=""
+        self.express=""
+        self.matlab=""
+        self.simulink=""
+        self.compiler=""
+        self.imagetb=""
+        self.opttb=""
+        self.stattb=""
+        self.sigtb=""
+        self.cplex=""
+        self.nicetohave=""
 
     def getNativeSpecification(self):
         """
@@ -304,7 +253,6 @@ class JobsThread (threading.Thread):
 def _processJobsLocally(jobs, maxNumThreads=1):
     """
     Run jobs on local machine in a multithreaded manner, providing the same interface.
-    NOT finished yet.
 
     @param jobs: list of jobs to be executed locally.
     @type jobs: list of Job objects
@@ -352,9 +300,9 @@ def _processJobsLocally(jobs, maxNumThreads=1):
     return jobs
 
 
-def _submitJobsToCluster(jobs):
+def submitJobs(jobs):
     """
-    Method used to send a list of jobs onto the cluster. Wait and forget.
+    Method used to send a list of jobs onto the cluster.
     @param jobs: list of jobs to be executed
     @type jobs: list of Job objects
     """
@@ -368,28 +316,11 @@ def _submitJobsToCluster(jobs):
     joblist=[]
     fileNames=[]
 
-
-    #fetch current path, and write to file
-    #pythonpath=sys.path
-    #pythonpath.append(os.getcwd())
-    #pythonpath.extend([os.path.expanduser(item) for item in PYTHONPATH])
-
-    #path_file = os.tempnam(outdir, "paths_") + ".bz2"
-    #print 'Saving %s to %s.' % (pythonpath,path_file)
-    #save(path_file, pythonpath)
-    
-
     for job in jobs:
         invars = os.tempnam(outdir, "pg") + ".bz2"
         job.name = invars.split(".")[-2].split("/")[-1]
-        try:
-            save(invars, job)
-            fileNames.append(invars)
-        except Exception, detail:
-            print "error while pickling file: " + invars
-            print detail
-
-
+        save(invars, job)
+        fileNames.append(invars)
 
         jt = s.createJobTemplate()
 
@@ -400,16 +331,11 @@ def _submitJobsToCluster(jobs):
 
 
         jt.remoteCommand = os.path.expanduser(PYGRID)
-        #jt.args = [invars, path_file]
         jt.args = [invars]
         jt.joinFiles=True
-
-        #resources
         jt.setNativeSpecification(job.nativeSpecification)
-
-        #set output directory
-        #fn = path.replace(os.path.expanduser(TMPHOST), )
         jt.outputPath=":" + os.path.expanduser(TMPCLIENT)
+
         jobid = s.runJob(jt)
         print 'Your job %s has been submitted with id %s' % (job.name,jobid)
 
@@ -417,9 +343,6 @@ def _submitJobsToCluster(jobs):
         # print os.system("du -h " + invars)
 
         joblist.append(jobid)
-
-        #To clean things up, we delete the job template. This frees the memory DRMAA
-        #set aside for the job template, but has no effect on submitted jobs.
         s.deleteJobTemplate(jt)
 
     sid = s.getContact()
@@ -429,9 +352,18 @@ def _submitJobsToCluster(jobs):
 
 
 
-def _collectResultsFromCluster(sid,joblist,fileNames,wait=False):
+def collectJobs(sid,jobids,fileNames,wait=False):
     """
-    Collect the results from the joblist
+    Collect the results from the jobids, returns a list of Jobs
+    
+    @param sid: session identifier
+    @type sid: string returned by cluster
+    @param jobids: list of job identifiers returned by the cluster
+    @type jobids: list of strings
+    @param fileNames: list of output file names
+    @type fileNames: list of strings
+    @param wait: Wait for jobs to finish?
+    @type wait: Boolean, defaults to False
     """
     s=DRMAA.Session()
     s.init(sid)
@@ -441,7 +373,7 @@ def _collectResultsFromCluster(sid,joblist,fileNames,wait=False):
     else:
         drmaaWait=DRMAA.Session.TIMEOUT_NO_WAIT
 
-    s.synchronize(joblist, drmaaWait, True)
+    s.synchronize(jobids, drmaaWait, True)
     print "success: all jobs finished"
     s.exit()
 
@@ -460,41 +392,69 @@ def _collectResultsFromCluster(sid,joblist,fileNames,wait=False):
         #remove input file
         if retJob.cleanup:
             os.remove(outvars)
-            logfilename = os.path.expanduser(TMPCLIENT) + retJob.name + '.o' + joblist[ix]
+            logfilename = os.path.expanduser(TMPCLIENT) + retJob.name + '.o' + jobids[ix]
             print logfilename
             os.remove(logfilename)
 
     return retJobs
 
 
-def _processJobsOnCluster(jobs):
-    """
-    Use _submitJobsToCluster and _collectResultsFromCluster
-    to run jobs and wait for the results.
-    """
-
-    (sid,joblist,fileNames)=_submitJobsToCluster(jobs)
-    return _collectResultsFromCluster(sid,joblist,fileNames,wait=True)
-
 
 def processJobs(jobs, local=False):
     """
     Director method to decide whether to run on cluster or locally
     """
-
     if (not local and drmaa_present):
-        return _processJobsOnCluster(jobs)
-    if (not local and not drmaa_present):
-        return _processJobsLocally(jobs, maxNumThreads=3)
+        #Use submitJobs and collectJobs to run jobs and wait for the results.
+        (sid,joblist,fileNames)=submitJobs(jobs)
+        return collectJobs(sid,joblist,fileNames,wait=True)
     else:
         return _processJobsLocally(jobs, maxNumThreads=3)
 
 
-def submitJobs(jobs):
-    return _submitJobsToCluster(jobs)
 
-def collectJobs(sid,jobids,fileNames,wait=True):
-    return _collectResultsFromCluster(sid,jobids,fileNames,wait)
+
+def getStatus(sid,joblist):
+    """
+    Get the status of all jobs in joblist.
+    Returns True if all jobs are finished.
+
+    There is some instability in determining job completion
+    """
+    _decodestatus = {
+        -42: 'sge and drmaa not in sync',
+        DRMAA.Session.UNDETERMINED: 'process status cannot be determined',
+        DRMAA.Session.QUEUED_ACTIVE: 'job is queued and active',
+        DRMAA.Session.SYSTEM_ON_HOLD: 'job is queued and in system hold',
+        DRMAA.Session.USER_ON_HOLD: 'job is queued and in user hold',
+        DRMAA.Session.USER_SYSTEM_ON_HOLD: 'job is queued and in user and system hold',
+        DRMAA.Session.RUNNING: 'job is running',
+        DRMAA.Session.SYSTEM_SUSPENDED: 'job is system suspended',
+        DRMAA.Session.USER_SUSPENDED: 'job is user suspended',
+        DRMAA.Session.DONE: 'job finished normally',
+        DRMAA.Session.FAILED: 'job finished, but failed',
+        }
+
+    s = DRMAA.Session()
+    s.init(sid)
+    status_summary = {}.fromkeys(_decodestatus,0)
+    for jobid in joblist:
+        try:
+            curstat = s.getJobProgramStatus(jobid)
+        except DRMAA.InvalidJobError, message:
+            print message
+            status_summary[-42] += 1
+        else:
+            status_summary[curstat] += 1
+
+    print 'Status of %s at %s' % (sid,time.strftime('%d/%m/%Y - %H.%M:%S'))
+    for curkey in status_summary.keys():
+        if status_summary[curkey]>0:
+            print '%s: %d' % (_decodestatus[curkey],status_summary[curkey])
+    s.exit()
+
+    return ((status_summary[DRMAA.Session.DONE]+status_summary[-42])==len(joblist))
+
 
 
 #####################################################################
@@ -502,7 +462,9 @@ def collectJobs(sid,jobids,fileNames,wait=True):
 #####################################################################
 
 def save(filename,myobj):
-    """save the myobj to filename using pickle"""
+    """
+    Save myobj to filename using pickle
+    """
     try:
         f = bz2.BZ2File(filename,'wb')
     except IOError, details:
@@ -515,7 +477,9 @@ def save(filename,myobj):
 
 
 def load(filename):
-    """load the myobj from filename using pickle"""
+    """
+    Load from filename using pickle
+    """
     try:
         f = bz2.BZ2File(filename,'rb')
     except IOError, details:
@@ -528,37 +492,18 @@ def load(filename):
     return myobj
 
 
-def create_shell(file_name):
-    """
-    creates temporary shell script
-    """
-
-    try:
-        f=open(file_name, mode=700)
-
-    except:
-        print "muhahahaha"
-
 ################################################################
 #      The following code will be executed on the cluster      #
 ################################################################
 
 def runJob(pickleFileName):
     """
+    This is the code that is executed on the cluster side.
     Runs job which was pickled to a file called pickledFileName.
-    Saved paths are loaded in advance from another Pickleded object
-    called path_file.
 
     @param pickleFileName: filename of pickled Job object
     @type pickleFileName: string
-    @param path_file: filename of pickled list of strings
-    @type path_file: string
     """
-
-    #print 'runJob(%s,%s)' % (pickleFileName,path_file)
-    #restore pythonpath on cluster node
-    #saved_paths = load(path_file)
-    #sys.path.extend(saved_paths)
 
     inPath = pickleFileName
     job=load(inPath)
@@ -583,6 +528,7 @@ class Usage(Exception):
     def __init__(self, msg):
         """
         Constructor of simple Exception.
+        
         @param msg: exception message
         @type msg: string
         """
@@ -593,7 +539,7 @@ class Usage(Exception):
 
 def main(argv=None):
     """
-    Generic main
+    Parse the command line inputs and call runJob
 
     @param argv: list of arguments
     @type argv: list of strings

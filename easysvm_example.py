@@ -67,15 +67,11 @@ def demo(gcfilename, plot=False):
     # The original easysvm call is as follows
     #(all_outputs, all_split) = crossvalidation(num_fold_cv, kernelname, kparam, C, gc_examples, gc_labels)
 
-    #####################################################################
-    # initialise splits
-    #####################################################################
+    # Show the 4 ways to do cross validation
     partitions = getPartitionedSet(len(gc_labels), num_fold_cv)
-
-
-    #demo_forloop(num_fold_cv,partitions,gc_labels,gc_examples,kernelname,kparam,C)
-    #demo_jobslocal(num_fold_cv,partitions,gc_labels,gc_examples,kernelname,kparam,C)
-    #demo_jobswait(num_fold_cv,partitions,gc_labels,gc_examples,kernelname,kparam,C)
+    demo_forloop(num_fold_cv,partitions,gc_labels,gc_examples,kernelname,kparam,C)
+    demo_jobslocal(num_fold_cv,partitions,gc_labels,gc_examples,kernelname,kparam,C)
+    demo_jobswait(num_fold_cv,partitions,gc_labels,gc_examples,kernelname,kparam,C)
     demo_session(num_fold_cv,partitions,gc_labels,gc_examples,kernelname,kparam,C)
 
 
