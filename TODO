@@ -3,6 +3,9 @@ TODO
 
 + validate member flags for KybJob
 + Unify method jobs
-+ Solve issue with environment variable (pythongrid_runner.sh)
++ Solve issue with environment variable LD_LIBRARY_PATH (i.e. import
+DRMAA on cluster
 + add queue to local multithreading
 + hold interface
++ Need a better way to set job and file names. Preferably human
+readable and unique.

@@ -4,17 +4,20 @@ pythongrid provides a nice frontend to DRMAA
 """
 
 #paths on cluster file system
-PYTHONPATH = ["~/svn/tools/python/", "~/svn/tools/python/pythongrid/"]
+#PYTHONPATH = ["~/svn/tools/python/", "~/svn/tools/python/pythongrid/"]
 
 
 #location of pythongrid.py on cluster file system
-DRMAAPATH = "/usr/local/sge/lib/lx26-amd64/"
-LOCATION = "~/svn/tools/python/pythongrid/pythongrid.py"
+#LD_LIBRARY_PATH = "/usr/local/sge/lib/lx26-amd64/"
+PYGRID = "~/svn/tools/python/pythongrid/pythongrid.py"
 
 #define tmp directories
 TMPHOST = "~/tmp/DRMAA_JOB_OUT/"
 TMPCLIENT = "~/tmp/DRMAA_JOB_OUT/"
 
+
+#print "LD_LIBRARY_PATH:", os.getenv("LD_LIBRARY_PATH")
+#print "PYTHONPATH:", os.getenv("PYTHONPATH")
 
 
 import sys
@@ -23,18 +26,7 @@ import bz2
 import cPickle
 import getopt
 import threading
-
-os.putenv("PYTHONPATH", str(os.getenv("LD_LIBRARY_PATH")) + ":" \
-          + "/fml/ag-raetsch/one/home/lib/python2.5/site-packages")
-
-#try to import DRMAA
-
-#os.putenv("LD_LIBRARY_PATH", str(os.getenv("LD_LIBRARY_PATH")) + ":" + os.path.expanduser(DRMAAPATH))
-
-#os.environ['LD_LIBRARY_PATH'] = os.getenv("LD_LIBRARY_PATH") + ":" + DRMAAPATH
-#os.environ['LD_LIBRARY_PATH'] = DRMAAPATH
-
-#print "env:", os.getenv("LD_LIBRARY_PATH")
+import time
 
 
 drmaa_present=1
@@ -46,13 +38,15 @@ except ImportError, detail:
     print detail
     drmaa_present=0
 
+    
 
 
-def getStatus(joblist):
+def getStatus(sid,joblist):
     """
     Get the status of all jobs in joblist.
     """
     _decodestatus = {
+        -42: 'sge and drmaa not in sync',
         DRMAA.Session.UNDETERMINED: 'process status cannot be determined',
         DRMAA.Session.QUEUED_ACTIVE: 'job is queued and active',
         DRMAA.Session.SYSTEM_ON_HOLD: 'job is queued and in system hold',
@@ -66,17 +60,24 @@ def getStatus(joblist):
         }
 
     s = DRMAA.Session()
-    s.init()
+    s.init(sid)
     status_summary = {}.fromkeys(_decodestatus,0)
     for jobid in joblist:
-        status_summary[s.getJobProgramStatus(jobid)] += 1
+        try:
+            curstat = s.getJobProgramStatus(jobid)
+        except DRMAA.InvalidJobError, message:
+            print message
+            status_summary[-42] += 1
+        else:
+            status_summary[curstat] += 1
 
+    print 'Status of %s at %s' % (sid,time.strftime('%d/%m/%Y - %H.%M:%S'))
     for curkey in status_summary.keys():
         if status_summary[curkey]>0:
-            print '%s: %d' % (_decodestatus[status_summary[curkey]],status_summary[curkey])
+            print '%s: %d' % (_decodestatus[curkey],status_summary[curkey])
+    s.exit()
 
-
-
+    return ((status_summary[DRMAA.Session.DONE]+status_summary[-42])==len(joblist))
 
 
 
@@ -369,13 +370,13 @@ def _submitJobsToCluster(jobs):
 
 
     #fetch current path, and write to file
-    pythonpath=sys.path
-    pythonpath.append(os.getcwd())
-    pythonpath.extend([os.path.expanduser(item) for item in PYTHONPATH])
+    #pythonpath=sys.path
+    #pythonpath.append(os.getcwd())
+    #pythonpath.extend([os.path.expanduser(item) for item in PYTHONPATH])
 
-    path_file = os.tempnam(outdir, "paths_") + ".bz2"
+    #path_file = os.tempnam(outdir, "paths_") + ".bz2"
     #print 'Saving %s to %s.' % (pythonpath,path_file)
-    save(path_file, pythonpath)
+    #save(path_file, pythonpath)
     
 
     for job in jobs:
@@ -392,12 +393,15 @@ def _submitJobsToCluster(jobs):
 
         jt = s.createJobTemplate()
 
-        #TODO figure this out
-        #jt.setEnvironment({"LD_LIBRARY_PATH": "/usr/local/sge/lib/lx26-amd64/"})
+        #TODO figure this out for agbs
+        jt.setEnvironment({"LD_LIBRARY_PATH": os.getenv("LD_LIBRARY_PATH"),
+                           "PYTHONPATH": os.getenv("PYTHONPATH"),
+                           })
 
 
-        jt.remoteCommand = os.path.expanduser(LOCATION)
-        jt.args = [invars, path_file]
+        jt.remoteCommand = os.path.expanduser(PYGRID)
+        #jt.args = [invars, path_file]
+        jt.args = [invars]
         jt.joinFiles=True
 
         #resources
@@ -418,11 +422,10 @@ def _submitJobsToCluster(jobs):
         #set aside for the job template, but has no effect on submitted jobs.
         s.deleteJobTemplate(jt)
 
+    sid = s.getContact()
+    s.exit()
 
-    #clean up path file
-    #os.remove(path_file)
-
-    return (s.getContact(),joblist,fileNames)
+    return (sid,joblist,fileNames)
 
 
 
@@ -444,7 +447,7 @@ def _collectResultsFromCluster(sid,joblist,fileNames,wait=False):
 
     #attempt to collect results
     retJobs=[]
-    for fileName in fileNames:
+    for ix,fileName in enumerate(fileNames):
         outvars = fileName + ".out"
         try:
             retJob=load(outvars)
@@ -457,6 +460,9 @@ def _collectResultsFromCluster(sid,joblist,fileNames,wait=False):
         #remove input file
         if retJob.cleanup:
             os.remove(outvars)
+            logfilename = os.path.expanduser(TMPCLIENT) + retJob.name + '.o' + joblist[ix]
+            print logfilename
+            os.remove(logfilename)
 
     return retJobs
 
@@ -537,7 +543,7 @@ def create_shell(file_name):
 #      The following code will be executed on the cluster      #
 ################################################################
 
-def runJob(pickleFileName, path_file):
+def runJob(pickleFileName):
     """
     Runs job which was pickled to a file called pickledFileName.
     Saved paths are loaded in advance from another Pickleded object
@@ -551,8 +557,8 @@ def runJob(pickleFileName, path_file):
 
     #print 'runJob(%s,%s)' % (pickleFileName,path_file)
     #restore pythonpath on cluster node
-    saved_paths = load(path_file)
-    sys.path.extend(saved_paths)
+    #saved_paths = load(path_file)
+    #sys.path.extend(saved_paths)
 
     inPath = pickleFileName
     job=load(inPath)
@@ -599,17 +605,13 @@ def main(argv=None):
 
     try:
         try:
-
             opts, args = getopt.getopt(argv[1:], "h", ["help"])
-
-            runJob(args[0], args[1])
-
+            runJob(args[0])
         except getopt.error, msg:
             raise Usage(msg)
 
 
     except Usage, err:
-
         print >>sys.stderr, err.msg
         print >>sys.stderr, "for help use --help"
 

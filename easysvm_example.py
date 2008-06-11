@@ -37,11 +37,14 @@ from esvm.mldata import init_datasetfile
 from numpy.linalg import norm
 import numpy
 
-from pythongrid import KybJob, processJobs, submitJobs, collectJobs
+from pythongrid import KybJob
+from pythongrid import processJobs, submitJobs, collectJobs
+from pythongrid import getStatus
 
 def demo(gcfilename, plot=False):
     """
-    Use pythongrid for cross validation
+    This is the main script.
+    Use pythongrid for cross validation.
     """
     # hyperparameters
     num_fold_cv = 5
@@ -61,8 +64,8 @@ def demo(gcfilename, plot=False):
     kernelname = 'linear'
     kparam = {'scale':1.0}
 
+    # The original easysvm call is as follows
     #(all_outputs, all_split) = crossvalidation(num_fold_cv, kernelname, kparam, C, gc_examples, gc_labels)
-    #print 'AROC: %f' % calcroc(all_outputs,gc_labels)
 
     #####################################################################
     # initialise splits
@@ -70,9 +73,9 @@ def demo(gcfilename, plot=False):
     partitions = getPartitionedSet(len(gc_labels), num_fold_cv)
 
 
-    demo_forloop(num_fold_cv,partitions,gc_labels,gc_examples,kernelname,kparam,C)
-    demo_jobslocal(num_fold_cv,partitions,gc_labels,gc_examples,kernelname,kparam,C)
-    demo_jobswait(num_fold_cv,partitions,gc_labels,gc_examples,kernelname,kparam,C)
+    #demo_forloop(num_fold_cv,partitions,gc_labels,gc_examples,kernelname,kparam,C)
+    #demo_jobslocal(num_fold_cv,partitions,gc_labels,gc_examples,kernelname,kparam,C)
+    #demo_jobswait(num_fold_cv,partitions,gc_labels,gc_examples,kernelname,kparam,C)
     demo_session(num_fold_cv,partitions,gc_labels,gc_examples,kernelname,kparam,C)
 
 
@@ -91,6 +94,7 @@ def demo_forloop(num_fold_cv,partitions,gc_labels,gc_examples,\
         XT, LT, XTE, LTE = getCurrentSplit(fold, partitions, gc_labels, gc_examples)
         svmout[fold] = train_and_test(XT, LT, XTE, C, kernelname, kparam)
     report_error(partitions,svmout,gc_labels)
+    print '--------------'
 
 
 
@@ -99,12 +103,15 @@ def demo_jobslocal(num_fold_cv,partitions,gc_labels,gc_examples,\
     """
     Use pythongrid, but run jobs locally on the same machine.
     This doesn't need DRMAA.
+
+    retjobs = pythongrid.processJobs(myjobs, local=True)
     """
     print 'demo jobs local'
     myjobs = create_jobs(num_fold_cv,partitions,gc_labels,gc_examples,\
                          kernelname,kparam,C)
-    processJobs(myjobs, local=True)
-    collect_results(myjobs,partitions,gc_labels)
+    retjobs = processJobs(myjobs, local=True)
+    collect_results(retjobs,partitions,gc_labels)
+    print '--------------'
 
 
 def demo_jobswait(num_fold_cv,partitions,gc_labels,gc_examples,\
@@ -112,13 +119,17 @@ def demo_jobswait(num_fold_cv,partitions,gc_labels,gc_examples,\
     """
     Use pythongrid to submit jobs to the cluster,
     and wait for them to complete.
-    Needs DRMAA, but code looks like normal for loop.
+    Needs DRMAA, but at the end of the call, the return values
+    are available.
+
+    retjobs = pythongrid.processJobs(myjobs, local=False)
     """
     print 'demo jobs wait'
     myjobs = create_jobs(num_fold_cv,partitions,gc_labels,gc_examples,\
                          kernelname,kparam,C)
     retjobs = processJobs(myjobs, local=False)
     collect_results(retjobs,partitions,gc_labels)
+    print '--------------'
 
 
     
@@ -129,32 +140,39 @@ def demo_session(num_fold_cv,partitions,gc_labels,gc_examples,\
     Submission returns a session id which is used later to
     collect the results.
     Needs DRMAA, and user code has to take care of job completion.
+
+    (sid,jobids,filenames)=pythongrid.submitJobs(myjobs)
+    myjobs=pythongrid.collectJobs(sid,jobids,filenames)
     """
     print 'demo session'
     myjobs = create_jobs(num_fold_cv,partitions,gc_labels,gc_examples,\
                          kernelname,kparam,C)
     (sid,jobids,filenames)=submitJobs(myjobs)
-    print 'job submission complete, having a short nap... zzzz'
     del myjobs
-    time.sleep(10)
-    print 'woken up, collecting jobs'
+    print 'checking whether finished'
+    while not getStatus(sid,jobids):
+        time.sleep(2)
+        
+    print 'collecting jobs'
     myjobs=collectJobs(sid,jobids,filenames)
     collect_results(myjobs,partitions,gc_labels)
+    print '--------------'
 
 
 def create_jobs(num_fold_cv,partitions,gc_labels,gc_examples,\
                 kernelname,kparam,C):
-    """create jobs"""
+    """Create a list of jobs, each of which is the training and prediction phase
+    for one of the folds of cross validation."""
     myjobs = []
     for fold in xrange(num_fold_cv):
         XT, LT, XTE, LTE = getCurrentSplit(fold, partitions, gc_labels, gc_examples)
-        myjobs.append(KybJob(train_and_test,(XT, LT, XTE, C, kernelname, kparam),cleanup=False))
+        myjobs.append(KybJob(train_and_test,(XT, LT, XTE, C, kernelname, kparam)))
 
     return myjobs
 
 
 def collect_results(myjobs,partitions,gc_labels):
-    """collect results"""
+    """Collect the results from each of the folds of cross validation."""
     num_fold_cv = len(myjobs)
     svmout = []
     for fold in xrange(num_fold_cv):
@@ -169,7 +187,8 @@ def collect_results(myjobs,partitions,gc_labels):
 
 def report_error(partitions,svmout,labels):
     """
-    Sort the SVM outputs
+    Reorganise the SVM outputs based on the partitions,
+    then compute the AROC.
     """
     num_fold_cv = len(partitions)
     total_examples = 0
