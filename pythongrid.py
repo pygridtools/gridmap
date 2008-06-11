@@ -8,15 +8,15 @@ in a more 'pythonic' fashion.
 #paths on cluster file system
 #PYTHONPATH = ["~/svn/tools/python/", "~/svn/tools/python/pythongrid/"]
 
-
 #location of pythongrid.py on cluster file system
 #LD_LIBRARY_PATH = "/usr/local/sge/lib/lx26-amd64/"
 PYGRID = "~/svn/tools/python/pythongrid/pythongrid.py"
 
-#define tmp directories
-TMPHOST = "~/tmp/DRMAA_JOB_OUT/"
-TMPCLIENT = "~/tmp/DRMAA_JOB_OUT/"
+#define temp directories for the input and output variables
+TEMPDIR = "~/tmp/DRMAA_JOB_OUT/"
 
+# used for generating random filenames
+alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
 
 #print "LD_LIBRARY_PATH:", os.getenv("LD_LIBRARY_PATH")
 #print "PYTHONPATH:", os.getenv("PYTHONPATH")
@@ -29,7 +29,7 @@ import cPickle
 import getopt
 import threading
 import time
-
+import random
 
 drmaa_present=1
 
@@ -40,7 +40,6 @@ except ImportError, detail:
     print detail
     drmaa_present=0
 
-    
 
 
 
@@ -73,8 +72,9 @@ class Job (object):
         self.outputfile=""
 
     def __repr__(self):
-        return ('%s\nargs=%s\nkwlist=%s\nret=%s\ncleanup=%s\nnativeSpecification=%s\n' %\
-                (self.f,self.args,self.kwlist,self.ret,self.cleanup,self.nativeSpecification))
+        return ('%s\nargs=%s\nkwlist=%s\nret=%s\ncleanup=%s\nnativeSpecification=%s\ninputfile=%s\noutputfile=%s\n' %\
+                (self.f,self.args,self.kwlist,self.ret,self.cleanup,\
+                 self.nativeSpecification,self.inputfile,self.outputfile))
 
     def execute(self):
         """
@@ -95,8 +95,7 @@ class KybJob(Job):
         """
         constructor of KybJob
         """
-        Job.__init__(self,f, args, kwlist={}, cleanup)
-        self.name=""
+        Job.__init__(self, f, args, kwlist, cleanup)
         self.h_vmem=""
         self.arch=""
         self.tmpfree=""
@@ -112,6 +111,15 @@ class KybJob(Job):
         self.sigtb=""
         self.cplex=""
         self.nicetohave=""
+        self.jobid=""
+
+        outdir=os.path.expanduser(TEMPDIR)
+        if not os.path.isdir(outdir):
+            raise Exception()
+        # TODO: ensure uniqueness of file names
+        self.name = 'pg'+''.join([random.choice(alphabet) for a in xrange(8)])
+        self.inputfile = outdir + self.name + ".bz2"
+        self.outputfile = outdir + self.name + "_out.bz2"
 
     def getNativeSpecification(self):
         """
@@ -229,8 +237,6 @@ class JobsThread (threading.Thread):
     are assinged to one thread.
     """
 
-    jobs=[]
-
     def __init__(self, jobs):
         """
         Constructor
@@ -281,7 +287,6 @@ def _processJobsLocally(jobs, maxNumThreads=1):
     #assign jobs to threads
     #TODO use a queue here
     for (i, job) in enumerate(jobs):
-
         jobList.append(job)
 
         if ((i%jobsPerThread==0 and i!=0) or i==(numJobs-1)):
@@ -307,21 +312,12 @@ def submitJobs(jobs):
     @type jobs: list of Job objects
     """
 
-    outdir=os.path.expanduser(TMPHOST)
-    if not os.path.isdir(outdir):
-        raise Exception()
-
     s=DRMAA.Session()
     s.init()
-    joblist=[]
-    fileNames=[]
+    jobids=[]
 
     for job in jobs:
-        invars = os.tempnam(outdir, "pg") + ".bz2"
-        job.name = invars.split(".")[-2].split("/")[-1]
-        save(invars, job)
-        fileNames.append(invars)
-
+        save(job.inputfile, job)
         jt = s.createJobTemplate()
 
         #TODO figure this out for agbs
@@ -331,28 +327,29 @@ def submitJobs(jobs):
 
 
         jt.remoteCommand = os.path.expanduser(PYGRID)
-        jt.args = [invars]
+        jt.args = [job.inputfile]
         jt.joinFiles=True
         jt.setNativeSpecification(job.nativeSpecification)
-        jt.outputPath=":" + os.path.expanduser(TMPCLIENT)
+        jt.outputPath=":" + os.path.expanduser(TEMPDIR)
 
         jobid = s.runJob(jt)
+        job.jobid = jobid
         print 'Your job %s has been submitted with id %s' % (job.name,jobid)
 
         #display file size
         # print os.system("du -h " + invars)
 
-        joblist.append(jobid)
+        jobids.append(jobid)
         s.deleteJobTemplate(jt)
 
     sid = s.getContact()
     s.exit()
 
-    return (sid,joblist,fileNames)
+    return (sid,jobids)
 
 
 
-def collectJobs(sid,jobids,fileNames,wait=False):
+def collectJobs(sid,jobids,joblist,wait=False):
     """
     Collect the results from the jobids, returns a list of Jobs
     
@@ -360,11 +357,12 @@ def collectJobs(sid,jobids,fileNames,wait=False):
     @type sid: string returned by cluster
     @param jobids: list of job identifiers returned by the cluster
     @type jobids: list of strings
-    @param fileNames: list of output file names
-    @type fileNames: list of strings
     @param wait: Wait for jobs to finish?
     @type wait: Boolean, defaults to False
     """
+    for ix in xrange(len(jobids)):
+        assert(jobids[ix] == joblist[ix].jobid)
+        
     s=DRMAA.Session()
     s.init(sid)
 
@@ -379,20 +377,20 @@ def collectJobs(sid,jobids,fileNames,wait=False):
 
     #attempt to collect results
     retJobs=[]
-    for ix,fileName in enumerate(fileNames):
-        outvars = fileName + ".out"
+    for ix,job in enumerate(joblist):
         try:
-            retJob=load(outvars)
+            retJob=load(job.outputfile)
+            assert(retJob.name == job.name)
             retJobs.append(retJob)
         except Exception, detail:
-            print "error while unpickling file: " + outvars
+            print "error while unpickling file: " + job.outputfile
             print "most likely there was an error during jobs execution"
             print detail
 
-        #remove input file
+        #remove output file
         if retJob.cleanup:
-            os.remove(outvars)
-            logfilename = os.path.expanduser(TMPCLIENT) + retJob.name + '.o' + jobids[ix]
+            os.remove(job.outputfile)
+            logfilename = os.path.expanduser(TEMPDIR) + job.name + '.o' + jobids[ix]
             print logfilename
             os.remove(logfilename)
 
@@ -406,17 +404,17 @@ def processJobs(jobs, local=False):
     """
     if (not local and drmaa_present):
         #Use submitJobs and collectJobs to run jobs and wait for the results.
-        (sid,joblist,fileNames)=submitJobs(jobs)
-        return collectJobs(sid,joblist,fileNames,wait=True)
+        (sid,jobids)=submitJobs(jobs)
+        return collectJobs(sid,jobids,jobs,wait=True)
     else:
         return _processJobsLocally(jobs, maxNumThreads=3)
 
 
 
 
-def getStatus(sid,joblist):
+def getStatus(sid,jobids):
     """
-    Get the status of all jobs in joblist.
+    Get the status of all jobs in jobids.
     Returns True if all jobs are finished.
 
     There is some instability in determining job completion
@@ -438,7 +436,7 @@ def getStatus(sid,joblist):
     s = DRMAA.Session()
     s.init(sid)
     status_summary = {}.fromkeys(_decodestatus,0)
-    for jobid in joblist:
+    for jobid in jobids:
         try:
             curstat = s.getJobProgramStatus(jobid)
         except DRMAA.InvalidJobError, message:
@@ -453,7 +451,7 @@ def getStatus(sid,joblist):
             print '%s: %d' % (_decodestatus[curkey],status_summary[curkey])
     s.exit()
 
-    return ((status_summary[DRMAA.Session.DONE]+status_summary[-42])==len(joblist))
+    return ((status_summary[DRMAA.Session.DONE]+status_summary[-42])==len(jobids))
 
 
 

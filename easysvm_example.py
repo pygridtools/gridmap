@@ -143,14 +143,14 @@ def demo_session(num_fold_cv,partitions,gc_labels,gc_examples,\
     print 'demo session'
     myjobs = create_jobs(num_fold_cv,partitions,gc_labels,gc_examples,\
                          kernelname,kparam,C)
-    (sid,jobids,filenames)=submitJobs(myjobs)
+    (sid,jobids)=submitJobs(myjobs)
     del myjobs
     print 'checking whether finished'
     while not getStatus(sid,jobids):
         time.sleep(2)
         
     print 'collecting jobs'
-    myjobs=collectJobs(sid,jobids,filenames)
+    myjobs=collectJobs(sid,jobids,myjobs)
     collect_results(myjobs,partitions,gc_labels)
     print '--------------'
 
