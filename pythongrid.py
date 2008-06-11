@@ -24,6 +24,8 @@ import cPickle
 import getopt
 import threading
 
+os.putenv("PYTHONPATH", str(os.getenv("LD_LIBRARY_PATH")) + ":" \
+          + "/fml/ag-raetsch/one/home/lib/python2.5/site-packages")
 
 #try to import DRMAA
 
@@ -42,24 +44,27 @@ try:
 except ImportError, detail:
     print "Error importing DRMAA. Only local multi-threading supported. Please check your installation."
     print detail
-    #drmaa_present=0
+    drmaa_present=0
 
 
-
-_decodestatus = {
-    DRMAA.Session.UNDETERMINED: 'process status cannot be determined',
-    DRMAA.Session.QUEUED_ACTIVE: 'job is queued and active',
-    DRMAA.Session.SYSTEM_ON_HOLD: 'job is queued and in system hold',
-    DRMAA.Session.USER_ON_HOLD: 'job is queued and in user hold',
-    DRMAA.Session.USER_SYSTEM_ON_HOLD: 'job is queued and in user and system hold',
-    DRMAA.Session.RUNNING: 'job is running',
-    DRMAA.Session.SYSTEM_SUSPENDED: 'job is system suspended',
-    DRMAA.Session.USER_SUSPENDED: 'job is user suspended',
-    DRMAA.Session.DONE: 'job finished normally',
-    DRMAA.Session.FAILED: 'job finished, but failed',
-    }
 
 def getStatus(joblist):
+    """
+    Get the status of all jobs in joblist.
+    """
+    _decodestatus = {
+        DRMAA.Session.UNDETERMINED: 'process status cannot be determined',
+        DRMAA.Session.QUEUED_ACTIVE: 'job is queued and active',
+        DRMAA.Session.SYSTEM_ON_HOLD: 'job is queued and in system hold',
+        DRMAA.Session.USER_ON_HOLD: 'job is queued and in user hold',
+        DRMAA.Session.USER_SYSTEM_ON_HOLD: 'job is queued and in user and system hold',
+        DRMAA.Session.RUNNING: 'job is running',
+        DRMAA.Session.SYSTEM_SUSPENDED: 'job is system suspended',
+        DRMAA.Session.USER_SUSPENDED: 'job is user suspended',
+        DRMAA.Session.DONE: 'job finished normally',
+        DRMAA.Session.FAILED: 'job finished, but failed',
+        }
+
     s = DRMAA.Session()
     s.init()
     status_summary = {}.fromkeys(_decodestatus,0)
@@ -87,12 +92,12 @@ class Job (object):
     args=()
     kwlist={}
     ret=None
-    cleanup=1
+    cleanup=True
 
     nativeSpecification=""
 
 
-    def __init__(self, f, args, kwlist={}, additionalpaths=[], cleanup=1):
+    def __init__(self, f, args, kwlist={}, additionalpaths=[], cleanup=True):
         """
         constructor of Job
 
@@ -120,6 +125,10 @@ class Job (object):
         #self.pythonpath.extend(additionalpaths)
 
 
+    def __repr__(self):
+        return ('%s\nargs=%s\nkwlist=%s\nret=%s\ncleanup=%s\nnativeSpecification=%s\n' %\
+                (self.f,self.args,self.kwlist,self.ret,self.cleanup,self.nativeSpecification))
+
     def execute(self):
         """
         Executes function f with given arguments and writes return value to field ret.
@@ -135,6 +144,7 @@ class KybJob(Job):
     Not quite finished yet, interface will most likely change in the near future. (march 2008)
     """
 
+    name=""
     h_vmem=""
     arch=""
     tmpfree=""
@@ -160,6 +170,8 @@ class KybJob(Job):
 
         ret=""
 
+        if (self.name != ""):
+            ret=ret + " -N " + str(self.name)
         if (self.h_vmem != ""):
             ret=ret + " -l " + "h_vmem" + "=" + str(self.h_vmem)
         if (self.arch != ""):
@@ -287,27 +299,8 @@ class JobsThread (threading.Thread):
             job.execute()
 
 
-def processJobs(jobs, local=False):
-    """
-    Director method to decide whether to run on cluster or locally
-    """
 
-    if (not local and drmaa_present):
-        return _processJobsOnCluster(jobs)
-    if (not local and not drmaa_present):
-        return __processJobsLocally__(jobs, maxNumThreads=3)
-    else:
-        return __processJobsLocally__(jobs, maxNumThreads=3)
-
-
-def submitJobs(jobs):
-    return _submitJobsToCluster(jobs)
-
-def collectJobs(sid,jobids,fileNames,wait=True):
-    return _collectJobsFromCluster(sid,jobids,fileNames,wait)
-
-
-def __processJobsLocally__(jobs, maxNumThreads=1):
+def _processJobsLocally(jobs, maxNumThreads=1):
     """
     Run jobs on local machine in a multithreaded manner, providing the same interface.
     NOT finished yet.
@@ -358,139 +351,6 @@ def __processJobsLocally__(jobs, maxNumThreads=1):
     return jobs
 
 
-
-def __processJobsOnCluster__(jobs):
-    """
-    Method used to send a list of jobs onto the cluster. Method will wait for all jobs to finish and return
-    the list of jobs with the respective ret field set.
-
-    @param jobs: list of jobs to be executed
-    @type jobs: list of Job objects
-    """
-
-    dir=os.path.expanduser(TMPHOST)
-
-    if not os.path.isdir(dir):
-        raise Exception()
-
-
-    s=DRMAA.Session()
-    s.init()
-
-
-    joblist=[]
-
-    fileNames=[]
-
-
-    #set paths
-
-
-    #fetch current path
-    pythonpath=sys.path
-    pythonpath.append(os.getcwd())
-    pythonpath.extend([os.path.expanduser(item) for item in PYTHONPATH])
-
-    path_file= os.tempnam(dir, "paths_")
-
-    #write paths to a separate file
-    save(path_file, pythonpath)
-
-
-    for job in jobs:
-
-
-        path = os.tempnam(dir, "pkl_") + ".bz2"
-
-        print "path: " + path
-
-        try:
-            save(path, job)
-            fileNames.append(path)
-        except Exception, detail:
-            print "error while pickling file: " + path
-            print detail
-
-
-
-        print 'Creating job template'
-        jt = s.createJobTemplate()
-
-        #TODO figure this out
-        jt.setEnvironment({"LD_LIBRARY_PATH": "/usr/local/sge/lib/lx26-amd64/"})
-
-
-        command = os.path.expanduser(LOCATION)
-        print command
-
-        jt.remoteCommand = command
-        jt.args = [path, path_file]
-        jt.joinFiles=True
-
-        #resources
-        jt.setNativeSpecification(job.nativeSpecification)
-
-        #set output directory
-        #fn = path.replace(os.path.expanduser(TMPHOST), )
-        jt.outputPath=":" + os.path.expanduser(TMPCLIENT)
-        jobid = s.runJob(jt)
-        print 'Your job has been submitted with id ' + str(jobid)
-
-        #display file size
-        print os.system("du -h " + path)
-
-        joblist.append(jobid)
-
-        #To clean things up, we delete the job template. This frees the memory DRMAA
-        #set aside for the job template, but has no effect on submitted jobs.
-        #s.deleteJobTemplate(jt)
-
-
-    #wait for jobs to finish
-    s.synchronize(joblist, DRMAA.Session.TIMEOUT_WAIT_FOREVER, True)
-
-
-
-    print "success: all jobs finished"
-
-    s.exit()
-
-    retJobs=[]
-
-
-    #attempt to collect results
-    for fileName in fileNames:
-
-        path = fileName + ".out"
-
-        print "reading output file:", path
-
-        try:
-            retJob=load(path)
-            retJobs.append(retJob)
-
-            #clean up
-            if retJob.cleanup:
-                os.remove(path)
-
-        except Exception, detail:
-            print "error while unpickling file: " + path
-            print "most likely there was an error when executing a Job"
-            print detail
-
-
-    #clean up paths file
-    try:
-        os.remove(path_file)
-    except Exception, detail:
-        print detail
-
-
-    return retJobs
-
-
-
-
 def _submitJobsToCluster(jobs):
     """
     Method used to send a list of jobs onto the cluster. Wait and forget.
@@ -498,63 +358,46 @@ def _submitJobsToCluster(jobs):
     @type jobs: list of Job objects
     """
 
-    dir=os.path.expanduser(TMPHOST)
-
-    if not os.path.isdir(dir):
+    outdir=os.path.expanduser(TMPHOST)
+    if not os.path.isdir(outdir):
         raise Exception()
-
 
     s=DRMAA.Session()
     s.init()
-
-
     joblist=[]
-
     fileNames=[]
 
 
-    #set paths
-
-
-    #fetch current path
+    #fetch current path, and write to file
     pythonpath=sys.path
     pythonpath.append(os.getcwd())
     pythonpath.extend([os.path.expanduser(item) for item in PYTHONPATH])
 
-    path_file= os.tempnam(dir, "paths_")
-
-    #write paths to a separate file
+    path_file = os.tempnam(outdir, "paths_") + ".bz2"
+    #print 'Saving %s to %s.' % (pythonpath,path_file)
     save(path_file, pythonpath)
-
+    
 
     for job in jobs:
-
-
-        path = os.tempnam(dir, "pkl_") + ".bz2"
-
-        print "path: " + path
-
+        invars = os.tempnam(outdir, "pg") + ".bz2"
+        job.name = invars.split(".")[-2].split("/")[-1]
         try:
-            save(path, job)
-            fileNames.append(path)
+            save(invars, job)
+            fileNames.append(invars)
         except Exception, detail:
-            print "error while pickling file: " + path
+            print "error while pickling file: " + invars
             print detail
 
 
 
-        print 'Creating job template'
         jt = s.createJobTemplate()
 
         #TODO figure this out
-        jt.setEnvironment({"LD_LIBRARY_PATH": "/usr/local/sge/lib/lx26-amd64/"})
+        #jt.setEnvironment({"LD_LIBRARY_PATH": "/usr/local/sge/lib/lx26-amd64/"})
 
 
-        command = os.path.expanduser(LOCATION)
-        print command
-
-        jt.remoteCommand = command
-        jt.args = [path, path_file]
+        jt.remoteCommand = os.path.expanduser(LOCATION)
+        jt.args = [invars, path_file]
         jt.joinFiles=True
 
         #resources
@@ -564,10 +407,10 @@ def _submitJobsToCluster(jobs):
         #fn = path.replace(os.path.expanduser(TMPHOST), )
         jt.outputPath=":" + os.path.expanduser(TMPCLIENT)
         jobid = s.runJob(jt)
-        print 'Your job has been submitted with id ' + str(jobid)
+        print 'Your job %s has been submitted with id %s' % (job.name,jobid)
 
         #display file size
-        print os.system("du -h " + path)
+        # print os.system("du -h " + invars)
 
         joblist.append(jobid)
 
@@ -577,7 +420,7 @@ def _submitJobsToCluster(jobs):
 
 
     #clean up path file
-    os.remove(path_file)
+    #os.remove(path_file)
 
     return (s.getContact(),joblist,fileNames)
 
@@ -596,27 +439,24 @@ def _collectResultsFromCluster(sid,joblist,fileNames,wait=False):
         drmaaWait=DRMAA.Session.TIMEOUT_NO_WAIT
 
     s.synchronize(joblist, drmaaWait, True)
-
     print "success: all jobs finished"
-
-    #close session
     s.exit()
-
-
 
     #attempt to collect results
     retJobs=[]
     for fileName in fileNames:
-        path = fileName + ".out"
-        print path
+        outvars = fileName + ".out"
         try:
-            retJob=load(path)
+            retJob=load(outvars)
             retJobs.append(retJob)
-
         except Exception, detail:
-            print "error while unpickling file: " + path
+            print "error while unpickling file: " + outvars
             print "most likely there was an error during jobs execution"
             print detail
+
+        #remove input file
+        if retJob.cleanup:
+            os.remove(outvars)
 
     return retJobs
 
@@ -628,9 +468,27 @@ def _processJobsOnCluster(jobs):
     """
 
     (sid,joblist,fileNames)=_submitJobsToCluster(jobs)
-
     return _collectResultsFromCluster(sid,joblist,fileNames,wait=True)
 
+
+def processJobs(jobs, local=False):
+    """
+    Director method to decide whether to run on cluster or locally
+    """
+
+    if (not local and drmaa_present):
+        return _processJobsOnCluster(jobs)
+    if (not local and not drmaa_present):
+        return _processJobsLocally(jobs, maxNumThreads=3)
+    else:
+        return _processJobsLocally(jobs, maxNumThreads=3)
+
+
+def submitJobs(jobs):
+    return _submitJobsToCluster(jobs)
+
+def collectJobs(sid,jobids,fileNames,wait=True):
+    return _collectResultsFromCluster(sid,jobids,fileNames,wait)
 
 
 #####################################################################
@@ -691,7 +549,7 @@ def runJob(pickleFileName, path_file):
     @type path_file: string
     """
 
-
+    #print 'runJob(%s,%s)' % (pickleFileName,path_file)
     #restore pythonpath on cluster node
     saved_paths = load(path_file)
     sys.path.extend(saved_paths)
@@ -700,7 +558,7 @@ def runJob(pickleFileName, path_file):
     job=load(inPath)
 
     job.execute()
-
+    
     #remove input file
     if job.cleanup:
         os.remove(pickleFileName)
@@ -711,55 +569,55 @@ def runJob(pickleFileName, path_file):
     save(outPath, job)
 
 
-    class Usage(Exception):
+class Usage(Exception):
+    """
+    Simple Exception for cmd-line user-interface.
+    """
+
+    def __init__(self, msg):
         """
-        Simple Exception for cmd-line user-interface.
-        """
-
-        def __init__(self, msg):
-            """
-            Constructor of simple Exception.
-            @param msg: exception message
-            @type msg: string
-            """
-
-            self.msg = msg
-
-
-
-    def main(argv=None):
-        """
-        Generic main
-
-        @param argv: list of arguments
-        @type argv: list of strings
+        Constructor of simple Exception.
+        @param msg: exception message
+        @type msg: string
         """
 
+        self.msg = msg
 
-        if argv is None:
-            argv = sys.argv
 
+
+def main(argv=None):
+    """
+    Generic main
+
+    @param argv: list of arguments
+    @type argv: list of strings
+    """
+
+
+    if argv is None:
+        argv = sys.argv
+
+    try:
         try:
-            try:
 
-                opts, args = getopt.getopt(argv[1:], "h", ["help"])
+            opts, args = getopt.getopt(argv[1:], "h", ["help"])
 
-                runJob(args[0], args[1])
+            runJob(args[0], args[1])
 
-            except getopt.error, msg:
-                raise Usage(msg)
+        except getopt.error, msg:
+            raise Usage(msg)
 
 
-        except Usage, err:
+    except Usage, err:
 
-            print >>sys.stderr, err.msg
-            print >>sys.stderr, "for help use --help"
+        print >>sys.stderr, err.msg
+        print >>sys.stderr, "for help use --help"
 
-            return 2
+        return 2
 
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv)
 
 

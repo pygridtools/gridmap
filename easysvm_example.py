@@ -1,5 +1,13 @@
 #!/usr/bin/env python
 
+"""
+An example script that demonstrates usage of pythongrid that uses easysvm.
+http://www.easysvm.org
+
+The script computes cross validation error for SVM binary classification with
+a linear kernel. The features are two dimensional real vectors (GC content)
+"""
+
 #############################################################################################
 #                                                                                           #
 #    This program is free software; you can redistribute it and/or modify                   #
@@ -29,7 +37,7 @@ from esvm.mldata import init_datasetfile
 from numpy.linalg import norm
 import numpy
 
-from pythongrid import KybJob, processJobs
+from pythongrid import KybJob, processJobs, submitJobs, collectJobs
 
 def demo(gcfilename, plot=False):
     """
@@ -62,10 +70,10 @@ def demo(gcfilename, plot=False):
     partitions = getPartitionedSet(len(gc_labels), num_fold_cv)
 
 
-    #demo_forloop(num_fold_cv,partitions,gc_labels,gc_examples,kernelname,kparam,C)
-    #demo_jobslocal(num_fold_cv,partitions,gc_labels,gc_examples,kernelname,kparam,C)
+    demo_forloop(num_fold_cv,partitions,gc_labels,gc_examples,kernelname,kparam,C)
+    demo_jobslocal(num_fold_cv,partitions,gc_labels,gc_examples,kernelname,kparam,C)
     demo_jobswait(num_fold_cv,partitions,gc_labels,gc_examples,kernelname,kparam,C)
-    #demo_session(num_fold_cv,partitions,gc_labels,gc_examples,kernelname,kparam,C)
+    demo_session(num_fold_cv,partitions,gc_labels,gc_examples,kernelname,kparam,C)
 
 
 
@@ -109,8 +117,8 @@ def demo_jobswait(num_fold_cv,partitions,gc_labels,gc_examples,\
     print 'demo jobs wait'
     myjobs = create_jobs(num_fold_cv,partitions,gc_labels,gc_examples,\
                          kernelname,kparam,C)
-    processJobs(myjobs, local=False)
-    collect_results(myjobs,partitions,gc_labels)
+    retjobs = processJobs(myjobs, local=False)
+    collect_results(retjobs,partitions,gc_labels)
 
 
     
@@ -125,9 +133,12 @@ def demo_session(num_fold_cv,partitions,gc_labels,gc_examples,\
     print 'demo session'
     myjobs = create_jobs(num_fold_cv,partitions,gc_labels,gc_examples,\
                          kernelname,kparam,C)
-    (sid,jobids)=submitJobs(myjobs)
+    (sid,jobids,filenames)=submitJobs(myjobs)
+    print 'job submission complete, having a short nap... zzzz'
+    del myjobs
     time.sleep(10)
-    myjobs=collectJobs(sid,jobids)
+    print 'woken up, collecting jobs'
+    myjobs=collectJobs(sid,jobids,filenames)
     collect_results(myjobs,partitions,gc_labels)
 
 
@@ -137,7 +148,7 @@ def create_jobs(num_fold_cv,partitions,gc_labels,gc_examples,\
     myjobs = []
     for fold in xrange(num_fold_cv):
         XT, LT, XTE, LTE = getCurrentSplit(fold, partitions, gc_labels, gc_examples)
-        myjobs.append(KybJob(train_and_test,(XT, LT, XTE, C, kernelname, kparam)))
+        myjobs.append(KybJob(train_and_test,(XT, LT, XTE, C, kernelname, kparam),cleanup=False))
 
     return myjobs
 
@@ -151,6 +162,7 @@ def collect_results(myjobs,partitions,gc_labels):
 
     for fold in xrange(num_fold_cv):
         svmout[fold] = myjobs[fold].ret
+
     report_error(partitions,svmout,gc_labels)
 
 
