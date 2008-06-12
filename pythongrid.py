@@ -12,8 +12,11 @@ in a more 'pythonic' fashion.
 #LD_LIBRARY_PATH = "/usr/local/sge/lib/lx26-amd64/"
 PYGRID = "~/svn/tools/python/pythongrid/pythongrid.py"
 
-#define temp directories for the input and output variables
+#define temp directories for the input and output variables (must be writable from cluster)
+# ag-raetsch
 TEMPDIR = "~/tmp/DRMAA_JOB_OUT/"
+# agbs
+#TEMPDIR = "/agbs/cluster/ong/DRMAA_JOB_OUT"
 
 # used for generating random filenames
 alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
@@ -115,6 +118,7 @@ class KybJob(Job):
 
         outdir=os.path.expanduser(TEMPDIR)
         if not os.path.isdir(outdir):
+            print '%s does not exist. Please create a directory' % outdir
             raise Exception()
         # TODO: ensure uniqueness of file names
         self.name = 'pg'+''.join([random.choice(alphabet) for a in xrange(8)])
