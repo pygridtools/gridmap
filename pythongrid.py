@@ -14,7 +14,7 @@ PYGRID = "~/svn/tools/python/pythongrid/pythongrid.py"
 
 #define temp directories for the input and output variables (must be writable from cluster)
 # ag-raetsch
-TEMPDIR = "~/tmp/DRMAA_JOB_OUT/"
+TEMPDIR = "~/tmp/"
 # agbs
 #TEMPDIR = "/agbs/cluster/ong/DRMAA_JOB_OUT"
 
@@ -65,14 +65,14 @@ class Job (object):
         @param kwlist: dictionary of keyword arguments
         @type kwlist: dict
         """
-        self.f=f
-        self.args=args
-        self.kwlist=kwlist
-        self.cleanup=cleanup
-        self.ret=None
-        self.nativeSpecification=""
-        self.inputfile=""
-        self.outputfile=""
+        self.f = f
+        self.args = args
+        self.kwlist = kwlist
+        self.cleanup = cleanup
+        self.ret = None
+        self.nativeSpecification = ""
+        self.inputfile = ""
+        self.outputfile = ""
 
     def __repr__(self):
         return ('%s\nargs=%s\nkwlist=%s\nret=%s\ncleanup=%s\nnativeSpecification=%s\ninputfile=%s\noutputfile=%s\n' %\
@@ -99,24 +99,24 @@ class KybJob(Job):
         constructor of KybJob
         """
         Job.__init__(self, f, args, kwlist, cleanup)
-        self.h_vmem=""
-        self.arch=""
-        self.tmpfree=""
-        self.h_cpu=""
-        self.h_rt=""
-        self.express=""
-        self.matlab=""
-        self.simulink=""
-        self.compiler=""
-        self.imagetb=""
-        self.opttb=""
-        self.stattb=""
-        self.sigtb=""
-        self.cplex=""
-        self.nicetohave=""
-        self.jobid=""
+        self.h_vmem = ""
+        self.arch = ""
+        self.tmpfree = ""
+        self.h_cpu = ""
+        self.h_rt = ""
+        self.express = ""
+        self.matlab = ""
+        self.simulink = ""
+        self.compiler = ""
+        self.imagetb = ""
+        self.opttb = ""
+        self.stattb = ""
+        self.sigtb = ""
+        self.cplex = ""
+        self.nicetohave = ""
+        self.jobid = ""
 
-        outdir=os.path.expanduser(TEMPDIR)
+        outdir = os.path.expanduser(TEMPDIR)
         if not os.path.isdir(outdir):
             print '%s does not exist. Please create a directory' % outdir
             raise Exception()
@@ -133,37 +133,37 @@ class KybJob(Job):
         ret=""
 
         if (self.name != ""):
-            ret=ret + " -N " + str(self.name)
+            ret = ret + " -N " + str(self.name)
         if (self.h_vmem != ""):
-            ret=ret + " -l " + "h_vmem" + "=" + str(self.h_vmem)
+            ret = ret + " -l " + "h_vmem" + "=" + str(self.h_vmem)
         if (self.arch != ""):
-            ret=ret + " -l " + "arch" + "=" + str(self.arch)
+            ret = ret + " -l " + "arch" + "=" + str(self.arch)
         if (self.tmpfree != ""):
-            ret=ret + " -l " + "tmpfree" + "=" + str(self.tmpfree)
+            ret = ret + " -l " + "tmpfree" + "=" + str(self.tmpfree)
         if (self.h_cpu != ""):
-            ret=ret + " -l " + "h_cpu" + "=" + str(self.h_cpu)
+            ret = ret + " -l " + "h_cpu" + "=" + str(self.h_cpu)
         if (self.h_rt != ""):
-            ret=ret + " -l " + "h_rt" + "=" + str(self.h_rt)
+            ret = ret + " -l " + "h_rt" + "=" + str(self.h_rt)
         if (self.express != ""):
-            ret=ret + " -l " + "express" + "=" + str(self.express)
+            ret = ret + " -l " + "express" + "=" + str(self.express)
         if (self.matlab != ""):
-            ret=ret + " -l " + "matlab" + "=" + str(self.matlab)
+            ret = ret + " -l " + "matlab" + "=" + str(self.matlab)
         if (self.simulink != ""):
-            ret=ret + " -l " + "simulink" + "=" + str(self.simulink)
+            ret = ret + " -l " + "simulink" + "=" + str(self.simulink)
         if (self.compiler != ""):
-            ret=ret + " -l " + "compiler" + "=" + str(self.compiler)
+            ret = ret + " -l " + "compiler" + "=" + str(self.compiler)
         if (self.imagetb != ""):
-            ret=ret + " -l " + "imagetb" + "=" + str(self.imagetb)
+            ret = ret + " -l " + "imagetb" + "=" + str(self.imagetb)
         if (self.opttb != ""):
-            ret=ret + " -l " + "opttb" + "=" + str(self.opttb)
+            ret = ret + " -l " + "opttb" + "=" + str(self.opttb)
         if (self.stattb != ""):
-            ret=ret + " -l " + "stattb" + "=" + str(self.stattb)
+            ret = ret + " -l " + "stattb" + "=" + str(self.stattb)
         if (self.sigtb != ""):
-            ret=ret + " -l " + "sigtb" + "=" + str(self.sigtb)
+            ret = ret + " -l " + "sigtb" + "=" + str(self.sigtb)
         if (self.cplex != ""):
-            ret=ret + " -l " + "cplex" + "=" + str(self.cplex)
+            ret = ret + " -l " + "cplex" + "=" + str(self.cplex)
         if (self.nicetohave != ""):
-            ret=ret + " -l " + "nicetohave" + "=" + str(self.nicetohave)
+            ret = ret + " -l " + "nicetohave" + "=" + str(self.nicetohave)
 
         return ret
 
@@ -207,11 +207,11 @@ class MethodJob:
 
     #TODO derive this from Job, unify!
 
-    methodName=""
-    obj=None
-    args=()
-    kwlist={}
-    ret=None
+    methodName = ""
+    obj = None
+    args = ()
+    kwlist = {}
+    ret = None
 
     def __init__(self, m, args, kwlist={}):
         """
@@ -224,14 +224,14 @@ class MethodJob:
         @type kwlist: dict
         """
 
-        self.methodName=m.im_func.func_name
-        self.obj=m.im_self
-        self.args=args
-        self.kwlist=kwlist
+        self.methodName = m.im_func.func_name
+        self.obj = m.im_self
+        self.args = args
+        self.kwlist = kwlist
 
     def execute(self):
-        m=getattr(self.obj, self.methodName)
-        self.ret=apply(m, self.args, self.kwlist)
+        m = getattr(self.obj, self.methodName)
+        self.ret = apply(m, self.args, self.kwlist)
 
 
 
@@ -276,17 +276,17 @@ def _processJobsLocally(jobs, maxNumThreads=1):
 
     #check if there are fewer jobs then allowed threads
     if (maxNumThreads >= numJobs):
-        numThreads=numJobs
-        jobsPerThread=1
+        numThreads = numJobs
+        jobsPerThread = 1
     else:
-        numThreads=maxNumThreads
-        jobsPerThread=(numJobs/numThreads)+1
+        numThreads = maxNumThreads
+        jobsPerThread = (numJobs/numThreads)+1
 
     print "number of threads: ", numThreads
     print "jobs per thread: ", jobsPerThread
 
-    jobList=[]
-    threadList=[]
+    jobList = []
+    threadList = []
 
     #assign jobs to threads
     #TODO use a queue here
@@ -296,10 +296,10 @@ def _processJobsLocally(jobs, maxNumThreads=1):
         if ((i%jobsPerThread==0 and i!=0) or i==(numJobs-1)):
             #create new thread
             print "starting new thread"
-            thread=JobsThread(jobList)
+            thread = JobsThread(jobList)
             threadList.append(thread)
             thread.start()
-            jobList=[]
+            jobList = []
 
 
     #wait for threads to finish
@@ -316,9 +316,9 @@ def submitJobs(jobs):
     @type jobs: list of Job objects
     """
 
-    s=DRMAA.Session()
+    s = DRMAA.Session()
     s.init()
-    jobids=[]
+    jobids = []
 
     for job in jobs:
         save(job.inputfile, job)
@@ -329,16 +329,15 @@ def submitJobs(jobs):
                            "PYTHONPATH": os.getenv("PYTHONPATH"),
                            })
 
-
         jt.remoteCommand = os.path.expanduser(PYGRID)
         jt.args = [job.inputfile]
-        jt.joinFiles=True
+        jt.joinFiles = True
         jt.setNativeSpecification(job.nativeSpecification)
-        jt.outputPath=":" + os.path.expanduser(TEMPDIR)
+        jt.outputPath = ":" + os.path.expanduser(TEMPDIR)
 
         jobid = s.runJob(jt)
         job.jobid = jobid
-        print 'Your job %s has been submitted with id %s' % (job.name,jobid)
+        print 'Your job %s has been submitted with id %s' % (job.name, jobid)
 
         #display file size
         # print os.system("du -h " + invars)
@@ -356,7 +355,7 @@ def submitJobs(jobs):
 def collectJobs(sid,jobids,joblist,wait=False):
     """
     Collect the results from the jobids, returns a list of Jobs
-    
+
     @param sid: session identifier
     @type sid: string returned by cluster
     @param jobids: list of job identifiers returned by the cluster
@@ -366,29 +365,29 @@ def collectJobs(sid,jobids,joblist,wait=False):
     """
     for ix in xrange(len(jobids)):
         assert(jobids[ix] == joblist[ix].jobid)
-        
-    s=DRMAA.Session()
+
+    s = DRMAA.Session()
     s.init(sid)
 
     if wait:
-        drmaaWait=DRMAA.Session.TIMEOUT_WAIT_FOREVER
+        drmaaWait = DRMAA.Session.TIMEOUT_WAIT_FOREVER
     else:
-        drmaaWait=DRMAA.Session.TIMEOUT_NO_WAIT
+        drmaaWait = DRMAA.Session.TIMEOUT_NO_WAIT
 
     s.synchronize(jobids, drmaaWait, True)
     print "success: all jobs finished"
     s.exit()
 
     #attempt to collect results
-    retJobs=[]
+    retJobs = []
     for ix,job in enumerate(joblist):
         try:
-            retJob=load(job.outputfile)
+            retJob = load(job.outputfile)
             assert(retJob.name == job.name)
             retJobs.append(retJob)
         except Exception, detail:
             print "error while unpickling file: " + job.outputfile
-            print "most likely there was an error during jobs execution"
+            print "most likely there was an error during job execution"
             print detail
 
         #remove output file
@@ -408,7 +407,7 @@ def processJobs(jobs, local=False):
     """
     if (not local and drmaa_present):
         #Use submitJobs and collectJobs to run jobs and wait for the results.
-        (sid,jobids)=submitJobs(jobs)
+        (sid,jobids) = submitJobs(jobs)
         return collectJobs(sid,jobids,jobs,wait=True)
     else:
         return _processJobsLocally(jobs, maxNumThreads=3)
@@ -508,10 +507,10 @@ def runJob(pickleFileName):
     """
 
     inPath = pickleFileName
-    job=load(inPath)
+    job = load(inPath)
 
     job.execute()
-    
+
     #remove input file
     if job.cleanup:
         os.remove(pickleFileName)
@@ -527,7 +526,7 @@ class Usage(Exception):
     def __init__(self, msg):
         """
         Constructor of simple Exception.
-        
+
         @param msg: exception message
         @type msg: string
         """
