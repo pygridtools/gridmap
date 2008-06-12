@@ -146,7 +146,7 @@ def demo_session(num_fold_cv,partitions,gc_labels,gc_examples,\
     (sid,jobids)=submitJobs(myjobs)
     print 'checking whether finished'
     while not getStatus(sid,jobids):
-        time.sleep(2)
+        time.sleep(5)
         
     print 'collecting jobs'
     retjobs=collectJobs(sid,jobids,myjobs)

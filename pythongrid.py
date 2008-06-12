@@ -124,6 +124,7 @@ class KybJob(Job):
         self.name = 'pg'+''.join([random.choice(alphabet) for a in xrange(8)])
         self.inputfile = outdir + self.name + ".bz2"
         self.outputfile = outdir + self.name + "_out.bz2"
+        save(self.inputfile,self)
 
     def getNativeSpecification(self):
         """
@@ -321,7 +322,7 @@ def submitJobs(jobs):
     jobids = []
 
     for job in jobs:
-        save(job.inputfile, job)
+        #save(job.inputfile, job)
         jt = s.createJobTemplate()
 
         #TODO figure this out for agbs
