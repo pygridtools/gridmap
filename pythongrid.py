@@ -512,10 +512,7 @@ def runJob(pickleFileName):
     if job.cleanup:
         os.remove(pickleFileName)
 
-
-    outPath = pickleFileName + ".out"
-
-    save(outPath, job)
+    save(job.outputfile, job)
 
 
 class Usage(Exception):
