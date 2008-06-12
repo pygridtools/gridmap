@@ -41,17 +41,17 @@ def runExample():
 
   print "output ret field in each job before multithreaded computation"
   for (i, job) in enumerate(functionJobs):
-    print "Job with id: ", i, "- ret: ", job.ret
+    print "Job #", i, "- ret: ", job.ret
 
   print ""
-  print "sending function jobs to local machine"
+  print "executing jobs on local machine"
   print ""
 
   processedFunctionJobs = processJobs(functionJobs, local=2)
 
   print "ret fields AFTER execution on local machine"
   for (i, job) in enumerate(processedFunctionJobs):
-    print "Job with id: ", i, "- ret: ", job.ret
+    print "Job #", i, "- ret: ", job.ret
 
   print ""
   print ""
@@ -65,7 +65,7 @@ def runExample():
 
   print "output ret field in each job before sending it onto the cluster"
   for (i, job) in enumerate(functionJobs):
-    print "Job with id: ", i, "- ret: ", job.ret
+    print "Job #", i, "- ret: ", job.ret
 
   print ""
   print "sending function jobs to cluster"
@@ -75,7 +75,7 @@ def runExample():
 
   print "ret fields AFTER execution on cluster"
   for (i, job) in enumerate(processedFunctionJobs):
-    print "Job with id: ", i, "- ret: ", job.ret
+    print "Job #", i, "- ret: ", job.ret
 
 
   print ""
@@ -100,7 +100,7 @@ def runExample():
   retjobs=collectJobs(sid,jobids,myjobs)
   print "ret fields AFTER execution on cluster"
   for (i, job) in enumerate(retjobs):
-    print "Job with id: ", i, "- ret: ", job.ret
+    print "Job #", i, "- ret: ", job.ret
 
   print '--------------'
 
@@ -108,7 +108,7 @@ def runExample():
 
 def computeFaculty(n):
   '''
-  Dummy function for testing a regular (function) Job.
+  computes faculty of n
   '''
 
   ret=1
