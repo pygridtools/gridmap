@@ -122,7 +122,7 @@ class KybJob(Job):
             raise Exception()
         # TODO: ensure uniqueness of file names
         self.name = 'pg'+''.join([random.choice(alphabet) for a in xrange(8)])
-        self.inputfile = outdir + self.name + ".bz2"
+        self.inputfile = outdir + self.name + "_in.bz2"
         self.outputfile = outdir + self.name + "_out.bz2"
 
     def getNativeSpecification(self):
@@ -390,7 +390,7 @@ def collectJobs(sid,jobids,joblist,wait=False):
             print "most likely there was an error during job execution"
             print detail
 
-        #remove output file
+        #remove files
         if retJob.cleanup:
             os.remove(job.outputfile)
             logfilename = os.path.expanduser(TEMPDIR) + job.name + '.o' + jobids[ix]
@@ -516,7 +516,7 @@ def runJob(pickleFileName):
 
     #remove input file
     if job.cleanup:
-        os.remove(pickleFileName)
+        os.remove(job.inputfile)
 
     save(job.outputfile, job)
 
