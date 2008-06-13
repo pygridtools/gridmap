@@ -22,7 +22,7 @@ Dependencies
 - `easysvm`_  (>=0.2) [optional, used in example]
 
 .. _`DRMAA-python`: http://gridengine.sunsource.net/howto/drmaa_python.html
-.. _`easysvm`_ : http://www.easysvm.org
+.. _`easysvm` : http://www.easysvm.org
 
 
 Install
