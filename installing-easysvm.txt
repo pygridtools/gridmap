@@ -1,0 +1,15 @@
+If you want to try easysvm_example.py, first build shogun, then install easysvm.
+
+Build shogun:
+wget ftp://shogun-toolbox.org/shogun/releases/0.6/sources/shogun-0.6.3.tar.bz2
+tar xjf shogun-0.6.3.tar.bz2
+cd shogun-0.6.3/trunk/src
+./configure --interface=python-modular --prefix=${HOME}
+make
+make install
+
+Install easysvm:
+wget http://www.fml.tuebingen.mpg.de/raetsch/projects/easysvm/easysvm-0.2.tar.gz
+tar xzf easysvm-0.2.tar.gz
+cd easysvm-0.2
+python setup.py install --prefix=${HOME}
