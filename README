@@ -15,8 +15,22 @@ and may also be faster if the cluster is busy and the jobs are small.
 Installation
 ============
 
+Dependencies
+------------
+
+- `DRMAA-python`_ (>=0.2.2)
+- `easysvm`_  (>=0.2) [optional, used in example]
+
+.. _`DRMAA-python`: http://gridengine.sunsource.net/howto/drmaa_python.html
+.. _`easysvm`_ : http://www.easysvm.org
+
+
 Install
 -------
+
+DRMAA-python is required. To check that it is available
+
+    >>> import DRMAA
 
 Untar the archive, and put pythongrid.py somewhere in $PYTHONPATH
 
@@ -36,29 +50,19 @@ engine is in the shared path. For example
 
     export LD_LIBRARY_PATH=/usr/local/sge/lib/lx26-amd64/:$LD_LIBRARY_PATH
 
-DRMAA-python is required. To check that everything has installed
-properly
+To check that everything has installed properly
 
-    >>> import DRMAA
     >>> import pythongrid
 
-
-Dependencies
-------------
-
-- `DRMAA-python`_ (>=0.2.2)
-- `easysvm`_  (>=0.2) [optional]
-
-.. _`DRMAA-python`: http://gridengine.sunsource.net/howto/drmaa_python.html
-.. _`easysvm`_ : http://www.easysvm.org
 
 
 Usage
 =====
 
-Three functions wrap the complexity:
+Four functions wrap the complexity:
 
 - submitJobs takes a list of jobs and sends them to the cluster
+- getStatus checks the jobs in a given session
 - collectJobs takes a list of job ids and collects their results
 - processJobs provides a shortcut that does both in series. It also
   provides an option to run locally.
