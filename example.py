@@ -11,18 +11,19 @@ def makeJobs():
   '''
   Creates a list of Jobs.   
   '''
-
+  
+  inputvec = [[20],[30],[40],[50]]
+  print 'print computing the factorials of %s' % str(inputvec)
   jobs=[]
-  j1 = KybJob(example.computeFaculty, [20])
+  j1 = KybJob(example.computeFactorial, inputvec[0])
   j1.h_vmem="300M"
 
   jobs.append(j1)
 
   #One needs to use the full identifier such that the module name is explicit.
-  jobs.append(KybJob(example.computeFaculty, [30]))
-  jobs.append(KybJob(example.computeFaculty, [40]))
-  jobs.append(KybJob(example.computeFaculty, [50]))
-  jobs.append(KybJob(example.computeFaculty, [50]))
+  jobs.append(KybJob(example.computeFactorial, inputvec[1]))
+  jobs.append(KybJob(example.computeFactorial, inputvec[2]))
+  jobs.append(KybJob(example.computeFactorial, inputvec[3]))
 
   return jobs
 
@@ -47,7 +48,7 @@ def runExample():
   print "executing jobs on local machine"
   print ""
 
-  processedFunctionJobs = processJobs(functionJobs, local=2)
+  processedFunctionJobs = processJobs(functionJobs, local=True)
 
   print "ret fields AFTER execution on local machine"
   for (i, job) in enumerate(processedFunctionJobs):
@@ -94,7 +95,7 @@ def runExample():
 
   print 'checking whether finished'
   while not getStatus(sid,jobids):
-    time.sleep(2)
+    time.sleep(7)
         
   print 'collecting jobs'
   retjobs=collectJobs(sid,jobids,myjobs)
@@ -106,9 +107,9 @@ def runExample():
 
 
 
-def computeFaculty(n):
+def computeFactorial(n):
   '''
-  computes faculty of n
+  computes factorial of n
   '''
 
   ret=1

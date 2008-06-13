@@ -401,7 +401,7 @@ def collectJobs(sid,jobids,joblist,wait=False):
 
 
 
-def processJobs(jobs, local=False):
+def processJobs(jobs, local=False, maxNumThreads=3):
     """
     Director method to decide whether to run on cluster or locally
     """
@@ -409,6 +409,9 @@ def processJobs(jobs, local=False):
         #Use submitJobs and collectJobs to run jobs and wait for the results.
         (sid,jobids) = submitJobs(jobs)
         return collectJobs(sid,jobids,jobs,wait=True)
+    elif (not local and not drmaa_present):
+        print 'Warning: import DRMAA failed, computing locally'
+        return _processJobsLocally(jobs, maxNumThreads=3)        
     else:
         return _processJobsLocally(jobs, maxNumThreads=3)
 
