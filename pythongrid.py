@@ -12,7 +12,8 @@ in a more 'pythonic' fashion.
 #LD_LIBRARY_PATH = "/usr/local/sge/lib/lx26-amd64/"
 PYGRID = "~/svn/tools/python/pythongrid/pythongrid.py"
 
-#define temp directories for the input and output variables (must be writable from cluster)
+#define temp directories for the input and output variables
+#(must be writable from cluster)
 # ag-raetsch
 TEMPDIR = "~/tmp/"
 # agbs
@@ -39,14 +40,13 @@ drmaa_present=1
 try:
     import DRMAA
 except ImportError, detail:
-    print "Error importing DRMAA. Only local multi-threading supported. Please check your installation."
+    print "Error importing DRMAA. Only local multi-threading supported."
+    print "Please check your installation."
     print detail
     drmaa_present=0
 
 
-
-
-class Job (object):
+class Job(object):
     """
     Central entity that wrappes a function and its data. Basically,
     a job consists of a function, its argument list, its
@@ -75,17 +75,19 @@ class Job (object):
         self.outputfile = ""
 
     def __repr__(self):
-        return ('%s\nargs=%s\nkwlist=%s\nret=%s\ncleanup=%s\nnativeSpecification=%s\ninputfile=%s\noutputfile=%s\n' %\
-                (self.f,self.args,self.kwlist,self.ret,self.cleanup,\
-                 self.nativeSpecification,self.inputfile,self.outputfile))
+        retstr1 = ('%s\nargs=%s\nkwlist=%s\nret=%s\ncleanup=%s' %
+                   self.f, self.args, self.kwlist, self.ret, self.cleanup)
+        retstr2 = ('\nnativeSpecification=%s\ninputfile=%s\noutputfile=%s\n' %
+                   self.nativeSpecification, self.inputfile, self.outputfile)
+        return retstr1 + retstr2
 
     def execute(self):
         """
-        Executes function f with given arguments and writes return value to field ret.
+        Executes function f with given arguments
+        and writes return value to field ret.
         Input data is removed after execution to save space.
         """
         self.ret=apply(self.f, self.args, self.kwlist)
-
 
 
 class KybJob(Job):
@@ -176,7 +178,8 @@ class KybJob(Job):
 
         self.__nativeSpecification=x
 
-    nativeSpecification = property(getNativeSpecification, setNativeSpecification)
+    nativeSpecification = property(getNativeSpecification,
+                                   setNativeSpecification)
 
 
 #TODO make read-only
@@ -203,6 +206,8 @@ class KybJob(Job):
 #
 
 #TODO this class will most likely disappear, soon.
+
+
 class MethodJob:
 
     #TODO derive this from Job, unify!
@@ -234,8 +239,7 @@ class MethodJob:
         self.ret = apply(m, self.args, self.kwlist)
 
 
-
-class JobsThread (threading.Thread):
+class JobsThread(threading.Thread):
     """
     In case jobs are to be computed locally, a number of Jobs (possibly one)
     are assinged to one thread.
@@ -251,7 +255,7 @@ class JobsThread (threading.Thread):
         self.jobs = jobs
         threading.Thread.__init__(self)
 
-    def run (self):
+    def run(self):
         """
         Executes each job in job list
         """
@@ -259,14 +263,15 @@ class JobsThread (threading.Thread):
             job.execute()
 
 
-
-def _processJobsLocally(jobs, maxNumThreads=1):
+def _process_jobs_locally(jobs, maxNumThreads=1):
     """
-    Run jobs on local machine in a multithreaded manner, providing the same interface.
+    Run jobs on local machine in a multithreaded manner,
+    providing the same interface.
 
     @param jobs: list of jobs to be executed locally.
     @type jobs: list of Job objects
-    @param maxNumThreads: defines the maximal number of threads to be used to process jobs
+    @param maxNumThreads: defines the maximal number of threads
+                          to be used to process jobs
     @type maxNumThreads: integer
     """
 
@@ -309,7 +314,7 @@ def _processJobsLocally(jobs, maxNumThreads=1):
     return jobs
 
 
-def submitJobs(jobs):
+def submit_jobs(jobs):
     """
     Method used to send a list of jobs onto the cluster.
     @param jobs: list of jobs to be executed
@@ -348,11 +353,10 @@ def submitJobs(jobs):
     sid = s.getContact()
     s.exit()
 
-    return (sid,jobids)
+    return (sid, jobids)
 
 
-
-def collectJobs(sid,jobids,joblist,wait=False):
+def collect_jobs(sid, jobids, joblist, wait=False):
     """
     Collect the results from the jobids, returns a list of Jobs
 
@@ -380,7 +384,7 @@ def collectJobs(sid,jobids,joblist,wait=False):
 
     #attempt to collect results
     retJobs = []
-    for ix,job in enumerate(joblist):
+    for ix, job in enumerate(joblist):
         try:
             retJob = load(job.outputfile)
             assert(retJob.name == job.name)
@@ -393,32 +397,30 @@ def collectJobs(sid,jobids,joblist,wait=False):
         #remove files
         if retJob.cleanup:
             os.remove(job.outputfile)
-            logfilename = os.path.expanduser(TEMPDIR) + job.name + '.o' + jobids[ix]
+            logfilename = (os.path.expanduser(TEMPDIR)
+                           + job.name + '.o' + jobids[ix])
             print logfilename
             os.remove(logfilename)
 
     return retJobs
 
 
-
-def processJobs(jobs, local=False, maxNumThreads=3):
+def process_jobs(jobs, local=False, maxNumThreads=3):
     """
     Director method to decide whether to run on cluster or locally
     """
     if (not local and drmaa_present):
-        #Use submitJobs and collectJobs to run jobs and wait for the results.
-        (sid,jobids) = submitJobs(jobs)
-        return collectJobs(sid,jobids,jobs,wait=True)
+        #Use submit_jobs and collect_jobs to run jobs and wait for the results.
+        (sid, jobids) = submit_jobs(jobs)
+        return collect_jobs(sid, jobids, jobs, wait=True)
     elif (not local and not drmaa_present):
         print 'Warning: import DRMAA failed, computing locally'
-        return _processJobsLocally(jobs, maxNumThreads=3)        
+        return _process_jobs_locally(jobs, maxNumThreads=3)
     else:
-        return _processJobsLocally(jobs, maxNumThreads=3)
+        return _process_jobs_locally(jobs, maxNumThreads=3)
 
 
-
-
-def getStatus(sid,jobids):
+def get_status(sid, jobids):
     """
     Get the status of all jobs in jobids.
     Returns True if all jobs are finished.
@@ -431,7 +433,7 @@ def getStatus(sid,jobids):
         DRMAA.Session.QUEUED_ACTIVE: 'job is queued and active',
         DRMAA.Session.SYSTEM_ON_HOLD: 'job is queued and in system hold',
         DRMAA.Session.USER_ON_HOLD: 'job is queued and in user hold',
-        DRMAA.Session.USER_SYSTEM_ON_HOLD: 'job is queued and in user and system hold',
+        DRMAA.Session.USER_SYSTEM_ON_HOLD: 'job is in user and system hold',
         DRMAA.Session.RUNNING: 'job is running',
         DRMAA.Session.SYSTEM_SUSPENDED: 'job is system suspended',
         DRMAA.Session.USER_SUSPENDED: 'job is user suspended',
@@ -441,7 +443,7 @@ def getStatus(sid,jobids):
 
     s = DRMAA.Session()
     s.init(sid)
-    status_summary = {}.fromkeys(_decodestatus,0)
+    status_summary = {}.fromkeys(_decodestatus, 0)
     for jobid in jobids:
         try:
             curstat = s.getJobProgramStatus(jobid)
@@ -451,32 +453,33 @@ def getStatus(sid,jobids):
         else:
             status_summary[curstat] += 1
 
-    print 'Status of %s at %s' % (sid,time.strftime('%d/%m/%Y - %H.%M:%S'))
+    print 'Status of %s at %s' % (sid, time.strftime('%d/%m/%Y - %H.%M:%S'))
     for curkey in status_summary.keys():
         if status_summary[curkey]>0:
-            print '%s: %d' % (_decodestatus[curkey],status_summary[curkey])
+            print '%s: %d' % (_decodestatus[curkey], status_summary[curkey])
     s.exit()
 
-    return ((status_summary[DRMAA.Session.DONE]+status_summary[-42])==len(jobids))
-
+    return ((status_summary[DRMAA.Session.DONE]
+             +status_summary[-42])==len(jobids))
 
 
 #####################################################################
 # Dealing with data
 #####################################################################
 
-def save(filename,myobj):
+
+def save(filename, myobj):
     """
     Save myobj to filename using pickle
     """
     try:
-        f = bz2.BZ2File(filename,'wb')
+        f = bz2.BZ2File(filename, 'wb')
     except IOError, details:
         sys.stderr.write('File ' + filename + ' cannot be written\n')
         sys.stderr.write(details)
         return
 
-    cPickle.dump(myobj,f,protocol=2)
+    cPickle.dump(myobj, f, protocol=2)
     f.close()
 
 
@@ -485,7 +488,7 @@ def load(filename):
     Load from filename using pickle
     """
     try:
-        f = bz2.BZ2File(filename,'rb')
+        f = bz2.BZ2File(filename, 'rb')
     except IOError, details:
         sys.stderr.write('File ' + filename + ' cannot be read\n')
         sys.stderr.write(details)
@@ -500,7 +503,8 @@ def load(filename):
 #      The following code will be executed on the cluster      #
 ################################################################
 
-def runJob(pickleFileName):
+
+def run_job(pickleFileName):
     """
     This is the code that is executed on the cluster side.
     Runs job which was pickled to a file called pickledFileName.
@@ -537,10 +541,9 @@ class Usage(Exception):
         self.msg = msg
 
 
-
 def main(argv=None):
     """
-    Parse the command line inputs and call runJob
+    Parse the command line inputs and call run_job
 
     @param argv: list of arguments
     @type argv: list of strings
@@ -553,7 +556,7 @@ def main(argv=None):
     try:
         try:
             opts, args = getopt.getopt(argv[1:], "h", ["help"])
-            runJob(args[0])
+            run_job(args[0])
         except getopt.error, msg:
             raise Usage(msg)
 
@@ -564,9 +567,5 @@ def main(argv=None):
 
         return 2
 
-
-
 if __name__ == "__main__":
     main(sys.argv)
-
-

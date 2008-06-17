@@ -3,12 +3,12 @@ TODO
 
 + validate member flags for KybJob
 + Unify method jobs
-+ Solve issue with environment variable LD_LIBRARY_PATH (i.e. import
-DRMAA on cluster
 + add queue to local multithreading
++ Replace threading with multiprocessing (threading doesn't really
+work because of Global Intepreter Lock in python.
+http://www.python.org/dev/peps/pep-0371/
 + hold interface
 + Need a better way to set job and file names. Preferably human
 readable and unique.
-+ Set additional path from a config file, self.pythonpath.extend(additionalpaths)
 + Clear memory after pickling in the constructor, so reduce memory
 usage

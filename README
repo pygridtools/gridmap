@@ -61,10 +61,10 @@ Usage
 
 Four functions wrap the complexity:
 
-- submitJobs takes a list of jobs and sends them to the cluster
-- getStatus checks the jobs in a given session
-- collectJobs takes a list of job ids and collects their results
-- processJobs provides a shortcut that does both in series. It also
+- submit_jobs takes a list of jobs and sends them to the cluster
+- get_status checks the jobs in a given session
+- collect_jobs takes a list of job ids and collects their results
+- process_jobs provides a shortcut that does both in series. It also
   provides an option to run locally.
 
 Please look at the examples for usage details.
