@@ -1,4 +1,15 @@
 #! /usr/bin/env python
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# Written (W) 2008 Christian Widmer
+# Written (W) 2008 Cheng Soon Ong
+# Copyright (C) 2008 Max-Planck-Society
+
+
 """
 pythongrid provides a high level front end to DRMAA-python.
 This module provides wrappers that simplify submission and collection of jobs,
@@ -389,18 +400,22 @@ def collect_jobs(sid, jobids, joblist, wait=False):
             retJob = load(job.outputfile)
             assert(retJob.name == job.name)
             retJobs.append(retJob)
+
+            #remove files
+            if retJob.cleanup:
+                os.remove(job.outputfile)
+                logfilename = (os.path.expanduser(TEMPDIR)
+                               + job.name + '.o' + jobids[ix])
+                print logfilename
+                os.remove(logfilename)
+
         except Exception, detail:
             print "error while unpickling file: " + job.outputfile
             print "most likely there was an error during job execution"
+
             print detail
 
-        #remove files
-        if retJob.cleanup:
-            os.remove(job.outputfile)
-            logfilename = (os.path.expanduser(TEMPDIR)
-                           + job.name + '.o' + jobids[ix])
-            print logfilename
-            os.remove(logfilename)
+
 
     return retJobs
 
