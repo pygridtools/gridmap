@@ -27,6 +27,8 @@ PYGRID = "~/svn/tools/python/pythongrid/pythongrid.py"
 #(must be writable from cluster)
 # ag-raetsch
 TEMPDIR = "~/tmp/"
+#TEMPDIR = "/fml/ag-raetsch/home/fabio/tmp/pygrid/"
+
 # agbs
 #TEMPDIR = "/agbs/cluster/ong/DRMAA_JOB_OUT"
 
@@ -39,12 +41,15 @@ alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
 
 import sys
 import os
+import os.path
 import bz2
 import cPickle
 import getopt
 import threading
 import time
 import random
+
+jp = os.path.join
 
 drmaa_present=1
 
@@ -135,8 +140,8 @@ class KybJob(Job):
             raise Exception()
         # TODO: ensure uniqueness of file names
         self.name = 'pg'+''.join([random.choice(alphabet) for a in xrange(8)])
-        self.inputfile = outdir + self.name + "_in.bz2"
-        self.outputfile = outdir + self.name + "_out.bz2"
+        self.inputfile = jp(outdir,self.name + "_in.bz2")
+        self.outputfile =jp(outdir,self.name + "_out.bz2")
 
     def getNativeSpecification(self):
         """
@@ -343,6 +348,7 @@ def submit_jobs(jobs):
         #TODO figure this out for agbs
         jt.setEnvironment({"LD_LIBRARY_PATH": os.getenv("LD_LIBRARY_PATH"),
                            "PYTHONPATH": os.getenv("PYTHONPATH"),
+                           "MOSEKLM_LICENSE_FILE": os.getenv("MOSEKLM_LICENSE_FILE"),
                            })
 
         jt.remoteCommand = os.path.expanduser(PYGRID)
@@ -430,9 +436,9 @@ def process_jobs(jobs, local=False, maxNumThreads=3):
         return collect_jobs(sid, jobids, jobs, wait=True)
     elif (not local and not drmaa_present):
         print 'Warning: import DRMAA failed, computing locally'
-        return _process_jobs_locally(jobs, maxNumThreads=3)
+        return _process_jobs_locally(jobs, maxNumThreads)
     else:
-        return _process_jobs_locally(jobs, maxNumThreads=3)
+        return _process_jobs_locally(jobs, maxNumThreads)
 
 
 def get_status(sid, jobids):
