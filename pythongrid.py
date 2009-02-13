@@ -45,13 +45,13 @@ import os.path
 import bz2
 import cPickle
 import getopt
-import threading
 import time
 import random
 
 jp = os.path.join
 
 drmaa_present=1
+multiprocessing_present=1
 
 try:
     import DRMAA
@@ -60,6 +60,14 @@ except ImportError, detail:
     print "Please check your installation."
     print detail
     drmaa_present=0
+
+try:
+    import multiprocessing
+except ImportError, detail:
+    print "Error importing multiprocessing. Local computing limited to one CPU."
+    print "Please install python2.6 or the backport of the multiprocessing package"
+    print detail
+    multiprocessing_present=0
 
 
 class Job(object):
@@ -255,28 +263,31 @@ class MethodJob:
         self.ret = apply(m, self.args, self.kwlist)
 
 
-class JobsThread(threading.Thread):
-    """
-    In case jobs are to be computed locally, a number of Jobs (possibly one)
-    are assinged to one thread.
-    """
+#only define this class if the multiprocessing module is present
+if multiprocessing_present:
 
-    def __init__(self, jobs):
+    class JobsProcess(multiprocessing.Process):
         """
-        Constructor
-        @param jobs: list of jobs
-        @type jobs: list of Job objects
+        In case jobs are to be computed locally, a number of Jobs (possibly one)
+        are assinged to one thread.
         """
 
-        self.jobs = jobs
-        threading.Thread.__init__(self)
+        def __init__(self, jobs):
+            """
+            Constructor
+            @param jobs: list of jobs
+            @type jobs: list of Job objects
+            """
 
-    def run(self):
-        """
-        Executes each job in job list
-        """
-        for job in self.jobs:
-            job.execute()
+            self.jobs = jobs
+            multiprocessing.Process.__init__(self)
+
+        def run(self):
+            """
+            Executes each job in job list
+            """
+            for job in self.jobs:
+                job.execute()
 
 
 def _process_jobs_locally(jobs, maxNumThreads=1):
@@ -290,6 +301,18 @@ def _process_jobs_locally(jobs, maxNumThreads=1):
                           to be used to process jobs
     @type maxNumThreads: integer
     """
+
+
+    #perform sequential computation
+    if (not multiprocessing_present):
+        for job in jobs:
+            job.execute()
+
+        return jobs
+
+
+    #TODO: implement this using the processing package for python2.5 or
+    #the multiprocessing library in python2.6, including a queue
 
     numJobs=len(jobs)
 
@@ -307,25 +330,25 @@ def _process_jobs_locally(jobs, maxNumThreads=1):
     print "jobs per thread: ", jobsPerThread
 
     jobList = []
-    threadList = []
+    processList = []
 
-    #assign jobs to threads
-    #TODO use a queue here
+    #assign jobs to process
+    #TODO: use a queue here
     for (i, job) in enumerate(jobs):
         jobList.append(job)
 
         if ((i%jobsPerThread==0 and i!=0) or i==(numJobs-1)):
-            #create new thread
-            print "starting new thread"
-            thread = JobsThread(jobList)
-            threadList.append(thread)
-            thread.start()
+            #create new process
+            print "starting new process"
+            process = JobsProcess(jobList)
+            processList.append(process)
+            process.start()
             jobList = []
 
 
-    #wait for threads to finish
-    for thread in threadList:
-        thread.join()
+    #wait for process to finish
+    for process in processList:
+        process.join()
 
     return jobs
 
@@ -426,7 +449,7 @@ def collect_jobs(sid, jobids, joblist, wait=False):
     return retJobs
 
 
-def process_jobs(jobs, local=False, maxNumThreads=3):
+def process_jobs(jobs, local=False, maxNumThreads=1):
     """
     Director method to decide whether to run on cluster or locally
     """
@@ -436,9 +459,9 @@ def process_jobs(jobs, local=False, maxNumThreads=3):
         return collect_jobs(sid, jobids, jobs, wait=True)
     elif (not local and not drmaa_present):
         print 'Warning: import DRMAA failed, computing locally'
-        return _process_jobs_locally(jobs, maxNumThreads)
+        return _process_jobs_locally(jobs, maxNumThreads=maxNumThreads)
     else:
-        return _process_jobs_locally(jobs, maxNumThreads)
+        return _process_jobs_locally(jobs, maxNumThreads=maxNumThreads)
 
 
 def get_status(sid, jobids):
