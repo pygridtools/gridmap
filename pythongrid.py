@@ -324,7 +324,7 @@ def _process_jobs_locally(jobs, maxNumThreads=1):
         jobsPerThread = 1
     else:
         numThreads = maxNumThreads
-        jobsPerThread = (numJobs/numThreads)+1
+        jobsPerThread = int(float(numJobs)/float(numThreads)+0.5)
 
     print "number of threads: ", numThreads
     print "jobs per thread: ", jobsPerThread
