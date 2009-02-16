@@ -337,7 +337,7 @@ def _process_jobs_locally(jobs, maxNumThreads=1):
     for (i, job) in enumerate(jobs):
         jobList.append(job)
 
-        if ((i%jobsPerThread==0 and i!=0) or i==(numJobs-1)):
+        if (((i+1)%jobsPerThread==0) or i==(numJobs-1)):
             #create new process
             print "starting new process"
             process = JobsProcess(jobList)
