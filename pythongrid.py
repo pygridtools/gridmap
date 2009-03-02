@@ -97,8 +97,10 @@ class Job(object):
         self.nativeSpecification = ""
         self.inputfile = ""
         self.outputfile = ""
+        self.exception = None
 
-    def __repr__(self):
+    def __repr_broken__(self):
+        #TODO: fix representation
         retstr1 = ('%s\nargs=%s\nkwlist=%s\nret=%s\ncleanup=%s' %
                    self.f, self.args, self.kwlist, self.ret, self.cleanup)
         retstr2 = ('\nnativeSpecification=%s\ninputfile=%s\noutputfile=%s\n' %
@@ -109,9 +111,16 @@ class Job(object):
         """
         Executes function f with given arguments
         and writes return value to field ret.
+        If an exception is encountered during execution, ret will
+        remain empty and the exception will be written
+        to the exception field of the Job object.
         Input data is removed after execution to save space.
         """
-        self.ret=apply(self.f, self.args, self.kwlist)
+        try:
+            self.ret = apply(self.f, self.args, self.kwlist)
+        except  Exception, e:
+            print e
+            self.exception = e
 
 
 class KybJob(Job):
@@ -149,7 +158,7 @@ class KybJob(Job):
         # TODO: ensure uniqueness of file names
         self.name = 'pg'+''.join([random.choice(alphabet) for a in xrange(8)])
         self.inputfile = jp(outdir,self.name + "_in.bz2")
-        self.outputfile =jp(outdir,self.name + "_out.bz2")
+        self.outputfile = jp(outdir,self.name + "_out.bz2")
 
     def getNativeSpecification(self):
         """
@@ -311,8 +320,7 @@ def _process_jobs_locally(jobs, maxNumThreads=1):
         return jobs
 
 
-    #TODO: implement this using the processing package for python2.5 or
-    #the multiprocessing library in python2.6, including a queue
+    #TODO: including a queue (see http://pyinsci.blogspot.com/2009/02/usage-pattern-for-multiprocessing.html)
 
     numJobs=len(jobs)
 
@@ -333,7 +341,6 @@ def _process_jobs_locally(jobs, maxNumThreads=1):
     processList = []
 
     #assign jobs to process
-    #TODO: use a queue here
     for (i, job) in enumerate(jobs):
         jobList.append(job)
 
@@ -437,6 +444,11 @@ def collect_jobs(sid, jobids, joblist, wait=False):
                                + job.name + '.o' + jobids[ix])
                 print logfilename
                 os.remove(logfilename)
+
+            #print exceptions
+            if retJob.exception != None:
+                print "Exception caught in job with input file:", retJob.inputfile
+                print retJob.exception
 
         except Exception, detail:
             print "error while unpickling file: " + job.outputfile
