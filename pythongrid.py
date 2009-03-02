@@ -72,7 +72,7 @@ except ImportError, detail:
 
 class Job(object):
     """
-    Central entity that wrappes a function and its data. Basically,
+    Central entity that wraps a function and its data. Basically,
     a job consists of a function, its argument list, its
     keyword list and a field "ret" which is filled, when
     the execute method gets called
@@ -88,6 +88,8 @@ class Job(object):
         @type args: list
         @param kwlist: dictionary of keyword arguments
         @type kwlist: dict
+        @param cleanup: flag that determines the cleanup of input and log file
+        @type cleanup: boolean
         """
         self.f = f
         self.args = args
@@ -118,7 +120,9 @@ class Job(object):
         """
         try:
             self.ret = apply(self.f, self.args, self.kwlist)
-        except  Exception, e:
+        except Exception, e:
+            print "exception encountered:"
+            print str(type(e))
             print e
             self.exception = e
 
@@ -414,6 +418,7 @@ def collect_jobs(sid, jobids, joblist, wait=False):
     @param wait: Wait for jobs to finish?
     @type wait: Boolean, defaults to False
     """
+
     for ix in xrange(len(jobids)):
         assert(jobids[ix] == joblist[ix].jobid)
 
@@ -437,22 +442,30 @@ def collect_jobs(sid, jobids, joblist, wait=False):
             assert(retJob.name == job.name)
             retJobs.append(retJob)
 
-            #remove files
-            if retJob.cleanup:
-                os.remove(job.outputfile)
-                logfilename = (os.path.expanduser(TEMPDIR)
-                               + job.name + '.o' + jobids[ix])
-                print logfilename
-                os.remove(logfilename)
+            logfilename = (os.path.expanduser(TEMPDIR) + job.name + '.o' + jobids[ix])
 
             #print exceptions
             if retJob.exception != None:
-                print "Exception caught in job with input file:", retJob.inputfile
+                print str(type(retJob.exception))
+                print "Exception encountered in job with log file:"
+                print logfilename
                 print retJob.exception
+
+
+
+            #remove files
+            if retJob.cleanup:
+                os.remove(job.outputfile)
+                print "cleaning up:", job.outputfile
+
+                if retJob==None:
+                    os.remove(logfilename)
+                    print "cleaning up:", logfilename
+
 
         except Exception, detail:
             print "error while unpickling file: " + job.outputfile
-            print "most likely there was an error during job execution"
+            print "this could caused by a problem with the cluster environment"
 
             print detail
 
