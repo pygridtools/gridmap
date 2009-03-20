@@ -437,12 +437,13 @@ def collect_jobs(sid, jobids, joblist, wait=False):
     #attempt to collect results
     retJobs = []
     for ix, job in enumerate(joblist):
+        
+        logfilename = (os.path.expanduser(TEMPDIR) + job.name + '.o' + jobids[ix])
+        
         try:
             retJob = load(job.outputfile)
             assert(retJob.name == job.name)
             retJobs.append(retJob)
-
-            logfilename = (os.path.expanduser(TEMPDIR) + job.name + '.o' + jobids[ix])
 
             #print exceptions
             if retJob.exception != None:
@@ -465,8 +466,9 @@ def collect_jobs(sid, jobids, joblist, wait=False):
 
         except Exception, detail:
             print "error while unpickling file: " + job.outputfile
-            print "this could caused by a problem with the cluster environment"
-
+            print "this could caused by a problem with the cluster environment, imports or environment variables"
+            print "check log file for more information: " + logfilename
+            
             print detail
 
 
