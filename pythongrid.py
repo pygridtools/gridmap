@@ -21,7 +21,7 @@ in a more 'pythonic' fashion.
 
 #location of pythongrid.py on cluster file system
 #LD_LIBRARY_PATH = "/usr/local/sge/lib/lx26-amd64/"
-PYGRID = "~/svn/tools/python/pythongrid/pythongrid.py"
+PYGRID = "/local/cong/lib/python2.5/site-packages/pythongrid.py"
 
 #define temp directories for the input and output variables
 #(must be writable from cluster)
@@ -360,7 +360,26 @@ def _process_jobs_locally(jobs, maxNumThreads=1):
     #wait for process to finish
     for process in processList:
         process.join()
+        
 
+    return jobs
+
+def _execute(job):
+    """Cannot pickle method instances, so fake a function.
+    Used by _proc"""
+    return apply(job.f, job.args, job.kwlist)
+
+def _proc(jobs):
+    """Local execution using multiprocessing"""
+    if (not multiprocessing_present):
+        #perform sequential computation
+        for job in jobs:
+            job.execute()
+    else:
+        po = multiprocessing.Pool()
+        result = po.map(_execute, jobs)
+        for ix,job in enumerate(jobs):
+            job.ret = result[ix]
     return jobs
 
 
@@ -486,9 +505,11 @@ def process_jobs(jobs, local=False, maxNumThreads=1):
         return collect_jobs(sid, jobids, jobs, wait=True)
     elif (not local and not drmaa_present):
         print 'Warning: import DRMAA failed, computing locally'
-        return _process_jobs_locally(jobs, maxNumThreads=maxNumThreads)
+        #return _process_jobs_locally(jobs, maxNumThreads=maxNumThreads)
+        return _proc(jobs, maxNumThreads=maxNumThreads)
     else:
-        return _process_jobs_locally(jobs, maxNumThreads=maxNumThreads)
+        #return _process_jobs_locally(jobs, maxNumThreads=maxNumThreads)
+        return _proc(jobs, maxNumThreads=maxNumThreads)
 
 
 def get_status(sid, jobids):
