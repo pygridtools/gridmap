@@ -371,7 +371,6 @@ def _execute(job):
 
 def _proc(jobs, maxNumThreads=None):
     """Local execution using multiprocessing"""
-    maxNumThreads = None
     if (not multiprocessing_present):
         #perform sequential computation
         for job in jobs:
