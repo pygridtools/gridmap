@@ -369,14 +369,16 @@ def _execute(job):
     Used by _proc"""
     return apply(job.f, job.args, job.kwlist)
 
-def _proc(jobs):
+def _proc(jobs, maxNumThreads=None):
     """Local execution using multiprocessing"""
+    maxNumThreads = None
     if (not multiprocessing_present):
         #perform sequential computation
         for job in jobs:
             job.execute()
     else:
-        po = multiprocessing.Pool()
+        #print multiprocessing.cpu_count()
+        po = multiprocessing.Pool(maxNumThreads)
         result = po.map(_execute, jobs)
         for ix,job in enumerate(jobs):
             job.ret = result[ix]
