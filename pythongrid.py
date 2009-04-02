@@ -5,9 +5,9 @@
 # the Free Software Foundation; either version 2 of the License, or
 # (at your option) any later version.
 #
-# Written (W) 2008 Christian Widmer
-# Written (W) 2008 Cheng Soon Ong
-# Copyright (C) 2008 Max-Planck-Society
+# Written (W) 2008-2009 Christian Widmer
+# Written (W) 2008-2009 Cheng Soon Ong
+# Copyright (C) 2008-2009 Max-Planck-Society
 
 
 """
@@ -21,8 +21,8 @@ in a more 'pythonic' fashion.
 
 #location of pythongrid.py on cluster file system
 #LD_LIBRARY_PATH = "/usr/local/sge/lib/lx26-amd64/"
-PYGRID = "/local/cong/lib/python2.5/site-packages/pythongrid.py"
-
+#PYGRID = "/local/cong/lib/python2.5/site-packages/pythongrid.py"
+PYGRID = "~/svn/tools/python/pythongrid/pythongrid.py"
 #define temp directories for the input and output variables
 #(must be writable from cluster)
 # ag-raetsch
@@ -303,74 +303,28 @@ if multiprocessing_present:
                 job.execute()
 
 
-def _process_jobs_locally(jobs, maxNumThreads=1):
-    """
-    Run jobs on local machine in a multithreaded manner,
-    providing the same interface.
-
-    @param jobs: list of jobs to be executed locally.
-    @type jobs: list of Job objects
-    @param maxNumThreads: defines the maximal number of threads
-                          to be used to process jobs
-    @type maxNumThreads: integer
-    """
-
-
-    #perform sequential computation
-    if (not multiprocessing_present):
-        for job in jobs:
-            job.execute()
-
-        return jobs
-
-
-    #TODO: including a queue (see http://pyinsci.blogspot.com/2009/02/usage-pattern-for-multiprocessing.html)
-
-    numJobs=len(jobs)
-
-    print "number of jobs: ", numJobs
-
-    #check if there are fewer jobs then allowed threads
-    if (maxNumThreads >= numJobs):
-        numThreads = numJobs
-        jobsPerThread = 1
-    else:
-        numThreads = maxNumThreads
-        jobsPerThread = int(float(numJobs)/float(numThreads)+0.5)
-
-    print "number of threads: ", numThreads
-    print "jobs per thread: ", jobsPerThread
-
-    jobList = []
-    processList = []
-
-    #assign jobs to process
-    for (i, job) in enumerate(jobs):
-        jobList.append(job)
-
-        if (((i+1)%jobsPerThread==0) or i==(numJobs-1)):
-            #create new process
-            print "starting new process"
-            process = JobsProcess(jobList)
-            processList.append(process)
-            process.start()
-            jobList = []
-
-
-    #wait for process to finish
-    for process in processList:
-        process.join()
-        
-
-    return jobs
-
 def _execute(job):
     """Cannot pickle method instances, so fake a function.
-    Used by _proc"""
+    Used by _process_jobs_locally"""
+    
     return apply(job.f, job.args, job.kwlist)
 
-def _proc(jobs, maxNumThreads=None):
-    """Local execution using multiprocessing"""
+
+
+def _process_jobs_locally(jobs, maxNumThreads=None):
+    """
+    Local execution using the package multiprocessing, if present
+    
+    @param jobs: jobs to be executed
+    @type jobs: list<Job>
+    @param maxNumThreads: maximal number of threads
+    @type maxNumThreads: int
+    
+    @return: list of jobs, each with return in job.ret
+    @rtype: list<Job>
+    """
+    
+    
     if (not multiprocessing_present):
         #perform sequential computation
         for job in jobs:
@@ -381,6 +335,7 @@ def _proc(jobs, maxNumThreads=None):
         result = po.map(_execute, jobs)
         for ix,job in enumerate(jobs):
             job.ret = result[ix]
+            
     return jobs
 
 
@@ -388,7 +343,7 @@ def submit_jobs(jobs):
     """
     Method used to send a list of jobs onto the cluster.
     @param jobs: list of jobs to be executed
-    @type jobs: list of Job objects
+    @type jobs: list<Job>
     """
 
     s = DRMAA.Session()
@@ -500,17 +455,16 @@ def process_jobs(jobs, local=False, maxNumThreads=1):
     """
     Director method to decide whether to run on cluster or locally
     """
+    
     if (not local and drmaa_present):
         #Use submit_jobs and collect_jobs to run jobs and wait for the results.
         (sid, jobids) = submit_jobs(jobs)
         return collect_jobs(sid, jobids, jobs, wait=True)
     elif (not local and not drmaa_present):
         print 'Warning: import DRMAA failed, computing locally'
-        #return _process_jobs_locally(jobs, maxNumThreads=maxNumThreads)
-        return _proc(jobs, maxNumThreads=maxNumThreads)
+        return  _process_jobs_locally(jobs, maxNumThreads=maxNumThreads)
     else:
-        #return _process_jobs_locally(jobs, maxNumThreads=maxNumThreads)
-        return _proc(jobs, maxNumThreads=maxNumThreads)
+        return  _process_jobs_locally(jobs, maxNumThreads=maxNumThreads)
 
 
 def get_status(sid, jobids):

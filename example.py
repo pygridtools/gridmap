@@ -5,8 +5,8 @@
 # the Free Software Foundation; either version 2 of the License, or
 # (at your option) any later version.
 #
-# Written (W) 2008 Christian Widmer
-# Copyright (C) 2008 Max-Planck-Society
+# Written (W) 2008-2009 Christian Widmer
+# Copyright (C) 2008-2009 Max-Planck-Society
 
 import sys
 import getopt
@@ -22,26 +22,26 @@ def makeJobs():
     """
     Creates a list of Jobs.
     """
-    inputvec = [[20], [30], [40], [50]]
+    
+    inputvec = [[80000], [80000], [80000], [80000], [80000]]
     print 'print computing the factorials of %s' % str(inputvec)
     jobs=[]
-    j1 = KybJob(example.computeFactorial, inputvec[0])
-    j1.h_vmem="300M"
 
-    jobs.append(j1)
-
-    # One needs to use the full identifier
-    # such that the module name is explicit.
-    jobs.append(KybJob(example.computeFactorial, inputvec[1]))
-    jobs.append(KybJob(example.computeFactorial, inputvec[2]))
-    jobs.append(KybJob(example.computeFactorial, inputvec[3]))
+    for input in inputvec:
+        # We need to use the full identifier
+        # such that the module name is explicit.
+        job = KybJob(example.computeFactorial, input) 
+        job.h_vmem="300M"
+        
+        jobs.append(job)
+        
 
     return jobs
 
 
 def runExample():
     print "====================================="
-    print "======= Local Multithreading ========"
+    print "======  Local Multithreading  ======="
     print "====================================="
     print ""
     print ""
@@ -55,19 +55,22 @@ def runExample():
         print "Job #", i, "- ret: ", job.ret
 
     print ""
-    print "executing jobs on local machine"
+    print "executing jobs on local machine using 3 threads"
     print ""
 
-    processedFunctionJobs = process_jobs(functionJobs, local=True)
+    
+    processedFunctionJobs = process_jobs(functionJobs, local=True, maxNumThreads=3)
+    
 
     print "ret fields AFTER execution on local machine"
     for (i, job) in enumerate(processedFunctionJobs):
-        print "Job #", i, "- ret: ", job.ret
+        print "Job #", i, "- ret: ", str(job.ret)[0:10]
 
+    
     print ""
     print ""
     print "====================================="
-    print "=======     Submit and Wait        ========"
+    print "========   Submit and Wait   ========"
     print "====================================="
     print ""
     print ""
@@ -86,13 +89,13 @@ def runExample():
 
     print "ret fields AFTER execution on cluster"
     for (i, job) in enumerate(processedFunctionJobs):
-        print "Job #", i, "- ret: ", job.ret
+        print "Job #", i, "- ret: ", str(job.ret)[0:10]
 
 
     print ""
     print ""
     print "====================================="
-    print "=======    Submit and Forget     ========"
+    print "=======  Submit and Forget   ========"
     print "====================================="
     print ""
     print ""
@@ -110,7 +113,7 @@ def runExample():
     retjobs = collect_jobs(sid, jobids, myjobs)
     print "ret fields AFTER execution on cluster"
     for (i, job) in enumerate(retjobs):
-        print "Job #", i, "- ret: ", job.ret
+        print "Job #", i, "- ret: ", str(job.ret)[0:10]
 
     print '--------------'
 
@@ -147,4 +150,4 @@ def main(argv=None):
 
 if __name__ == "__main__":
     main()
-    #sys.exit(main())
+

@@ -1,8 +1,8 @@
 TODO
 
++ update to new DRMAA wrapper!
 + validate member flags for KybJob
 + Unify method jobs
-+ add queue to local multithreading
 + hold interface
 + Need a better way to set job and file names. Preferably human readable and unique.
 + Clear memory after pickling in the constructor, so reduce memory usage
