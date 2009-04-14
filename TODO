@@ -1,8 +1,14 @@
 TODO
 
+pre-0.3:
 + update to new DRMAA wrapper!
-+ validate member flags for KybJob
-+ Unify method jobs
-+ hold interface
++ clearly document "submit and wait" and "submit and collect"
+
+
+post-0.3:
++ add apply_to_combination as helper
++ Unify method jobs, reconsider whether it makes sense to have this
 + Need a better way to set job and file names. Preferably human readable and unique.
 + Clear memory after pickling in the constructor, so reduce memory usage
++ validate member flags for KybJob
++ hold interface
