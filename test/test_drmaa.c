@@ -20,5 +20,6 @@ int main (int argc, char **argv) {
     fprintf (stderr, "Could not shut down the DRMAA library: %s\n", error);
     return 1;
   }
+  printf ("DRMAA quit successfully\n");
   return 0;
 }
