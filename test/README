@@ -1,0 +1,14 @@
+This is just to check that all the headers and libraries are in place
+the C DRMAA installation.
+
+gcc -o test_drmaa -ldrmaa test_drmaa.c 
+./test_drmaa
+
+The output is:
+DRMAA library was started successfully
+
+If compilation fails, check the following environment variables (or use -L and -I).
+CPATH
+LIBRARY_PATH
+LD_LIBRARY_PATH
+
