@@ -27,7 +27,7 @@ PYGRID = "~/svn/tools/python/pythongrid/pythongrid.py"
 #(must be writable from cluster)
 # ag-raetsch
 TEMPDIR = "~/tmp/"
-#TEMPDIR = "/fml/ag-raetsch/home/fabio/tmp/pygrid/"
+
 
 # agbs
 #TEMPDIR = "/agbs/cluster/ong/DRMAA_JOB_OUT"
@@ -100,6 +100,8 @@ class Job(object):
         self.inputfile = ""
         self.outputfile = ""
         self.exception = None
+        self.environment = None
+        self.replace_env = False
 
     def __repr_broken__(self):
         #TODO: fix representation
@@ -121,9 +123,13 @@ class Job(object):
         try:
             self.ret = apply(self.f, self.args, self.kwlist)
         except Exception, e:
-            print "exception encountered:"
-            print str(type(e))
-            print e
+            print "exception encountered"
+            print "type:", str(type(e))
+            print "file:", e.filename
+            print "line:", e.lineno
+            print "offset:", e.offset
+            print "text:", e.text
+            print "========="
             self.exception = e
 
 
@@ -213,7 +219,7 @@ class KybJob(Job):
         @type x: string
         """
 
-        self.__nativeSpecification=x
+        self.__nativeSpecification = x
 
     nativeSpecification = property(getNativeSpecification,
                                    setNativeSpecification)
@@ -354,11 +360,25 @@ def submit_jobs(jobs):
         save(job.inputfile, job)
         jt = s.createJobTemplate()
 
-        #TODO figure this out for agbs
-        jt.setEnvironment({"LD_LIBRARY_PATH": os.getenv("LD_LIBRARY_PATH"),
-                           "PYTHONPATH": os.getenv("PYTHONPATH"),
-                           "MOSEKLM_LICENSE_FILE": os.getenv("MOSEKLM_LICENSE_FILE"),
-                           })
+        #fetch env vars from shell
+        shell_env = {"LD_LIBRARY_PATH": os.getenv("LD_LIBRARY_PATH"),
+                     "PYTHONPATH": os.getenv("PYTHONPATH"),
+                     "MOSEKLM_LICENSE_FILE": os.getenv("MOSEKLM_LICENSE_FILE"),
+                     }
+
+        if job.environment and job.replace_env:
+            # only consider defined env vars
+            jt.setEnvironment(job.environment)
+
+        elif job.environment and not job.override_env:
+            # replace env var from shell with defined env vars
+            env = shell_env
+            env.update(job.environment)
+            jt.setEnvironment(env)
+
+        else:
+            # only consider env vars from shell
+            jt.setEnvironment(shell_env)
 
         jt.remoteCommand = os.path.expanduser(PYGRID)
         jt.args = [job.inputfile]

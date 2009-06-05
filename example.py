@@ -23,7 +23,7 @@ def makeJobs():
     Creates a list of Jobs.
     """
     
-    inputvec = [[80000], [80000], [80000], [80000], [80000]]
+    inputvec = [[8000], [8000], [8000], [8000], [8000]]
     print 'print computing the factorials of %s' % str(inputvec)
     jobs=[]
 
