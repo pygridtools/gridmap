@@ -16,27 +16,22 @@ This module provides wrappers that simplify submission and collection of jobs,
 in a more 'pythonic' fashion.
 """
 
-#paths on cluster file system
-#PYTHONPATH = ["~/svn/tools/python/", "~/svn/tools/python/pythongrid/"]
 
-#location of pythongrid.py on cluster file system
-#LD_LIBRARY_PATH = "/usr/local/sge/lib/lx26-amd64/"
-#PYGRID = "/local/cong/lib/python2.5/site-packages/pythongrid.py"
+# location of pythongrid.py on cluster file system
+# TODO set this in configuration file
 PYGRID = "~/svn/tools/python/pythongrid/pythongrid.py"
-#define temp directories for the input and output variables
-#(must be writable from cluster)
+
+# define temp directories for the input and output variables
+# (must be writable from cluster)
+# TODO define separate client/server TEMPDIR
 # ag-raetsch
 TEMPDIR = "~/tmp/"
-
 
 # agbs
 #TEMPDIR = "/agbs/cluster/ong/DRMAA_JOB_OUT"
 
 # used for generating random filenames
 alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-
-#print "LD_LIBRARY_PATH:", os.getenv("LD_LIBRARY_PATH")
-#print "PYTHONPATH:", os.getenv("PYTHONPATH")
 
 
 import sys
@@ -47,6 +42,7 @@ import cPickle
 import getopt
 import time
 import random
+import traceback
 
 jp = os.path.join
 
@@ -96,12 +92,30 @@ class Job(object):
         self.kwlist = kwlist
         self.cleanup = cleanup
         self.ret = None
-        self.nativeSpecification = ""
         self.inputfile = ""
         self.outputfile = ""
+        self.nativeSpecification = ""
         self.exception = None
         self.environment = None
         self.replace_env = False
+
+        self.log_stdout = ""
+        self.log_stderr = ""
+
+        self.log_stdout_fn = ""
+        self.log_stderr_fn = ""
+
+        outdir = os.path.expanduser(TEMPDIR)
+        if not os.path.isdir(outdir):
+            print '%s does not exist. Please create a directory' % outdir
+            raise Exception()
+
+        # TODO: ensure uniqueness of file names
+        self.name = 'pg'+''.join([random.choice(alphabet) for a in xrange(8)])
+        self.inputfile = jp(outdir,self.name + "_in.bz2")
+        self.outputfile = jp(outdir,self.name + "_out.bz2")
+        self.jobid = ""
+
 
     def __repr_broken__(self):
         #TODO: fix representation
@@ -122,15 +136,24 @@ class Job(object):
         """
         try:
             self.ret = apply(self.f, self.args, self.kwlist)
+
         except Exception, e:
+
             print "exception encountered"
             print "type:", str(type(e))
-            print "file:", e.filename
-            print "line:", e.lineno
-            print "offset:", e.offset
-            print "text:", e.text
+            print "line number:", sys.exc_info()[2].tb_lineno
+            print e
+            traceback.print_exc(file=sys.stdout)
             print "========="
             self.exception = e
+
+        #read job output into job object
+        try:
+            self.log_stdout = file(self.log_stdout_fn).readlines()
+            #self.log_stderr = file(self.log_stderr_fn).readlines()
+        except Exception, e:
+            print e
+            print "log file not present"
 
 
 class KybJob(Job):
@@ -159,23 +182,14 @@ class KybJob(Job):
         self.sigtb = ""
         self.cplex = ""
         self.nicetohave = ""
-        self.jobid = ""
 
-        outdir = os.path.expanduser(TEMPDIR)
-        if not os.path.isdir(outdir):
-            print '%s does not exist. Please create a directory' % outdir
-            raise Exception()
-        # TODO: ensure uniqueness of file names
-        self.name = 'pg'+''.join([random.choice(alphabet) for a in xrange(8)])
-        self.inputfile = jp(outdir,self.name + "_in.bz2")
-        self.outputfile = jp(outdir,self.name + "_out.bz2")
 
     def getNativeSpecification(self):
         """
         define python-style getter
         """
 
-        ret=""
+        ret = ""
 
         if (self.name != ""):
             ret = ret + " -N " + str(self.name)
@@ -212,6 +226,7 @@ class KybJob(Job):
 
         return ret
 
+
     def setNativeSpecification(self, x):
         """
         define python-style setter
@@ -224,62 +239,6 @@ class KybJob(Job):
     nativeSpecification = property(getNativeSpecification,
                                    setNativeSpecification)
 
-
-#TODO make read-only
-#  def __getattribute__(self, name):
-#
-#    if (name == "nativeSpecification"):
-#
-#      ret=""
-#
-#      for attr in self.__dict__.keys():
-#
-#        print attr
-#
-#        value = self.__dict__[attr]
-#        if (value!=""):
-#          ret=ret + " -l " + attr + "=" + value
-#
-#      return ret
-#
-#
-#    else:
-#
-#      return Job.__getattribute__(self, name)
-#
-
-#TODO this class will most likely disappear, soon.
-
-
-class MethodJob:
-
-    #TODO derive this from Job, unify!
-
-    methodName = ""
-    obj = None
-    args = ()
-    kwlist = {}
-    ret = None
-
-    def __init__(self, m, args, kwlist={}):
-        """
-
-        @param m: method to execute
-        @type m: method
-        @param args: list of arguments
-        @type args: list
-        @param kwlist: keyword list
-        @type kwlist: dict
-        """
-
-        self.methodName = m.im_func.func_name
-        self.obj = m.im_self
-        self.args = args
-        self.kwlist = kwlist
-
-    def execute(self):
-        m = getattr(self.obj, self.methodName)
-        self.ret = apply(m, self.args, self.kwlist)
 
 
 #only define this class if the multiprocessing module is present
@@ -331,7 +290,7 @@ def _process_jobs_locally(jobs, maxNumThreads=None):
     """
     
     
-    if (not multiprocessing_present):
+    if (not multiprocessing_present or maxNumThreads == 1):
         #perform sequential computation
         for job in jobs:
             job.execute()
@@ -360,17 +319,20 @@ def submit_jobs(jobs):
         save(job.inputfile, job)
         jt = s.createJobTemplate()
 
-        #fetch env vars from shell
-        shell_env = {"LD_LIBRARY_PATH": os.getenv("LD_LIBRARY_PATH"),
-                     "PYTHONPATH": os.getenv("PYTHONPATH"),
-                     "MOSEKLM_LICENSE_FILE": os.getenv("MOSEKLM_LICENSE_FILE"),
-                     }
+        #fetch only specific env vars from shell
+        #shell_env = {"LD_LIBRARY_PATH": os.getenv("LD_LIBRARY_PATH"),
+        #             "PYTHONPATH": os.getenv("PYTHONPATH"),
+        #             "MOSEKLM_LICENSE_FILE": os.getenv("MOSEKLM_LICENSE_FILE"),
+        #             }
+
+        # fetch env vars from shell        
+        shell_env = os.environ
 
         if job.environment and job.replace_env:
             # only consider defined env vars
             jt.setEnvironment(job.environment)
 
-        elif job.environment and not job.override_env:
+        elif job.environment and not job.replace_env:
             # replace env var from shell with defined env vars
             env = shell_env
             env.update(job.environment)
@@ -385,12 +347,21 @@ def submit_jobs(jobs):
         jt.joinFiles = True
         jt.setNativeSpecification(job.nativeSpecification)
         jt.outputPath = ":" + os.path.expanduser(TEMPDIR)
+        jt.errorPath = ":" + os.path.expanduser(TEMPDIR)
 
         jobid = s.runJob(jt)
-        job.jobid = jobid
-        print 'Your job %s has been submitted with id %s' % (job.name, jobid)
 
-        #display file size
+        # set job fields that depend on the jobid assigned by grid engine
+        job.jobid = jobid
+        job.log_stdout_fn = (os.path.expanduser(TEMPDIR) + job.name + '.o' + jobid)
+        job.log_stderr_fn = (os.path.expanduser(TEMPDIR) + job.name + '.e' + jobid)
+
+        print 'Your job %s has been submitted with id %s' % (job.name, jobid)
+        print "stdout:", job.log_stdout_fn
+        print "stderr:", job.log_stderr_fn
+        print ""
+
+        #display tmp file size
         # print os.system("du -h " + invars)
 
         jobids.append(jobid)
@@ -444,25 +415,31 @@ def collect_jobs(sid, jobids, joblist, wait=False):
             if retJob.exception != None:
                 print str(type(retJob.exception))
                 print "Exception encountered in job with log file:"
-                print logfilename
+                print retJob.log_stdout_fn
                 print retJob.exception
-
 
 
             #remove files
             if retJob.cleanup:
-                os.remove(job.outputfile)
-                print "cleaning up:", job.outputfile
 
-                if retJob==None:
-                    os.remove(logfilename)
-                    print "cleaning up:", logfilename
+                print "cleaning up:", job.outputfile
+                os.remove(job.outputfile)
+
+                if retJob != None:
+
+                    print "cleaning up:", job.log_stdout_fn
+                    os.remove(job.log_stdout_fn)
+
+                    print "cleaning up:", job.log_stderr_fn
+                    #os.remove(job.log_stderr_fn)
 
 
         except Exception, detail:
             print "error while unpickling file: " + job.outputfile
             print "this could caused by a problem with the cluster environment, imports or environment variables"
-            print "check log file for more information: " + logfilename
+            print "check log files for more information: "
+            print "stdout:", job.log_stdout_fn
+            print "stderr:", job.log_stderr_fn
             
             print detail
 
@@ -473,16 +450,18 @@ def collect_jobs(sid, jobids, joblist, wait=False):
 
 def process_jobs(jobs, local=False, maxNumThreads=1):
     """
-    Director method to decide whether to run on cluster or locally
+    Director function to decide whether to run on the cluster or locally
     """
     
     if (not local and drmaa_present):
-        #Use submit_jobs and collect_jobs to run jobs and wait for the results.
+        # Use submit_jobs and collect_jobs to run jobs and wait for the results.
         (sid, jobids) = submit_jobs(jobs)
         return collect_jobs(sid, jobids, jobs, wait=True)
+
     elif (not local and not drmaa_present):
         print 'Warning: import DRMAA failed, computing locally'
         return  _process_jobs_locally(jobs, maxNumThreads=maxNumThreads)
+
     else:
         return  _process_jobs_locally(jobs, maxNumThreads=maxNumThreads)
 
