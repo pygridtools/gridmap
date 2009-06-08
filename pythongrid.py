@@ -99,11 +99,11 @@ class Job(object):
         self.environment = None
         self.replace_env = False
 
-        self.log_stdout = ""
-        self.log_stderr = ""
+        #self.log_stdout = ""
+        #self.log_stderr = ""
 
-        self.log_stdout_fn = ""
-        self.log_stderr_fn = ""
+        #self.log_stdout_fn = ""
+        #self.log_stderr_fn = ""
 
         outdir = os.path.expanduser(TEMPDIR)
         if not os.path.isdir(outdir):
@@ -146,14 +146,6 @@ class Job(object):
             traceback.print_exc(file=sys.stdout)
             print "========="
             self.exception = e
-
-        #read job output into job object
-        try:
-            self.log_stdout = file(self.log_stdout_fn).readlines()
-            #self.log_stderr = file(self.log_stderr_fn).readlines()
-        except Exception, e:
-            print e
-            print "log file not present"
 
 
 class KybJob(Job):
@@ -353,12 +345,12 @@ def submit_jobs(jobs):
 
         # set job fields that depend on the jobid assigned by grid engine
         job.jobid = jobid
-        job.log_stdout_fn = (os.path.expanduser(TEMPDIR) + job.name + '.o' + jobid)
-        job.log_stderr_fn = (os.path.expanduser(TEMPDIR) + job.name + '.e' + jobid)
+        log_stdout_fn = (os.path.expanduser(TEMPDIR) + job.name + '.o' + jobid)
+        log_stderr_fn = (os.path.expanduser(TEMPDIR) + job.name + '.e' + jobid)
 
         print 'Your job %s has been submitted with id %s' % (job.name, jobid)
-        print "stdout:", job.log_stdout_fn
-        print "stderr:", job.log_stderr_fn
+        print "stdout:", log_stdout_fn
+        print "stderr:", log_stderr_fn
         print ""
 
         #display tmp file size
@@ -404,7 +396,8 @@ def collect_jobs(sid, jobids, joblist, wait=False):
     retJobs = []
     for ix, job in enumerate(joblist):
         
-        logfilename = (os.path.expanduser(TEMPDIR) + job.name + '.o' + jobids[ix])
+        log_stdout_fn = (os.path.expanduser(TEMPDIR) + job.name + '.o' + jobids[ix])
+        log_stderr_fn = (os.path.expanduser(TEMPDIR) + job.name + '.e' + jobids[ix])
         
         try:
             retJob = load(job.outputfile)
@@ -427,19 +420,19 @@ def collect_jobs(sid, jobids, joblist, wait=False):
 
                 if retJob != None:
 
-                    print "cleaning up:", job.log_stdout_fn
-                    os.remove(job.log_stdout_fn)
+                    print "cleaning up:", log_stdout_fn
+                    os.remove(log_stdout_fn)
 
-                    print "cleaning up:", job.log_stderr_fn
-                    #os.remove(job.log_stderr_fn)
+                    print "cleaning up:", log_stderr_fn
+                    #os.remove(log_stderr_fn)
 
 
         except Exception, detail:
             print "error while unpickling file: " + job.outputfile
             print "this could caused by a problem with the cluster environment, imports or environment variables"
             print "check log files for more information: "
-            print "stdout:", job.log_stdout_fn
-            print "stderr:", job.log_stderr_fn
+            print "stdout:", log_stdout_fn
+            print "stderr:", log_stderr_fn
             
             print detail
 
