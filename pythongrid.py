@@ -405,9 +405,8 @@ def collect_jobs(sid, jobids, joblist, wait=False):
                 print log_stdout_fn
                 print retJob.exception
 
-
             #remove files
-            if retJob.cleanup:
+            elif retJob.cleanup:
 
                 print "cleaning up:", job.outputfile
                 os.remove(job.outputfile)
