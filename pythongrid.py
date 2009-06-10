@@ -99,12 +99,6 @@ class Job(object):
         self.environment = None
         self.replace_env = False
 
-        #self.log_stdout = ""
-        #self.log_stderr = ""
-
-        #self.log_stdout_fn = ""
-        #self.log_stderr_fn = ""
-
         outdir = os.path.expanduser(TEMPDIR)
         if not os.path.isdir(outdir):
             print '%s does not exist. Please create a directory' % outdir
@@ -408,7 +402,7 @@ def collect_jobs(sid, jobids, joblist, wait=False):
             if retJob.exception != None:
                 print str(type(retJob.exception))
                 print "Exception encountered in job with log file:"
-                print retJob.log_stdout_fn
+                print log_stdout_fn
                 print retJob.exception
 
 
