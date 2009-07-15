@@ -16,16 +16,18 @@ This module provides wrappers that simplify submission and collection of jobs,
 in a more 'pythonic' fashion.
 """
 
+#paths on cluster file system
+#PYTHONPATH = ["/fml/ag-raetsch/home/raetsch/svn/tools/python/", "/fml/ag-raetsch/home/raetsch/svn/tools/python/pythongrid/", '/fml/ag-raetsch/home/raetsch/mylibs/lib/python2.5/site-packages/', '/fml/ag-raetsch/home/raetsch/projects/Git-QPalma/ParaParser', '/fml/ag-raetsch/home/raetsch/projects/Git-QPalma/DynProg/', '/fml/ag-raetsch/share/software/mosek/5/tools/platform/linux64x86/bin', '/fml/ag-raetsch/home/fabio/site-packages', '/fml/ag-raetsch/home/raetsch/projects/Git-QPalma/Genefinding', '/fml/ag-raetsch/share/software/lib/python2.5/site-packages']
 
 # location of pythongrid.py on cluster file system
 # TODO set this in configuration file
-PYGRID = "~/svn/tools/python/pythongrid/pythongrid.py"
+PYGRID = "/fml/ag-raetsch/home/raetsch/svn/tools/python/pythongrid/pythongrid.py"
 
 # define temp directories for the input and output variables
 # (must be writable from cluster)
 # TODO define separate client/server TEMPDIR
 # ag-raetsch
-TEMPDIR = "~/tmp/"
+TEMPDIR = "/fml/ag-raetsch/home/raetsch/tmp/pythongrid"
 
 # agbs
 #TEMPDIR = "/agbs/cluster/ong/DRMAA_JOB_OUT"
@@ -43,6 +45,14 @@ import getopt
 import time
 import random
 import traceback
+
+PPATH=reduce(lambda x,y: x+':'+y, PYTHONPATH) ;
+print PPATH
+os.environ['PYTHONPATH']= PPATH;
+
+sys.path.extend(PYTHONPATH)
+
+print "sys.path=" + str(sys.path) ;
 
 jp = os.path.join
 
