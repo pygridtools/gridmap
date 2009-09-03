@@ -19,23 +19,6 @@ in a more 'pythonic' fashion.
 #paths on cluster file system
 #PYTHONPATH = ["/fml/ag-raetsch/home/raetsch/svn/tools/python/", "/fml/ag-raetsch/home/raetsch/svn/tools/python/pythongrid/", '/fml/ag-raetsch/home/raetsch/mylibs/lib/python2.5/site-packages/', '/fml/ag-raetsch/home/raetsch/projects/Git-QPalma/ParaParser', '/fml/ag-raetsch/home/raetsch/projects/Git-QPalma/DynProg/', '/fml/ag-raetsch/share/software/mosek/5/tools/platform/linux64x86/bin', '/fml/ag-raetsch/home/fabio/site-packages', '/fml/ag-raetsch/home/raetsch/projects/Git-QPalma/Genefinding', '/fml/ag-raetsch/share/software/lib/python2.5/site-packages']
 
-# location of pythongrid.py on cluster file system
-# TODO set this in configuration file
-PYGRID = "/fml/ag-raetsch/home/raetsch/svn/tools/python/pythongrid/pythongrid.py"
-
-# define temp directories for the input and output variables
-# (must be writable from cluster)
-# TODO define separate client/server TEMPDIR
-# ag-raetsch
-TEMPDIR = "/fml/ag-raetsch/home/raetsch/tmp/pythongrid"
-
-# agbs
-#TEMPDIR = "/agbs/cluster/ong/DRMAA_JOB_OUT"
-
-# used for generating random filenames
-alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-
-
 import sys
 import os
 import os.path
@@ -46,11 +29,30 @@ import time
 import random
 import traceback
 
+
+#paths on cluster file system
+PYTHONPATH = os.environ['PYTHONPATH'] #["/fml/ag-raetsch/home/raetsch/svn/tools/python/", "/fml/ag-raetsch/home/raetsch/svn/tools/python/pythongrid/", '/fml/ag-raetsch/home/raetsch/mylibs/lib/python2.5/site-packages/', '/fml/ag-raetsch/home/raetsch/projects/Git-QPalma/ParaParser', '/fml/ag-raetsch/home/raetsch/projects/Git-QPalma/DynProg/', '/fml/ag-raetsch/share/software/mosek/5/tools/platform/linux64x86/bin', '/fml/ag-raetsch/home/fabio/site-packages', '/fml/ag-raetsch/home/raetsch/projects/Git-QPalma/Genefinding', '/fml/ag-raetsch/share/software/lib/python2.5/site-packages']
+
+# location of pythongrid.py on cluster file system
+# TODO set this in configuration file
+PYGRID = "~/svn/tools/python/pythongrid/pythongrid.py"
+
+# define temp directories for the input and output variables
+# (must be writable from cluster)
+# TODO define separate client/server TEMPDIR
+# ag-raetsch
+TEMPDIR = "~/tmp/"
+
+
+# used for generating random filenames
+alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+
 PPATH=reduce(lambda x,y: x+':'+y, PYTHONPATH) ;
 print PPATH
-os.environ['PYTHONPATH']= PPATH;
+os.environ['PYTHONPATH'] = PPATH;
 
 sys.path.extend(PYTHONPATH)
+
 
 print "sys.path=" + str(sys.path) ;
 
@@ -65,7 +67,7 @@ except ImportError, detail:
     print "Error importing DRMAA. Only local multi-threading supported."
     print "Please check your installation."
     print detail
-    drmaa_present=0
+    drmaa_present = 0
 
 try:
     import multiprocessing
@@ -73,7 +75,7 @@ except ImportError, detail:
     print "Error importing multiprocessing. Local computing limited to one CPU."
     print "Please install python2.6 or the backport of the multiprocessing package"
     print detail
-    multiprocessing_present=0
+    multiprocessing_present = 0
 
 
 class Job(object):

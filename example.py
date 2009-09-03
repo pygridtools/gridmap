@@ -40,6 +40,10 @@ def makeJobs():
 
 
 def runExample():
+    '''
+    execute example    
+    ''' 
+
     print "====================================="
     print "======  Local Multithreading  ======="
     print "====================================="
@@ -65,7 +69,7 @@ def runExample():
     print "ret fields AFTER execution on local machine"
     for (i, job) in enumerate(processedFunctionJobs):
         print "Job #", i, "- ret: ", str(job.ret)[0:10]
-
+    
     
     print ""
     print ""
