@@ -8,16 +8,21 @@ print('DRM system used: '+s.drmsInfo)
 jt=JobTemplate()
 jt.remoteCommand='/bin/sleep'
 jt.args=['10']
-jt.nativeSpecification='-q ether.s'
+jt.nativeSpecification=''
 jname=s.runJob(jt)
-s.control(jname, JobControlAction.TERMINATE)
+# Explicitly kill the job
+#s.control(jname, JobControlAction.TERMINATE)
 jinfo=s.wait(jname, Session.TIMEOUT_WAIT_FOREVER)
+
+# Show all the returned information
+# print jinfo
 if (jinfo.wasAborted):
     print('Job never ran')
 if (jinfo.hasExited):
-    print('Job exited with '+jinfo.exitStatus)
+    print('Job exited using the following resources:')
+    print jinfo.resourceUsage
 if (jinfo.hasSignal):
-    print('Job was signalled with '+jinfo.terminatingSignal)
+    print('Job was signalled with '+jinfo.terminatedSignal)
 s.exit()
                          
-print jinfo
+

@@ -1,4 +1,4 @@
-/* Some simple code just to check that installation is working */
+/* Start the drmaa library, submit a job (sleep 10), and quit. */
 
 #include <drmaa.h>
 
