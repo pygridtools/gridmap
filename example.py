@@ -10,6 +10,7 @@
 
 import sys
 import getopt
+import pythongrid
 from pythongrid import KybJob, Usage
 from pythongrid import process_jobs, submit_jobs, collect_jobs, get_status
 import time
@@ -23,7 +24,7 @@ def makeJobs():
     Creates a list of Jobs.
     """
     
-    inputvec = [[8000], [8000], [8000], [8000], [8000]]
+    inputvec = [[3], [5], [10], [15]]
     print 'print computing the factorials of %s' % str(inputvec)
     jobs=[]
 
@@ -50,7 +51,7 @@ def runExample():
     print ""
     print ""
 
-    print "generating fuction jobs"
+    print "generating function jobs"
 
     functionJobs = makeJobs()
 
@@ -60,9 +61,11 @@ def runExample():
 
     print ""
     print "executing jobs on local machine using 3 threads"
+    if not pythongrid.multiprocessing_present:
+        print 'multiprocessing not found, serial computation'
     print ""
 
-    
+
     processedFunctionJobs = process_jobs(functionJobs, local=True, maxNumThreads=3)
     
 

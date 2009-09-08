@@ -58,16 +58,16 @@ print "sys.path=" + str(sys.path) ;
 
 jp = os.path.join
 
-drmaa_present=1
-multiprocessing_present=1
+drmaa_present=True
+multiprocessing_present=True
 
 try:
-    import DRMAA
+    import drmaa
 except ImportError, detail:
-    print "Error importing DRMAA. Only local multi-threading supported."
+    print "Error importing drmaa. Only local multi-threading supported."
     print "Please check your installation."
     print detail
-    drmaa_present = 0
+    drmaa_present=False
 
 try:
     import multiprocessing
@@ -75,8 +75,7 @@ except ImportError, detail:
     print "Error importing multiprocessing. Local computing limited to one CPU."
     print "Please install python2.6 or the backport of the multiprocessing package"
     print detail
-    multiprocessing_present = 0
-
+    multiprocessing_present=False
 
 class Job(object):
     """
@@ -309,8 +308,8 @@ def submit_jobs(jobs):
     @type jobs: list<Job>
     """
 
-    s = DRMAA.Session()
-    s.init()
+    s = drmaa.Session()
+    s.initialize()
     jobids = []
 
     for job in jobs:
@@ -386,13 +385,13 @@ def collect_jobs(sid, jobids, joblist, wait=False):
     for ix in xrange(len(jobids)):
         assert(jobids[ix] == joblist[ix].jobid)
 
-    s = DRMAA.Session()
-    s.init(sid)
+    s = drmaa.Session()
+    s.initialize(sid)
 
     if wait:
-        drmaaWait = DRMAA.Session.TIMEOUT_WAIT_FOREVER
+        drmaaWait = drmaa.Session.TIMEOUT_WAIT_FOREVER
     else:
-        drmaaWait = DRMAA.Session.TIMEOUT_NO_WAIT
+        drmaaWait = drmaa.Session.TIMEOUT_NO_WAIT
 
     s.synchronize(jobids, drmaaWait, True)
     print "success: all jobs finished"
@@ -457,7 +456,7 @@ def process_jobs(jobs, local=False, maxNumThreads=1):
         return collect_jobs(sid, jobids, jobs, wait=True)
 
     elif (not local and not drmaa_present):
-        print 'Warning: import DRMAA failed, computing locally'
+        print 'Warning: import drmaa failed, computing locally'
         return  _process_jobs_locally(jobs, maxNumThreads=maxNumThreads)
 
     else:
@@ -473,25 +472,25 @@ def get_status(sid, jobids):
     """
     _decodestatus = {
         -42: 'sge and drmaa not in sync',
-        DRMAA.Session.UNDETERMINED: 'process status cannot be determined',
-        DRMAA.Session.QUEUED_ACTIVE: 'job is queued and active',
-        DRMAA.Session.SYSTEM_ON_HOLD: 'job is queued and in system hold',
-        DRMAA.Session.USER_ON_HOLD: 'job is queued and in user hold',
-        DRMAA.Session.USER_SYSTEM_ON_HOLD: 'job is in user and system hold',
-        DRMAA.Session.RUNNING: 'job is running',
-        DRMAA.Session.SYSTEM_SUSPENDED: 'job is system suspended',
-        DRMAA.Session.USER_SUSPENDED: 'job is user suspended',
-        DRMAA.Session.DONE: 'job finished normally',
-        DRMAA.Session.FAILED: 'job finished, but failed',
+        drmaa.Session.UNDETERMINED: 'process status cannot be determined',
+        drmaa.Session.QUEUED_ACTIVE: 'job is queued and active',
+        drmaa.Session.SYSTEM_ON_HOLD: 'job is queued and in system hold',
+        drmaa.Session.USER_ON_HOLD: 'job is queued and in user hold',
+        drmaa.Session.USER_SYSTEM_ON_HOLD: 'job is in user and system hold',
+        drmaa.Session.RUNNING: 'job is running',
+        drmaa.Session.SYSTEM_SUSPENDED: 'job is system suspended',
+        drmaa.Session.USER_SUSPENDED: 'job is user suspended',
+        drmaa.Session.DONE: 'job finished normally',
+        drmaa.Session.FAILED: 'job finished, but failed',
         }
 
-    s = DRMAA.Session()
-    s.init(sid)
+    s = drmaa.Session()
+    s.initialize(sid)
     status_summary = {}.fromkeys(_decodestatus, 0)
     for jobid in jobids:
         try:
             curstat = s.getJobProgramStatus(jobid)
-        except DRMAA.InvalidJobError, message:
+        except drmaa.InvalidJobError, message:
             print message
             status_summary[-42] += 1
         else:
@@ -503,7 +502,7 @@ def get_status(sid, jobids):
             print '%s: %d' % (_decodestatus[curkey], status_summary[curkey])
     s.exit()
 
-    return ((status_summary[DRMAA.Session.DONE]
+    return ((status_summary[drmaa.Session.DONE]
              +status_summary[-42])==len(jobids))
 
 
