@@ -4,6 +4,7 @@ pre-0.3:
 + update to new DRMAA wrapper!
 + clearly document "submit and wait" and "submit and collect"
 + remove hard-coded env vars and paths
++ Add ETHJob
 
 post-0.3:
 + add apply_to_combination as helper
