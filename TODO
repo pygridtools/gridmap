@@ -4,7 +4,8 @@ pre-0.3:
 + update to new DRMAA wrapper!
 + clearly document "submit and wait" and "submit and collect"
 + remove hard-coded env vars and paths
-+ Add ETHJob
++ fix problems with job submission that started recently (apparently caused by faulty feedback from grid engine, maybe a sleep will fix this)
+
 
 post-0.3:
 + add apply_to_combination as helper
@@ -13,3 +14,5 @@ post-0.3:
 + Clear memory after pickling in the constructor, so reduce memory usage
 + validate member flags for KybJob
 + hold interface
++ add feature of sending out email when jobs have finished
+
