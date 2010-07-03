@@ -11,13 +11,10 @@
 
 
 """
-pythongrid provides a high level front end to DRMAA-python.
+pythongrid provides a high level front-end to DRMAA-python.
 This module provides wrappers that simplify submission and collection of jobs,
 in a more 'pythonic' fashion.
 """
-
-#paths on cluster file system
-#PYTHONPATH = ["/fml/ag-raetsch/home/raetsch/svn/tools/python/", "/fml/ag-raetsch/home/raetsch/svn/tools/python/pythongrid/", '/fml/ag-raetsch/home/raetsch/mylibs/lib/python2.5/site-packages/', '/fml/ag-raetsch/home/raetsch/projects/Git-QPalma/ParaParser', '/fml/ag-raetsch/home/raetsch/projects/Git-QPalma/DynProg/', '/fml/ag-raetsch/share/software/mosek/5/tools/platform/linux64x86/bin', '/fml/ag-raetsch/home/fabio/site-packages', '/fml/ag-raetsch/home/raetsch/projects/Git-QPalma/Genefinding', '/fml/ag-raetsch/share/software/lib/python2.5/site-packages']
 
 import sys
 import os
@@ -31,7 +28,8 @@ import traceback
 
 
 #paths on cluster file system
-PYTHONPATH = os.environ['PYTHONPATH'] #["/fml/ag-raetsch/home/raetsch/svn/tools/python/", "/fml/ag-raetsch/home/raetsch/svn/tools/python/pythongrid/", '/fml/ag-raetsch/home/raetsch/mylibs/lib/python2.5/site-packages/', '/fml/ag-raetsch/home/raetsch/projects/Git-QPalma/ParaParser', '/fml/ag-raetsch/home/raetsch/projects/Git-QPalma/DynProg/', '/fml/ag-raetsch/share/software/mosek/5/tools/platform/linux64x86/bin', '/fml/ag-raetsch/home/fabio/site-packages', '/fml/ag-raetsch/home/raetsch/projects/Git-QPalma/Genefinding', '/fml/ag-raetsch/share/software/lib/python2.5/site-packages']
+# TODO set this in configuration file
+PYTHONPATH = os.environ['PYTHONPATH'] 
 
 # location of pythongrid.py on cluster file system
 # TODO set this in configuration file
@@ -40,18 +38,16 @@ PYGRID = "~/svn/tools/python/pythongrid/pythongrid.py"
 # define temp directories for the input and output variables
 # (must be writable from cluster)
 # TODO define separate client/server TEMPDIR
-# ag-raetsch
 TEMPDIR = "~/tmp/"
 
 
 # used for generating random filenames
-alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
-PPATH=reduce(lambda x,y: x+':'+y, PYTHONPATH) ;
-print PPATH
-os.environ['PYTHONPATH'] = PPATH;
-
-sys.path.extend(PYTHONPATH)
+#PPATH = reduce(lambda x,y: x+':'+y, PYTHONPATH)
+#print PPATH
+#os.environ['PYTHONPATH'] = PPATH
+#sys.path.extend(PYTHONPATH)
 
 
 print "sys.path=" + str(sys.path) ;
@@ -67,7 +63,7 @@ except ImportError, detail:
     print "Error importing drmaa. Only local multi-threading supported."
     print "Please check your installation."
     print detail
-    drmaa_present=False
+    drmaa_present = False
 
 try:
     import multiprocessing
@@ -75,7 +71,7 @@ except ImportError, detail:
     print "Error importing multiprocessing. Local computing limited to one CPU."
     print "Please install python2.6 or the backport of the multiprocessing package"
     print detail
-    multiprocessing_present=False
+    multiprocessing_present = False
 
 class Job(object):
     """
@@ -292,7 +288,6 @@ def _process_jobs_locally(jobs, maxNumThreads=None):
         for job in jobs:
             job.execute()
     else:
-        #print multiprocessing.cpu_count()
         po = multiprocessing.Pool(maxNumThreads)
         result = po.map(_execute, jobs)
         for ix,job in enumerate(jobs):
@@ -327,22 +322,23 @@ def submit_jobs(jobs):
 
         if job.environment and job.replace_env:
             # only consider defined env vars
-            jt.setEnvironment(job.environment)
+            jt.jobEnvironment = job.environment
 
         elif job.environment and not job.replace_env:
             # replace env var from shell with defined env vars
             env = shell_env
             env.update(job.environment)
-            jt.setEnvironment(env)
+            jt.jobEnvironment = env
 
         else:
             # only consider env vars from shell
-            jt.setEnvironment(shell_env)
+            jt.jobEnvironment = shell_env
+            
 
         jt.remoteCommand = os.path.expanduser(PYGRID)
         jt.args = [job.inputfile]
         jt.joinFiles = True
-        jt.setNativeSpecification(job.nativeSpecification)
+        jt.nativeSpecification = job.nativeSpecification
         jt.outputPath = ":" + os.path.expanduser(TEMPDIR)
         jt.errorPath = ":" + os.path.expanduser(TEMPDIR)
 
@@ -364,7 +360,7 @@ def submit_jobs(jobs):
         jobids.append(jobid)
         s.deleteJobTemplate(jt)
 
-    sid = s.getContact()
+    sid = s.contact
     s.exit()
 
     return (sid, jobids)
@@ -472,42 +468,47 @@ def get_status(sid, jobids):
     """
     _decodestatus = {
         -42: 'sge and drmaa not in sync',
-        drmaa.Session.UNDETERMINED: 'process status cannot be determined',
-        drmaa.Session.QUEUED_ACTIVE: 'job is queued and active',
-        drmaa.Session.SYSTEM_ON_HOLD: 'job is queued and in system hold',
-        drmaa.Session.USER_ON_HOLD: 'job is queued and in user hold',
-        drmaa.Session.USER_SYSTEM_ON_HOLD: 'job is in user and system hold',
-        drmaa.Session.RUNNING: 'job is running',
-        drmaa.Session.SYSTEM_SUSPENDED: 'job is system suspended',
-        drmaa.Session.USER_SUSPENDED: 'job is user suspended',
-        drmaa.Session.DONE: 'job finished normally',
-        drmaa.Session.FAILED: 'job finished, but failed',
-        }
+        "undetermined": 'process status cannot be determined',
+        "queued_active": 'job is queued and active',
+        "system_on_hold": 'job is queued and in system hold',
+        "user_on_hold": 'job is queued and in user hold',
+        "user_system_on_hold": 'job is in user and system hold',
+        "running": 'job is running',
+        "system_suspended": 'job is system suspended',
+        "user_suspended": 'job is user suspended',
+        "done": 'job finished normally',
+        "failed": 'job finished, but failed',
+    }
 
     s = drmaa.Session()
     s.initialize(sid)
+
     status_summary = {}.fromkeys(_decodestatus, 0)
     for jobid in jobids:
         try:
-            curstat = s.getJobProgramStatus(jobid)
-        except drmaa.InvalidJobError, message:
-            print message
-            status_summary[-42] += 1
-        else:
+            curstat = s.jobStatus(jobid)
             status_summary[curstat] += 1
+            print "XXX", curstat, "YYY", type(curstat)
+
+        except Exception, message:
+        #except drmaa.InvalidJobError, message:
+            print message
+            curstat = -42
 
     print 'Status of %s at %s' % (sid, time.strftime('%d/%m/%Y - %H.%M:%S'))
     for curkey in status_summary.keys():
         if status_summary[curkey]>0:
             print '%s: %d' % (_decodestatus[curkey], status_summary[curkey])
+
+        print status_summary[curkey]
+
     s.exit()
 
-    return ((status_summary[drmaa.Session.DONE]
-             +status_summary[-42])==len(jobids))
+    return ((status_summary["done"]+status_summary[-42])==len(jobids))
 
 
 #####################################################################
-# Dealing with data
+# Data persistence
 #####################################################################
 
 
@@ -555,6 +556,7 @@ def run_job(pickleFileName):
     @param pickleFileName: filename of pickled Job object
     @type pickleFileName: string
     """
+
 
     inPath = pickleFileName
     job = load(inPath)
