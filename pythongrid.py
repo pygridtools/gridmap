@@ -449,6 +449,10 @@ def process_jobs(jobs, local=False, maxNumThreads=1):
     if (not local and drmaa_present):
         # Use submit_jobs and collect_jobs to run jobs and wait for the results.
         (sid, jobids) = submit_jobs(jobs)
+
+        print 'checking whether finished'
+        while not get_status(sid, jobids):
+            time.sleep(7)
         return collect_jobs(sid, jobids, jobs, wait=True)
 
     elif (not local and not drmaa_present):
@@ -487,13 +491,13 @@ def get_status(sid, jobids):
     for jobid in jobids:
         try:
             curstat = s.jobStatus(jobid)
-            status_summary[curstat] += 1
-            print "XXX", curstat, "YYY", type(curstat)
+            print "current_status: %s for job with id %s" % (curstat, jobid)
 
         except Exception, message:
         #except drmaa.InvalidJobError, message:
             print message
             curstat = -42
+        status_summary[curstat] += 1
 
     print 'Status of %s at %s' % (sid, time.strftime('%d/%m/%Y - %H.%M:%S'))
     for curkey in status_summary.keys():
