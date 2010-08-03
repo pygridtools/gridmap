@@ -5,9 +5,9 @@
 # the Free Software Foundation; either version 2 of the License, or
 # (at your option) any later version.
 #
-# Written (W) 2008-2009 Christian Widmer
-# Written (W) 2008-2009 Cheng Soon Ong
-# Copyright (C) 2008-2009 Max-Planck-Society
+# Written (W) 2008-2010 Christian Widmer
+# Written (W) 2008-2010 Cheng Soon Ong
+# Copyright (C) 2008-2010 Max-Planck-Society
 
 
 """
@@ -81,7 +81,7 @@ class Job(object):
     the execute method gets called
     """
 
-    def __init__(self, f, args, kwlist={}, cleanup=True):
+    def __init__(self, f, args, kwlist={}, param=None, cleanup=True):
         """
         constructor of Job
 
@@ -106,6 +106,9 @@ class Job(object):
         self.environment = None
         self.replace_env = False
 
+        if param!=None:
+            self.__set_parameters(param)
+
         outdir = os.path.expanduser(TEMPDIR)
         if not os.path.isdir(outdir):
             print '%s does not exist. Please create a directory' % outdir
@@ -116,6 +119,19 @@ class Job(object):
         self.inputfile = jp(outdir,self.name + "_in.bz2")
         self.outputfile = jp(outdir,self.name + "_out.bz2")
         self.jobid = ""
+
+
+    def __set_parameters(self, param):
+        """
+        method to set parameters from dict
+        """
+
+        assert(param!=None)
+
+        for (key, value) in param.items():
+            setattr(self, key, value)
+
+        return self
 
 
     def __repr_broken__(self):
@@ -155,11 +171,11 @@ class KybJob(Job):
     the system at MPI Biol. Cyber. Tuebingen.
     """
 
-    def __init__(self, f, args, kwlist={}, cleanup=True):
+    def __init__(self, f, args, kwlist={}, param=None, cleanup=True):
         """
         constructor of KybJob
         """
-        Job.__init__(self, f, args, kwlist, cleanup)
+        Job.__init__(self, f, args, kwlist, param=param, cleanup=cleanup)
         self.h_vmem = ""
         self.arch = ""
         self.tmpfree = ""
@@ -269,7 +285,7 @@ def _execute(job):
 
 
 
-def _process_jobs_locally(jobs, maxNumThreads=None):
+def _process_jobs_locally(jobs, maxNumThreads=1):
     """
     Local execution using the package multiprocessing, if present
     
@@ -281,7 +297,8 @@ def _process_jobs_locally(jobs, maxNumThreads=None):
     @return: list of jobs, each with return in job.ret
     @rtype: list<Job>
     """
-    
+   
+    print "using %i threads" % (maxNumThreads)
     
     if (not multiprocessing_present or maxNumThreads == 1):
         #perform sequential computation
@@ -504,11 +521,69 @@ def get_status(sid, jobids):
         if status_summary[curkey]>0:
             print '%s: %d' % (_decodestatus[curkey], status_summary[curkey])
 
-        print status_summary[curkey]
-
     s.exit()
 
     return ((status_summary["done"]+status_summary[-42])==len(jobids))
+
+
+#####################################################################
+# MapReduce Interface
+#####################################################################
+
+
+
+def map(f, input_list, param=None, local=False, maxNumThreads=1):
+    """
+    provides a generic map function
+    """
+
+    jobs=[]
+
+    for input in input_list:
+        job = KybJob(f, input, param=param)
+        jobs.append(job)
+        
+
+    print "local processing:", local
+    processed_jobs = process_jobs(jobs, local=local, maxNumThreads=maxNumThreads)
+
+    results = [job.ret for job in processed_jobs]
+    return results
+
+
+def reduce(f, output_list):
+    """
+    provides a generic reduce function
+    """
+
+    return f(output_list)
+
+
+class MapReduce(object):
+    """
+    convenient high-level API for map-reduce interface
+    """
+
+    def __init__(self, fun_map, fun_reduce, input_list, param=None, name=None):
+        """
+        combines all that is needed for map-reduce
+        """
+
+        self.fun_map = fun_map
+        self.fun_reduce = fun_reduce
+        self.input_list = input_list
+        self.param = param
+        self.name = name
+
+    def wait(self, local=True, max_num_threads=1):
+        """
+        wait for jobs to finish
+        """
+
+        intermediate_results = map(self.fun_map, self.input_list, self.param, local, max_num_threads)
+        result = reduce(self.fun_reduce, intermediate_results)
+
+        return result
 
 
 #####################################################################
