@@ -539,15 +539,22 @@ def map(f, input_list, param=None, local=False, maxNumThreads=1):
 
     jobs=[]
 
+    # construct jobs
     for input in input_list:
-        job = KybJob(f, input, param=param)
+        job = KybJob(f, [input], param=param)
+        job.key = input
         jobs.append(job)
         
 
-    print "local processing:", local
+    # process jobs
     processed_jobs = process_jobs(jobs, local=local, maxNumThreads=maxNumThreads)
 
-    results = [job.ret for job in processed_jobs]
+
+    # store results
+    results = {}
+    for job in processed_jobs:
+        results[job.key] = job.ret
+    
     return results
 
 
