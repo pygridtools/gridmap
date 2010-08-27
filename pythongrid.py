@@ -532,7 +532,7 @@ def get_status(sid, jobids):
 
 
 
-def map(f, input_list, param=None, local=False, maxNumThreads=1):
+def map(f, input_list, param=None, local=False, maxNumThreads=1, mem="5G"):
     """
     provides a generic map function
     """
@@ -543,6 +543,8 @@ def map(f, input_list, param=None, local=False, maxNumThreads=1):
     for input in input_list:
         job = KybJob(f, [input], param=param)
         job.key = input
+        job.h_vmem = mem
+
         jobs.append(job)
         
 
@@ -557,13 +559,6 @@ def map(f, input_list, param=None, local=False, maxNumThreads=1):
     
     return results
 
-
-def reduce(f, output_list):
-    """
-    provides a generic reduce function
-    """
-
-    return f(output_list)
 
 
 class MapReduce(object):
@@ -588,7 +583,9 @@ class MapReduce(object):
         """
 
         intermediate_results = map(self.fun_map, self.input_list, self.param, local, max_num_threads)
-        result = reduce(self.fun_reduce, intermediate_results)
+
+        # apply user-defined reduce function to intermediate result
+        result = self.fun_reduce(intermediate_results)
 
         return result
 
