@@ -511,9 +511,9 @@ def get_status(sid, jobids):
             print "current_status: %s for job with id %s" % (curstat, jobid)
 
         except Exception, message:
-        #except drmaa.InvalidJobError, message:
-            print message
+            print "current_status: does_not_exist for job with id %s" % (jobid)
             curstat = -42
+
         status_summary[curstat] += 1
 
     print 'Status of %s at %s' % (sid, time.strftime('%d/%m/%Y - %H.%M:%S'))
