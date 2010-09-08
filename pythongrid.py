@@ -325,7 +325,6 @@ def submit_jobs(jobs):
     jobids = []
 
     for job in jobs:
-        save(job.inputfile, job)
         jt = s.createJobTemplate()
 
         #fetch only specific env vars from shell
@@ -363,12 +362,12 @@ def submit_jobs(jobs):
 
         # set job fields that depend on the jobid assigned by grid engine
         job.jobid = jobid
-        log_stdout_fn = (os.path.expanduser(TEMPDIR) + job.name + '.o' + jobid)
-        log_stderr_fn = (os.path.expanduser(TEMPDIR) + job.name + '.e' + jobid)
+        job.log_stdout_fn = (os.path.expanduser(TEMPDIR) + job.name + '.o' + jobid)
+        job.log_stderr_fn = (os.path.expanduser(TEMPDIR) + job.name + '.e' + jobid)
 
         print 'Your job %s has been submitted with id %s' % (job.name, jobid)
-        print "stdout:", log_stdout_fn
-        print "stderr:", log_stderr_fn
+        print "stdout:", job.log_stdout_fn
+        print "stderr:", job.log_stderr_fn
         print ""
 
         #display tmp file size
@@ -376,6 +375,9 @@ def submit_jobs(jobs):
 
         jobids.append(jobid)
         s.deleteJobTemplate(jt)
+
+        # finally save job object to file system
+        save(job.inputfile, job)
 
     sid = s.contact
     s.exit()
@@ -465,11 +467,14 @@ def process_jobs(jobs, local=False, maxNumThreads=1):
     
     if (not local and drmaa_present):
         # Use submit_jobs and collect_jobs to run jobs and wait for the results.
+        # jobid field is attached to each job object
         (sid, jobids) = submit_jobs(jobs)
 
         print 'checking whether finished'
-        while not get_status(sid, jobids):
-            time.sleep(7)
+
+        checker = StatusChecker(sid, jobs)
+        while not checker.check():
+            time.sleep(5)
         return collect_jobs(sid, jobids, jobs, wait=True)
 
     elif (not local and not drmaa_present):
@@ -480,51 +485,107 @@ def process_jobs(jobs, local=False, maxNumThreads=1):
         return  _process_jobs_locally(jobs, maxNumThreads=maxNumThreads)
 
 
+
 def get_status(sid, jobids):
     """
     Get the status of all jobs in jobids.
     Returns True if all jobs are finished.
 
-    There is some instability in determining job completion
+    Using the state-aware StatusChecker now, this
+    function maintains the previous
+    interface.
     """
-    _decodestatus = {
-        -42: 'sge and drmaa not in sync',
-        "undetermined": 'process status cannot be determined',
-        "queued_active": 'job is queued and active',
-        "system_on_hold": 'job is queued and in system hold',
-        "user_on_hold": 'job is queued and in user hold',
-        "user_system_on_hold": 'job is in user and system hold',
-        "running": 'job is running',
-        "system_suspended": 'job is system suspended',
-        "user_suspended": 'job is user suspended',
-        "done": 'job finished normally',
-        "failed": 'job finished, but failed',
-    }
 
-    s = drmaa.Session()
-    s.initialize(sid)
+    checker = StatusChecker(sid, jobids)
+    return checker.check()
 
-    status_summary = {}.fromkeys(_decodestatus, 0)
-    for jobid in jobids:
-        try:
-            curstat = s.jobStatus(jobid)
-            print "current_status: %s for job with id %s" % (curstat, jobid)
 
-        except Exception, message:
-            print "current_status: does_not_exist for job with id %s" % (jobid)
-            curstat = -42
 
-        status_summary[curstat] += 1
+class StatusChecker(object):
+    """
+    To deal with the fact that grid engine seems
+    to forget about finished jobs after a little while,
+    we need to keep track of finished jobs manually
+    and count a out-of-synch job as finished, if it has
+    previously had the status "finished"
+    """ 
 
-    print 'Status of %s at %s' % (sid, time.strftime('%d/%m/%Y - %H.%M:%S'))
-    for curkey in status_summary.keys():
-        if status_summary[curkey]>0:
-            print '%s: %d' % (_decodestatus[curkey], status_summary[curkey])
+    def __init__(self, sid, jobs):
+        """
+        we keep a memory of job ids
+        """
+        
+        self.jobs = jobs
+        self.jobids = [job.jobid for job in jobs]
+        self.sid = sid
+        self.jobid_to_status = {}.fromkeys(self.jobids, 0)
 
-    s.exit()
+        self._decodestatus = {
+            -42: 'sge and drmaa not in sync',
+            "undetermined": 'process status cannot be determined',
+            "queued_active": 'job is queued and active',
+            "system_on_hold": 'job is queued and in system hold',
+            "user_on_hold": 'job is queued and in user hold',
+            "user_system_on_hold": 'job is in user and system hold',
+            "running": 'job is running',
+            "system_suspended": 'job is system suspended',
+            "user_suspended": 'job is user suspended',
+            "done": 'job finished normally',
+            "failed": 'job finished, but failed',
+        }
+            
 
-    return ((status_summary["done"]+status_summary[-42])==len(jobids))
+    def check(self):
+        """
+        Get the status of all jobs.
+        Returns True if all jobs are finished.
+        """
+                
+        s = drmaa.Session()
+        s.initialize(self.sid)
 
+        status_summary = {}.fromkeys(self._decodestatus, 0)
+        status_changed = False
+
+        for job in self.jobs:
+
+            jobid = job.jobid
+            old_status = self.jobid_to_status[jobid]
+            
+            try:
+                curstat = s.jobStatus(jobid)
+
+            except Exception, message:
+                # handle case where already finished job
+                # is now out-of-synch with grid engine
+                if old_status == "done":
+                    curstat = "done"
+                else:
+                    curstat = -42
+
+            # print job status updates
+            if curstat != old_status:
+                print "status update for job", jobid, "from", old_status, "to", curstat, "log at", job.log_stdout_fn
+                status_changed = True
+
+            # remember current status
+            self.jobid_to_status[jobid] = curstat
+            status_summary[curstat] += 1
+
+
+        # print status summary
+        if status_changed:
+            print 'Status of %s at %s' % (self.sid, time.strftime('%d/%m/%Y - %H.%M:%S'))
+            for curkey in status_summary.keys():
+                if status_summary[curkey]>0:
+                    print '%s: %d' % (self._decodestatus[curkey], status_summary[curkey])
+            print "##############################################"
+            status_changed = False
+
+        s.exit()
+
+        return (status_summary["done"] + status_summary[-42]==len(self.jobs))
+                
 
 #####################################################################
 # MapReduce Interface
