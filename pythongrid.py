@@ -587,6 +587,7 @@ class StatusChecker(object):
                 if at_pos == -1:
                     node_name = "unscheduled"
                 else:
+                    #TODO replace with regex
                     node_name = output[at_pos+1:at_pos+10]
                 
                 # save node name
