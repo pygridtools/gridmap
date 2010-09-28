@@ -19,6 +19,7 @@ in a more 'pythonic' fashion.
 import sys
 import os
 import os.path
+import subprocess
 import bz2
 import cPickle
 import getopt
@@ -563,10 +564,35 @@ class StatusChecker(object):
                 else:
                     curstat = -42
 
+                    # check if output file is empty, if yes output job.args
+                    if os.path.exists(job.log_stdout_fn) and os.path.isfile(job.log_stdout_fn):
+                        tmp_file = file(job.log_stdout_fn)
+                        if tmp_file.read() == "":
+                            print "serious error [empty log] encountered for job", jobid, ", arguments:", job.args, "on", job.node_name
+                        tmp_file.close()
+
             # print job status updates
             if curstat != old_status:
-                print "status update for job", jobid, "from", old_status, "to", curstat, "log at", job.log_stdout_fn
+
+                # set flag
                 status_changed = True
+
+                # parse qstat output for node name
+                command = "qstat | grep %s" % (jobid)
+                process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
+                os.waitpid(process.pid, 0)
+                output = process.stdout.read().strip()
+                at_pos = output.find("@")
+
+                if at_pos == -1:
+                    node_name = "unscheduled"
+                else:
+                    node_name = output[at_pos+1:at_pos+10]
+                
+                # save node name
+                job.node_name = node_name
+
+                print "status update for job", jobid, "from", old_status, "to", curstat, "log at", job.log_stdout_fn, "on", node_name
 
             # remember current status
             self.jobid_to_status[jobid] = curstat
