@@ -20,7 +20,7 @@ import sys
 import os
 import os.path
 import subprocess
-import bz2
+import gzip
 import cPickle
 import getopt
 import time
@@ -117,8 +117,8 @@ class Job(object):
 
         # TODO: ensure uniqueness of file names
         self.name = 'pg'+''.join([random.choice(alphabet) for a in xrange(8)])
-        self.inputfile = jp(outdir,self.name + "_in.bz2")
-        self.outputfile = jp(outdir,self.name + "_out.bz2")
+        self.inputfile = jp(outdir,self.name + "_in.gz")
+        self.outputfile = jp(outdir,self.name + "_out.gz")
         self.jobid = ""
 
 
@@ -688,7 +688,7 @@ def save(filename, myobj):
     Save myobj to filename using pickle
     """
     try:
-        f = bz2.BZ2File(filename, 'wb')
+        f = gzip.GzipFile(filename, 'wb')
     except IOError, details:
         sys.stderr.write('File ' + filename + ' cannot be written\n')
         sys.stderr.write(details)
@@ -703,7 +703,7 @@ def load(filename):
     Load from filename using pickle
     """
     try:
-        f = bz2.BZ2File(filename, 'rb')
+        f = gzip.GzipFile(filename, 'rb')
     except IOError, details:
         sys.stderr.write('File ' + filename + ' cannot be read\n')
         sys.stderr.write(details)

@@ -114,7 +114,7 @@ def runExample():
     (sid, jobids) = submit_jobs(myjobs)
 
     print 'checking whether finished'
-    while not get_status(sid, jobids):
+    while not get_status(sid, myjobs):
         time.sleep(7)
     print 'collecting jobs'
     retjobs = collect_jobs(sid, jobids, myjobs)
