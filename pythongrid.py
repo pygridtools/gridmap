@@ -30,6 +30,7 @@ import zmq
 import socket
 import zlib
 import threading
+from datetime import datetime
 
 #paths on cluster file system
 # TODo set this in configuration file
@@ -200,6 +201,7 @@ class KybJob(Job):
         self.cause_of_death = ""
         self.jobid = -1
         self.node_name = ""
+        self.timestamp = None
 
 
     def getNativeSpecification(self):
@@ -582,26 +584,59 @@ class StatusCheckerZMQ(object):
 
         context = zmq.Context()
         socket = context.socket(zmq.REP)
-        socket.bind("tcp://192.168.1.250:5001")
+        socket.bind("tcp://192.168.1.250:5004")
 
         while not self.all_jobs_done():
+    
+            try:
+                msg_str = socket.recv(zmq.NOBLOCK)
+                return_msg = zdumps("")
+
+                msg = zloads(msg_str)
+                job_id = msg["job_id"]
+                job = self.jobid_to_job[job_id] 
+                print msg
+    
+                if msg["command"] == "fetch_input":
+                    return_msg = zdumps(self.jobid_to_job[job_id])
+    
+                if msg["command"] == "store_output":
+                    job.ret = msg["data"]
+                    return_msg = zdumps("thanks")
+    
+                if msg["command"] == "heart_beat":
+                    job.heart_beat = msg["data"]
+                    return_msg = zdumps("all good")
+    
+                current_time = datetime.now()
+    
+                # store in job object
+                job.timestamp = current_time
             
-            msg_str = socket.recv()
-            msg = zloads(msg_str)
+                socket.send(return_msg)
+
+            except Exception, detail:
+                time.sleep(1)                
+                print "msg not ready", detail
+
+            self.check_if_alive()
             
-            job_id = msg["job_id"]
 
-            print msg
 
-            if msg["command"] == "fetch_input":
-                return_msg = zdumps(self.jobid_to_job[job_id])
+    def check_if_alive(self):
+        """
+        look at jobs and decide what to do
+        """
+    
+        current_time = datetime.now()
 
-            if msg["command"] == "store_output":
-                self.jobid_to_job[job_id].ret = msg["data"]
-                return_msg = zdumps("thanks")
+        for job in self.jobs:
 
-        
-            socket.send(return_msg)
+            if job.timestamp != None:
+                time_delta = current_time - job.timestamp
+
+                if time_delta.seconds > 15 and job.ret == None:
+                    job.ret = "job dead"
 
 
 
@@ -966,58 +1001,17 @@ def load(filename):
 ################################################################
 
 
-class WorkerThread (threading.Thread):
-    """
-    worker thread will carry to main part of the workload
-    """
-
-    def __init__(self, job):
-        """
-        sets some field required by interface
-        """
-
-        threading.Thread.__init__(self)
-        self.threadID = 1
-        self.name = "worker"
-        self.counter = 1
-        self.job = job
-
-    def run(self):
-        """
-        executes worker thread
-        """
-        self.job.execute()
-
-
-class HeartbeatThread (threading.Thread):
+def heart_beat(job_id):
     """
     will send reponses to the server with
     information about the current state of
     the process
     """
 
-    def __init__(self, job_id):
-        """
-        sets some field required by interface
-        """
-
-        threading.Thread.__init__(self)
-        self.threadID = 2
-        self.name = "heartbeat"
-        self.counter = 2
-        self.job_id = job_id
-        self.worker_done = False
-
-    def run(self):
-        """
-        executes worker thread
-        """
-
-        while not self.worker_done:
-            status = get_job_status()
-            reply = send_zmq_msg(self.job_id, "heartbeat", status)
-            print reply
-            time.sleep(1)
+    while True:
+        status = get_job_status()
+        reply = send_zmq_msg(job_id, "heart_beat", status)
+        time.sleep(3)
 
 
 def get_job_status():
@@ -1026,6 +1020,7 @@ def get_job_status():
     worker and its machine (maybe not cross-platform)
     """
 
+    #TODO fetch info about memory and cpu hours
     status_container = {}
     status_container["general"] = "awesome"
 
@@ -1035,9 +1030,8 @@ def get_job_status():
 def run_job(job_id):
     """
     This is the code that is executed on the cluster side.
-    Runs job which was pickled to a file called pickledFileName.
 
-    @param job_id: filename of pickled Job object
+    @param job_id: unique id of job
     @type job_id: string
     """
 
@@ -1045,22 +1039,20 @@ def run_job(job_id):
     job = send_zmq_msg(job_id, "fetch_input", data=None)
 
     print "input arguments loaded, starting computation"
-    print job
 
-    worker = WorkerThread(job)
-    heart = HeartbeatThread(job_id)
-
-    worker.start()
+    # create heart beat process
+    heart = multiprocessing.Process(target=heart_beat, args=(job_id,))
     heart.start()
 
-    # wait for worker to finish
-    while worker.isAlive():
-        pass
+    # run job
+    job.execute()
 
-    heart.worker_done = True
-
+    # send back result
     thank_you_note = send_zmq_msg(job_id, "store_output", data=job.ret)
     print thank_you_note
+
+    # stop heartbeat
+    heart.terminate()
 
 
 
@@ -1072,7 +1064,7 @@ def send_zmq_msg(job_id, command, data):
 
     context = zmq.Context()
     zsocket = context.socket(zmq.REQ)
-    zsocket.connect("tcp://192.168.1.250:5001")
+    zsocket.connect("tcp://192.168.1.250:5004")
 
     host_name = socket.gethostname()
     ip_address = socket.gethostbyname(host_name)
