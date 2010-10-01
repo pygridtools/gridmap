@@ -61,7 +61,7 @@ def runExample():
 
     print ""
     print "executing jobs on local machine using 3 threads"
-    if not pythongrid.multiprocessing_present:
+    if not pythongrid.MULTIPROCESSING_PRESENT:
         print 'multiprocessing not found, serial computation'
     print ""
 

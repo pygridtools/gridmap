@@ -29,16 +29,16 @@ import traceback
 
 
 #paths on cluster file system
-# TODO set this in configuration file
+# TODo set this in configuration file
 PYTHONPATH = os.environ['PYTHONPATH'] 
 
 # location of pythongrid.py on cluster file system
-# TODO set this in configuration file
+# ToDO set this in configuration file
 PYGRID = "~/svn/tools/python/pythongrid/pythongrid.py"
 
 # define temp directories for the input and output variables
 # (must be writable from cluster)
-# TODO define separate client/server TEMPDIR
+# ToDO define separate client/server TEMPDIR
 TEMPDIR = "~/tmp/"
 
 
@@ -51,12 +51,13 @@ alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 #sys.path.extend(PYTHONPATH)
 
 
-print "sys.path=" + str(sys.path) ;
+print "sys.path=" + str(sys.path)
 
 jp = os.path.join
 
-drmaa_present=True
-multiprocessing_present=True
+DRMAA_PRESENT = True
+MULTIPROCESSING_PRESENT = True
+
 
 try:
     import drmaa
@@ -64,7 +65,7 @@ except ImportError, detail:
     print "Error importing drmaa. Only local multi-threading supported."
     print "Please check your installation."
     print detail
-    drmaa_present = False
+    DRMAA_PRESENT = False
 
 try:
     import multiprocessing
@@ -72,7 +73,7 @@ except ImportError, detail:
     print "Error importing multiprocessing. Local computing limited to one CPU."
     print "Please install python2.6 or the backport of the multiprocessing package"
     print detail
-    multiprocessing_present = False
+    MULTIPROCESSING_PRESENT = False
 
 class Job(object):
     """
@@ -115,7 +116,7 @@ class Job(object):
             print '%s does not exist. Please create a directory' % outdir
             raise Exception()
 
-        # TODO: ensure uniqueness of file names
+        # ToDO: ensure uniqueness of file names
         self.name = 'pg'+''.join([random.choice(alphabet) for a in xrange(8)])
         self.inputfile = jp(outdir,self.name + "_in.gz")
         self.outputfile = jp(outdir,self.name + "_out.gz")
@@ -136,7 +137,7 @@ class Job(object):
 
 
     def __repr_broken__(self):
-        #TODO: fix representation
+        #ToDO: fix representation
         retstr1 = ('%s\nargs=%s\nkwlist=%s\nret=%s\ncleanup=%s' %
                    self.f, self.args, self.kwlist, self.ret, self.cleanup)
         retstr2 = ('\nnativeSpecification=%s\ninputfile=%s\noutputfile=%s\n' %
@@ -192,6 +193,12 @@ class KybJob(Job):
         self.sigtb = ""
         self.cplex = ""
         self.nicetohave = ""
+
+        # additional fields for robustness
+        self.num_resubmits = 0
+        self.cause_of_death = ""
+        self.jobid = -1
+        self.node_name = ""
 
 
     def getNativeSpecification(self):
@@ -252,7 +259,7 @@ class KybJob(Job):
 
 
 #only define this class if the multiprocessing module is present
-if multiprocessing_present:
+if MULTIPROCESSING_PRESENT:
 
     class JobsProcess(multiprocessing.Process):
         """
@@ -301,7 +308,7 @@ def _process_jobs_locally(jobs, maxNumThreads=1):
    
     print "using %i threads" % (maxNumThreads)
     
-    if (not multiprocessing_present or maxNumThreads == 1):
+    if (not MULTIPROCESSING_PRESENT or maxNumThreads == 1):
         #perform sequential computation
         for job in jobs:
             job.execute()
@@ -321,69 +328,86 @@ def submit_jobs(jobs):
     @type jobs: list<Job>
     """
 
-    s = drmaa.Session()
-    s.initialize()
+    session = drmaa.Session()
+    session.initialize()
     jobids = []
 
     for job in jobs:
-        jt = s.createJobTemplate()
-
-        #fetch only specific env vars from shell
-        #shell_env = {"LD_LIBRARY_PATH": os.getenv("LD_LIBRARY_PATH"),
-        #             "PYTHONPATH": os.getenv("PYTHONPATH"),
-        #             "MOSEKLM_LICENSE_FILE": os.getenv("MOSEKLM_LICENSE_FILE"),
-        #             }
-
-        # fetch env vars from shell        
-        shell_env = os.environ
-
-        if job.environment and job.replace_env:
-            # only consider defined env vars
-            jt.jobEnvironment = job.environment
-
-        elif job.environment and not job.replace_env:
-            # replace env var from shell with defined env vars
-            env = shell_env
-            env.update(job.environment)
-            jt.jobEnvironment = env
-
-        else:
-            # only consider env vars from shell
-            jt.jobEnvironment = shell_env
-            
-
-        jt.remoteCommand = os.path.expanduser(PYGRID)
-        jt.args = [job.inputfile]
-        jt.joinFiles = True
-        jt.nativeSpecification = job.nativeSpecification
-        jt.outputPath = ":" + os.path.expanduser(TEMPDIR)
-        jt.errorPath = ":" + os.path.expanduser(TEMPDIR)
-
-        jobid = s.runJob(jt)
-
-        # set job fields that depend on the jobid assigned by grid engine
-        job.jobid = jobid
-        job.log_stdout_fn = (os.path.expanduser(TEMPDIR) + job.name + '.o' + jobid)
-        job.log_stderr_fn = (os.path.expanduser(TEMPDIR) + job.name + '.e' + jobid)
-
-        print 'Your job %s has been submitted with id %s' % (job.name, jobid)
-        print "stdout:", job.log_stdout_fn
-        print "stderr:", job.log_stderr_fn
-        print ""
-
-        #display tmp file size
-        # print os.system("du -h " + invars)
-
+        jobid = append_job_to_session(session, job)
         jobids.append(jobid)
-        s.deleteJobTemplate(jt)
 
-        # finally save job object to file system
-        save(job.inputfile, job)
-
-    sid = s.contact
-    s.exit()
+    sid = session.contact
+    session.exit()
 
     return (sid, jobids)
+
+
+
+def append_job_to_session(session, job):
+    """
+    For an active session, append new job
+    based on information stored in job object
+
+    side-effects:
+    - job.jobid set to jobid determined by grid-engine
+    - job.log_stdout_fn set to std::out file
+    - job.log_stderr_fn set to std::err file
+    """
+
+    jt = session.createJobTemplate()
+
+    #fetch only specific env vars from shell
+    #shell_env = {"LD_LIBRARY_PATH": os.getenv("LD_LIBRARY_PATH"),
+    #             "PYTHONPATH": os.getenv("PYTHONPATH"),
+    #             "MOSEKLM_LICENSE_FILE": os.getenv("MOSEKLM_LICENSE_FILE"),
+    #             }
+
+    # fetch env vars from shell        
+    shell_env = os.environ
+
+    if job.environment and job.replace_env:
+        # only consider defined env vars
+        jt.jobEnvironment = job.environment
+
+    elif job.environment and not job.replace_env:
+        # replace env var from shell with defined env vars
+        env = shell_env
+        env.update(job.environment)
+        jt.jobEnvironment = env
+
+    else:
+        # only consider env vars from shell
+        jt.jobEnvironment = shell_env
+        
+
+    jt.remoteCommand = os.path.expanduser(PYGRID)
+    jt.args = [job.inputfile]
+    jt.joinFiles = True
+    jt.nativeSpecification = job.nativeSpecification
+    jt.outputPath = ":" + os.path.expanduser(TEMPDIR)
+    jt.errorPath = ":" + os.path.expanduser(TEMPDIR)
+
+    jobid = session.runJob(jt)
+
+    # set job fields that depend on the jobid assigned by grid engine
+    job.jobid = jobid
+    job.log_stdout_fn = (os.path.expanduser(TEMPDIR) + job.name + '.o' + jobid)
+    job.log_stderr_fn = (os.path.expanduser(TEMPDIR) + job.name + '.e' + jobid)
+
+    print 'Your job %s has been submitted with id %s' % (job.name, jobid)
+    print "stdout:", job.log_stdout_fn
+    print "stderr:", job.log_stderr_fn
+    print ""
+
+    #display tmp file size
+    # print os.system("du -h " + invars)
+
+    session.deleteJobTemplate(jt)
+
+    # finally save job object to file system
+    save(job.inputfile, job)
+
+    return jobid
 
 
 def collect_jobs(sid, jobids, joblist, wait=False):
@@ -466,7 +490,7 @@ def process_jobs(jobs, local=False, maxNumThreads=1):
     Director function to decide whether to run on the cluster or locally
     """
     
-    if (not local and drmaa_present):
+    if (not local and DRMAA_PRESENT):
         # Use submit_jobs and collect_jobs to run jobs and wait for the results.
         # jobid field is attached to each job object
         (sid, jobids) = submit_jobs(jobs)
@@ -478,7 +502,7 @@ def process_jobs(jobs, local=False, maxNumThreads=1):
             time.sleep(5)
         return collect_jobs(sid, jobids, jobs, wait=True)
 
-    elif (not local and not drmaa_present):
+    elif (not local and not DRMAA_PRESENT):
         print 'Warning: import drmaa failed, computing locally'
         return  _process_jobs_locally(jobs, maxNumThreads=maxNumThreads)
 
@@ -564,12 +588,6 @@ class StatusChecker(object):
                 else:
                     curstat = -42
 
-                    # check if output file is empty, if yes output job.args
-                    if os.path.exists(job.log_stdout_fn) and os.path.isfile(job.log_stdout_fn):
-                        tmp_file = file(job.log_stdout_fn)
-                        if tmp_file.read() == "":
-                            print "serious error [empty log] encountered for job", jobid, ", arguments:", job.args, "on", job.node_name
-                        tmp_file.close()
 
             # print job status updates
             if curstat != old_status:
@@ -577,23 +595,15 @@ class StatusChecker(object):
                 # set flag
                 status_changed = True
 
-                # parse qstat output for node name
-                command = "qstat | grep %s" % (jobid)
-                process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
-                os.waitpid(process.pid, 0)
-                output = process.stdout.read().strip()
-                at_pos = output.find("@")
+                # determine node name
+                job.node_name = check_node_name(jobid)
 
-                if at_pos == -1:
-                    node_name = "unscheduled"
-                else:
-                    #TODO replace with regex
-                    node_name = output[at_pos+1:at_pos+10]
-                
-                # save node name
-                job.node_name = node_name
+                print "status update for job", jobid, "from", old_status, "to", curstat, "log at", job.log_stdout_fn, "on", job.node_name
+    
+                # check cause of death and resubmit if unnatural
+                if curstat == "done" or curstat == -42:
+                    resubmit = handle_resubmit(s, job)
 
-                print "status update for job", jobid, "from", old_status, "to", curstat, "log at", job.log_stdout_fn, "on", node_name
 
             # remember current status
             self.jobid_to_status[jobid] = curstat
@@ -612,7 +622,78 @@ class StatusChecker(object):
         s.exit()
 
         return (status_summary["done"] + status_summary[-42]==len(self.jobs))
-                
+
+
+
+def handle_resubmit(session, job):
+    """
+    heuristic to determine if the job should be resubmitted
+
+    side-effect: 
+    job.num_resubmits incremented
+    """
+
+    if check_cause_of_death(job) == "unknown" and job.num_resubmits < 4:
+
+        print "looks like job died an unnatural death, resubmitting (num resubmits = %i)" % (job.num_resubmits)
+        job.num_resubmits += 1
+        append_job_to_session(session, job)
+        
+        return True
+
+    else:
+
+        return False
+
+
+def check_cause_of_death(job):
+    """
+    heuristic to determine if the job died an
+    unnatural death (not caused by bug in client code)
+    or due to an error on the cluster side
+
+    side-effect: 
+    job.cause_of_death set to string descriptor
+    """
+
+    # wait for NFS to synch
+    # ToDO replace this by robust file-io
+    time.sleep(10)
+
+    # check if output file is empty
+    if os.path.exists(job.log_stdout_fn) and os.path.isfile(job.log_stdout_fn):
+        tmp_file = file(job.log_stdout_fn)
+        if tmp_file.read() == "":
+            print "job", jobid, " with arguments:", job.args, " died of an UNNATURAL death on", job.node_name
+            job.cause_of_death = "unknown"
+        tmp_file.close()
+    else:
+        job.cause_of_death = "natural"
+
+    return job.cause_of_death
+
+
+
+def check_node_name(jobid):
+    """
+    use qstat to grab the node name of current node
+    """
+
+    # parse qstat output for node name
+    command = "qstat | grep %s" % (jobid)
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
+    os.waitpid(process.pid, 0)
+    output = process.stdout.read().strip()
+    at_pos = output.find("@")
+
+    if at_pos == -1:
+        node_name = "unscheduled"
+    else:
+        #ToDO replace with regex
+        node_name = output[at_pos+1:at_pos+10]
+
+    return node_name
+
 
 #####################################################################
 # MapReduce Interface
@@ -728,9 +809,13 @@ def run_job(pickleFileName):
     @type pickleFileName: string
     """
 
+    #ToDO remove
+    os.system("touch " + pickleFileName + "_flag")
 
     inPath = pickleFileName
     job = load(inPath)
+
+    print "input arguments loaded, starting computation"
 
     job.execute()
 
