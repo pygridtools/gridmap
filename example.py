@@ -24,7 +24,7 @@ def makeJobs():
     Creates a list of Jobs.
     """
     
-    inputvec = [[3], [5], [10], [15]]
+    inputvec = [[3], [5], [10], [100000000]]
     print 'print computing the factorials of %s' % str(inputvec)
     jobs=[]
 
@@ -55,24 +55,24 @@ def runExample():
 
     functionJobs = makeJobs()
 
-    print "output ret field in each job before multithreaded computation"
-    for (i, job) in enumerate(functionJobs):
-        print "Job #", i, "- ret: ", job.ret
+    #print "output ret field in each job before multithreaded computation"
+    #for (i, job) in enumerate(functionJobs):
+    #    #print "Job #", i, "- ret: ", job.ret
 
-    print ""
-    print "executing jobs on local machine using 3 threads"
-    if not pythongrid.MULTIPROCESSING_PRESENT:
-        print 'multiprocessing not found, serial computation'
-    print ""
+    #print ""
+    #print "executing jobs on local machine using 3 threads"
+    #if not pythongrid.MULTIPROCESSING_PRESENT:
+    #    #print 'multiprocessing not found, serial computation'
+    #print ""
 
 
-    processedFunctionJobs = process_jobs(functionJobs, local=True, maxNumThreads=3)
-    
+    #processedFunctionJobs = process_jobs(functionJobs, local=True, maxNumThreads=3)
+    #
 
-    print "ret fields AFTER execution on local machine"
-    for (i, job) in enumerate(processedFunctionJobs):
-        print "Job #", i, "- ret: ", str(job.ret)[0:10]
-    
+    #print "ret fields AFTER execution on local machine"
+    #for (i, job) in enumerate(processedFunctionJobs):
+    #    #print "Job #", i, "- ret: ", str(job.ret)[0:10]
+    #
     
     print ""
     print ""
@@ -99,30 +99,29 @@ def runExample():
         print "Job #", i, "- ret: ", str(job.ret)[0:10]
 
 
-    print ""
-    print ""
-    print "====================================="
-    print "=======  Submit and Forget   ========"
-    print "====================================="
-    print ""
-    print ""
+    #print ""
+    #print ""
+    #print "====================================="
+    #print "=======  Submit and Forget   ========"
+    #print "====================================="
+    #print ""
+    #print ""
 
 
-    print 'demo session'
-    myjobs = makeJobs()
+    #print 'demo session'
+    #myjobs = makeJobs()
 
-    (sid, jobids) = submit_jobs(myjobs)
+    #(sid, jobids) = submit_jobs(myjobs)
 
-    print 'checking whether finished'
-    while not get_status(sid, myjobs):
-        time.sleep(7)
-    print 'collecting jobs'
-    retjobs = collect_jobs(sid, jobids, myjobs)
-    print "ret fields AFTER execution on cluster"
-    for (i, job) in enumerate(retjobs):
-        print "Job #", i, "- ret: ", str(job.ret)[0:10]
-
-    print '--------------'
+    #print 'checking whether finished'
+    #while not get_status(sid, myjobs):
+    #    time.sleep(7)
+    #print 'collecting jobs'
+    #retjobs = collect_jobs(sid, jobids, myjobs)
+    #print "ret fields AFTER execution on cluster"
+    #for (i, job) in enumerate(retjobs):
+    #    print "Job #", i, "- ret: ", str(job.ret)[0:10]
+    #print '--------------'
 
 
 def computeFactorial(n):

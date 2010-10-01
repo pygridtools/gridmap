@@ -26,7 +26,10 @@ import getopt
 import time
 import random
 import traceback
-
+import zmq
+import socket
+import zlib
+import threading
 
 #paths on cluster file system
 # TODo set this in configuration file
@@ -50,8 +53,6 @@ alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 #os.environ['PYTHONPATH'] = PPATH
 #sys.path.extend(PYTHONPATH)
 
-
-print "sys.path=" + str(sys.path)
 
 jp = os.path.join
 
@@ -497,10 +498,13 @@ def process_jobs(jobs, local=False, maxNumThreads=1):
 
         print 'checking whether finished'
 
-        checker = StatusChecker(sid, jobs)
-        while not checker.check():
-            time.sleep(5)
-        return collect_jobs(sid, jobids, jobs, wait=True)
+        #checker = StatusChecker(sid, jobs)
+        checker = StatusCheckerZMQ(sid, jobs)
+        checker.check()
+        #while not checker.check():
+        #    time.sleep(5)
+        #return collect_jobs(sid, jobids, jobs, wait=True)
+        return jobs
 
     elif (not local and not DRMAA_PRESENT):
         print 'Warning: import drmaa failed, computing locally'
@@ -508,6 +512,8 @@ def process_jobs(jobs, local=False, maxNumThreads=1):
 
     else:
         return  _process_jobs_locally(jobs, maxNumThreads=maxNumThreads)
+
+
 
 
 
@@ -524,6 +530,155 @@ def get_status(sid, jobids):
     checker = StatusChecker(sid, jobids)
     return checker.check()
 
+
+
+class StatusCheckerZMQ(object):
+    """
+    switched to next-generation cluster computing :D
+    """ 
+
+    def __init__(self, sid, jobs):
+        """
+        we keep a memory of job ids
+        """
+        
+        self.jobs = jobs
+        self.jobids = [job.jobid for job in jobs]
+        self.sid = sid
+
+        # save some useful mappings
+        self.jobid_to_status = {}.fromkeys(self.jobids, 0)
+        self.jobid_to_job = {}
+        for job in jobs:
+            #self.jobid_to_job[job.jobid] = job
+            self.jobid_to_job[job.inputfile] = job
+
+        self._decodestatus = {
+            -42: 'sge and drmaa not in sync',
+            "undetermined": 'process status cannot be determined',
+            "queued_active": 'job is queued and active',
+            "system_on_hold": 'job is queued and in system hold',
+            "user_on_hold": 'job is queued and in user hold',
+            "user_system_on_hold": 'job is in user and system hold',
+            "running": 'job is running',
+            "system_suspended": 'job is system suspended',
+            "user_suspended": 'job is user suspended',
+            "done": 'job finished normally',
+            "failed": 'job finished, but failed',
+        }
+
+    def __del__(self):
+        """
+        destructor to clean up session
+        """
+
+
+    def check(self):
+        """
+        serves input and output data
+        """
+
+        print "using the NEW and SHINY ZMQ layer"
+
+        context = zmq.Context()
+        socket = context.socket(zmq.REP)
+        socket.bind("tcp://192.168.1.250:5001")
+
+        while not self.all_jobs_done():
+            
+            msg_str = socket.recv()
+            msg = zloads(msg_str)
+            
+            job_id = msg["job_id"]
+
+            print msg
+
+            if msg["command"] == "fetch_input":
+                return_msg = zdumps(self.jobid_to_job[job_id])
+
+            if msg["command"] == "store_output":
+                self.jobid_to_job[job_id].ret = msg["data"]
+                return_msg = zdumps("thanks")
+
+        
+            socket.send(return_msg)
+
+
+
+    def all_jobs_done(self):
+        """
+        checks for all jobs if they are done
+        """
+
+        for job in self.jobs:
+            if job.ret == None:
+                return False
+
+        return True
+
+
+
+    def check_status_sge(self):
+        """
+        ask SGE for information on our job
+        """
+        
+        s = drmaa.Session()
+        s.initialize(self.sid)
+
+        status_summary = {}.fromkeys(self._decodestatus, 0)
+        status_changed = False
+
+        for job in self.jobs:
+
+            jobid = job.jobid
+            old_status = self.jobid_to_status[jobid]
+            
+            try:
+                curstat = s.jobStatus(jobid)
+
+            except Exception, message:
+                # handle case where already finished job
+                # is now out-of-synch with grid engine
+                if old_status == "done":
+                    curstat = "done"
+                else:
+                    curstat = -42
+
+
+            # print job status updates
+            if curstat != old_status:
+
+                # set flag
+                status_changed = True
+
+                # determine node name
+                job.node_name = check_node_name(jobid)
+
+                print "status update for job", jobid, "from", old_status, "to", curstat, "log at", job.log_stdout_fn, "on", job.node_name
+    
+                # check cause of death and resubmit if unnatural
+                if curstat == "done" or curstat == -42:
+                    resubmit = handle_resubmit(s, job)
+
+
+            # remember current status
+            self.jobid_to_status[jobid] = curstat
+            status_summary[curstat] += 1
+
+
+        # print status summary
+        if status_changed:
+            print 'Status of %s at %s' % (self.sid, time.strftime('%d/%m/%Y - %H.%M:%S'))
+            for curkey in status_summary.keys():
+                if status_summary[curkey]>0:
+                    print '%s: %d' % (self._decodestatus[curkey], status_summary[curkey])
+            print "##############################################"
+            status_changed = False
+
+        s.exit()
+
+        return (status_summary["done"] + status_summary[-42]==len(self.jobs))
 
 
 class StatusChecker(object):
@@ -764,6 +919,17 @@ class MapReduce(object):
 #####################################################################
 
 
+
+def zdumps(obj):
+    return zlib.compress(cPickle.dumps(obj,cPickle.HIGHEST_PROTOCOL),9)
+    #return cPickle.dumps(obj,cPickle.HIGHEST_PROTOCOL)
+
+
+def zloads(zstr):
+    return cPickle.loads(zlib.decompress(zstr)) 
+    #return cPickle.loads(zstr) 
+
+
 def save(filename, myobj):
     """
     Save myobj to filename using pickle
@@ -800,30 +966,130 @@ def load(filename):
 ################################################################
 
 
-def run_job(pickleFileName):
+class WorkerThread (threading.Thread):
+    """
+    worker thread will carry to main part of the workload
+    """
+
+    def __init__(self, job):
+        """
+        sets some field required by interface
+        """
+
+        threading.Thread.__init__(self)
+        self.threadID = 1
+        self.name = "worker"
+        self.counter = 1
+        self.job = job
+
+    def run(self):
+        """
+        executes worker thread
+        """
+        self.job.execute()
+
+
+class HeartbeatThread (threading.Thread):
+    """
+    will send reponses to the server with
+    information about the current state of
+    the process
+    """
+
+    def __init__(self, job_id):
+        """
+        sets some field required by interface
+        """
+
+        threading.Thread.__init__(self)
+        self.threadID = 2
+        self.name = "heartbeat"
+        self.counter = 2
+        self.job_id = job_id
+        self.worker_done = False
+
+    def run(self):
+        """
+        executes worker thread
+        """
+
+        while not self.worker_done:
+            status = get_job_status()
+            reply = send_zmq_msg(self.job_id, "heartbeat", status)
+            print reply
+            time.sleep(1)
+
+
+def get_job_status():
+    """
+    script to determine the status of the current 
+    worker and its machine (maybe not cross-platform)
+    """
+
+    status_container = {}
+    status_container["general"] = "awesome"
+
+    return status_container
+
+
+def run_job(job_id):
     """
     This is the code that is executed on the cluster side.
     Runs job which was pickled to a file called pickledFileName.
 
-    @param pickleFileName: filename of pickled Job object
-    @type pickleFileName: string
+    @param job_id: filename of pickled Job object
+    @type job_id: string
     """
 
-    #ToDO remove
-    os.system("touch " + pickleFileName + "_flag")
-
-    inPath = pickleFileName
-    job = load(inPath)
+    #job = ""
+    job = send_zmq_msg(job_id, "fetch_input", data=None)
 
     print "input arguments loaded, starting computation"
+    print job
 
-    job.execute()
+    worker = WorkerThread(job)
+    heart = HeartbeatThread(job_id)
 
-    #remove input file
-    if job.cleanup:
-        os.remove(job.inputfile)
+    worker.start()
+    heart.start()
 
-    save(job.outputfile, job)
+    # wait for worker to finish
+    while worker.isAlive():
+        pass
+
+    heart.worker_done = True
+
+    thank_you_note = send_zmq_msg(job_id, "store_output", data=job.ret)
+    print thank_you_note
+
+
+
+def send_zmq_msg(job_id, command, data):
+    """
+    simple code to send messages back to host
+    (and get a reply back)
+    """
+
+    context = zmq.Context()
+    zsocket = context.socket(zmq.REQ)
+    zsocket.connect("tcp://192.168.1.250:5001")
+
+    host_name = socket.gethostname()
+    ip_address = socket.gethostbyname(host_name)
+
+    msg_container = {}
+    msg_container["job_id"] = job_id
+    msg_container["host_name"] = host_name
+    msg_container["ip_address"] = ip_address
+    msg_container["command"] = command
+    msg_container["data"] = data
+
+    msg_string = zdumps(msg_container)
+
+    zsocket.send(msg_string)
+    msg = zloads(zsocket.recv())
+
+    return msg
 
 
 class Usage(Exception):
