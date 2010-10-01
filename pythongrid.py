@@ -539,14 +539,16 @@ class StatusCheckerZMQ(object):
     switched to next-generation cluster computing :D
     """ 
 
-    def __init__(self, sid, jobs):
+    def __init__(self, session_id, jobs):
         """
         we keep a memory of job ids
         """
         
         self.jobs = jobs
         self.jobids = [job.jobid for job in jobs]
-        self.sid = sid
+
+        # keep DRMAA session (for resubmissions)
+        self.session_id = session_id
 
         # save some useful mappings
         self.jobid_to_status = {}.fromkeys(self.jobids, 0)
@@ -637,7 +639,9 @@ class StatusCheckerZMQ(object):
                 time_delta = current_time - job.timestamp
 
                 if time_delta.seconds > 15 and job.ret == None:
-                    job.ret = "job dead"
+                    job.cause_of_death = "unknown"
+                    if not handle_resubmit(self.session_id, job):
+                        job.ret = "job dead"
 
 
 
@@ -816,7 +820,7 @@ class StatusChecker(object):
 
 
 
-def handle_resubmit(session, job):
+def handle_resubmit(session_id, job):
     """
     heuristic to determine if the job should be resubmitted
 
@@ -824,16 +828,23 @@ def handle_resubmit(session, job):
     job.num_resubmits incremented
     """
 
-    if check_cause_of_death(job) == "unknown" and job.num_resubmits < 4:
+    if job.cause_of_death == "unknown" and job.num_resubmits < 3:
 
-        print "looks like job died an unnatural death, resubmitting (num resubmits = %i)" % (job.num_resubmits)
+        print "looks like job died an unnatural death, resubmitting (previous resubmits = %i)" % (job.num_resubmits)
         job.num_resubmits += 1
+        # reset timestamp
+        job.timestamp = None
+
+        # append to session
+        session = drmaa.Session()
+        session.initialize(session_id)
         append_job_to_session(session, job)
-        
+        session.exit()
+
         return True
 
     else:
-
+        
         return False
 
 
@@ -1036,7 +1047,6 @@ def run_job(job_id):
     @type job_id: string
     """
 
-    #job = ""
     job = send_zmq_msg(job_id, "fetch_input", data=None)
 
     print "input arguments loaded, starting computation"
