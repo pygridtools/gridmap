@@ -584,50 +584,51 @@ class StatusCheckerZMQ(object):
 
         context = zmq.Context()
         socket = context.socket(zmq.REP)
-        socket.bind("tcp://192.168.1.250:5004")
+        socket.bind("tcp://192.168.1.250:5001")
+
+        local_heart = multiprocessing.Process(target=heart_beat, args=(-1,))
+        local_heart.start()
 
         while not self.all_jobs_done():
     
-            try:
-                msg_str = socket.recv(zmq.NOBLOCK)
-                return_msg = zdumps("")
+            msg_str = socket.recv()
+            msg = zloads(msg_str)
+            return_msg = zdumps("")
 
-                msg = zloads(msg_str)
-                job_id = msg["job_id"]
+            job_id = msg["job_id"]
+
+            # only if its not the local beat
+            if job_id != -1:
+
                 job = self.jobid_to_job[job_id] 
                 print msg
-    
+
                 if msg["command"] == "fetch_input":
                     return_msg = zdumps(self.jobid_to_job[job_id])
-    
+
                 if msg["command"] == "store_output":
                     job.ret = msg["data"]
                     return_msg = zdumps("thanks")
-    
+
                 if msg["command"] == "heart_beat":
                     job.heart_beat = msg["data"]
                     return_msg = zdumps("all good")
-    
-                current_time = datetime.now()
-    
-                # store in job object
-                job.timestamp = current_time
-            
-                socket.send(return_msg)
 
-            except Exception, detail:
-                time.sleep(1)                
-                print "msg not ready", detail
+                # store in job object
+                job.timestamp = datetime.now()
 
             self.check_if_alive()
-            
+        
+            socket.send(return_msg)
+
+        local_heart.terminate()
 
 
     def check_if_alive(self):
         """
         look at jobs and decide what to do
         """
-    
+
         current_time = datetime.now()
 
         for job in self.jobs:
@@ -1064,7 +1065,7 @@ def send_zmq_msg(job_id, command, data):
 
     context = zmq.Context()
     zsocket = context.socket(zmq.REQ)
-    zsocket.connect("tcp://192.168.1.250:5004")
+    zsocket.connect("tcp://192.168.1.250:5001")
 
     host_name = socket.gethostname()
     ip_address = socket.gethostbyname(host_name)
