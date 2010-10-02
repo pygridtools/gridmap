@@ -200,8 +200,12 @@ class KybJob(Job):
         self.num_resubmits = 0
         self.cause_of_death = ""
         self.jobid = -1
-        self.node_name = ""
+        self.host_name = ""
         self.timestamp = None
+        self.heart_beat = None
+
+        # black and white lists
+        self.white_list = ""
 
 
     def getNativeSpecification(self):
@@ -243,6 +247,12 @@ class KybJob(Job):
             ret = ret + " -l " + "cplex" + "=" + str(self.cplex)
         if (self.nicetohave != ""):
             ret = ret + " -l " + "nicetohave" + "=" + str(self.nicetohave)
+
+        if (self.white_list != ""):
+            ret = ret + " -q "
+            for i in range(len(self.white_list)-1):
+                ret = ret + self.white_list[i] + ","
+            ret = ret + self.white_list[-1]
 
         return ret
 
@@ -324,7 +334,7 @@ def _process_jobs_locally(jobs, maxNumThreads=1):
     return jobs
 
 
-def submit_jobs(jobs):
+def submit_jobs(jobs, white_list=""):
     """
     Method used to send a list of jobs onto the cluster.
     @param jobs: list of jobs to be executed
@@ -336,6 +346,8 @@ def submit_jobs(jobs):
     jobids = []
 
     for job in jobs:
+        # set job white list
+        job.white_list = white_list
         jobid = append_job_to_session(session, job)
         jobids.append(jobid)
 
@@ -402,13 +414,7 @@ def append_job_to_session(session, job):
     print "stderr:", job.log_stderr_fn
     print ""
 
-    #display tmp file size
-    # print os.system("du -h " + invars)
-
     session.deleteJobTemplate(jt)
-
-    # finally save job object to file system
-    save(job.inputfile, job)
 
     return jobid
 
@@ -494,9 +500,12 @@ def process_jobs(jobs, local=False, maxNumThreads=1):
     """
     
     if (not local and DRMAA_PRESENT):
+
+        white_list = get_white_list()
+
         # Use submit_jobs and collect_jobs to run jobs and wait for the results.
         # jobid field is attached to each job object
-        (sid, jobids) = submit_jobs(jobs)
+        (sid, jobids) = submit_jobs(jobs, white_list)
 
         print 'checking whether finished'
 
@@ -547,7 +556,7 @@ class StatusCheckerZMQ(object):
         self.jobs = jobs
         self.jobids = [job.jobid for job in jobs]
 
-        # keep DRMAA session (for resubmissions)
+        # keep track of DRMAA session (for resubmissions)
         self.session_id = session_id
 
         # save some useful mappings
@@ -570,11 +579,6 @@ class StatusCheckerZMQ(object):
             "done": 'job finished normally',
             "failed": 'job finished, but failed',
         }
-
-    def __del__(self):
-        """
-        destructor to clean up session
-        """
 
 
     def check(self):
@@ -618,6 +622,7 @@ class StatusCheckerZMQ(object):
 
                 # store in job object
                 job.timestamp = datetime.now()
+                job.host_name = msg["host_name"]
 
             self.check_if_alive()
         
@@ -638,7 +643,7 @@ class StatusCheckerZMQ(object):
             if job.timestamp != None:
                 time_delta = current_time - job.timestamp
 
-                if time_delta.seconds > 15 and job.ret == None:
+                if time_delta.seconds > 120 and job.ret == None:
                     job.cause_of_death = "unknown"
                     if not handle_resubmit(self.session_id, job):
                         job.ret = "job dead"
@@ -693,9 +698,9 @@ class StatusCheckerZMQ(object):
                 status_changed = True
 
                 # determine node name
-                job.node_name = check_node_name(jobid)
+                job.host_name = check_host_name(jobid)
 
-                print "status update for job", jobid, "from", old_status, "to", curstat, "log at", job.log_stdout_fn, "on", job.node_name
+                print "status update for job", jobid, "from", old_status, "to", curstat, "log at", job.log_stdout_fn, "on", job.host_name
     
                 # check cause of death and resubmit if unnatural
                 if curstat == "done" or curstat == -42:
@@ -791,9 +796,9 @@ class StatusChecker(object):
                 status_changed = True
 
                 # determine node name
-                job.node_name = check_node_name(jobid)
+                job.host_name = check_host_name(jobid)
 
-                print "status update for job", jobid, "from", old_status, "to", curstat, "log at", job.log_stdout_fn, "on", job.node_name
+                print "status update for job", jobid, "from", old_status, "to", curstat, "log at", job.log_stdout_fn, "on", job.host_name
     
                 # check cause of death and resubmit if unnatural
                 if curstat == "done" or curstat == -42:
@@ -831,6 +836,14 @@ def handle_resubmit(session_id, job):
     if job.cause_of_death == "unknown" and job.num_resubmits < 3:
 
         print "looks like job died an unnatural death, resubmitting (previous resubmits = %i)" % (job.num_resubmits)
+
+        if job.heart_beat != None:
+            print "last used memory: ", job.heart_beat["memory"], "on node", job.host_name
+
+        #TODO add blacklist
+        # remove node from white_list
+        job.white_list.remove(job.host_name)
+
         job.num_resubmits += 1
         # reset timestamp
         job.timestamp = None
@@ -841,60 +854,14 @@ def handle_resubmit(session_id, job):
         append_job_to_session(session, job)
         session.exit()
 
+        # TODO: kill off old job (to make sure)
+    
         return True
 
     else:
         
         return False
 
-
-def check_cause_of_death(job):
-    """
-    heuristic to determine if the job died an
-    unnatural death (not caused by bug in client code)
-    or due to an error on the cluster side
-
-    side-effect: 
-    job.cause_of_death set to string descriptor
-    """
-
-    # wait for NFS to synch
-    # ToDO replace this by robust file-io
-    time.sleep(10)
-
-    # check if output file is empty
-    if os.path.exists(job.log_stdout_fn) and os.path.isfile(job.log_stdout_fn):
-        tmp_file = file(job.log_stdout_fn)
-        if tmp_file.read() == "":
-            print "job", jobid, " with arguments:", job.args, " died of an UNNATURAL death on", job.node_name
-            job.cause_of_death = "unknown"
-        tmp_file.close()
-    else:
-        job.cause_of_death = "natural"
-
-    return job.cause_of_death
-
-
-
-def check_node_name(jobid):
-    """
-    use qstat to grab the node name of current node
-    """
-
-    # parse qstat output for node name
-    command = "qstat | grep %s" % (jobid)
-    process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
-    os.waitpid(process.pid, 0)
-    output = process.stdout.read().strip()
-    at_pos = output.find("@")
-
-    if at_pos == -1:
-        node_name = "unscheduled"
-    else:
-        #ToDO replace with regex
-        node_name = output[at_pos+1:at_pos+10]
-
-    return node_name
 
 
 #####################################################################
@@ -1009,11 +976,111 @@ def load(filename):
 
 
 ################################################################
+#      Calculate memory usage
+################################################################
+
+
+def _VmB(VmKey, pid):
+    '''Private.
+    '''
+
+    _proc_status = '/proc/%d/status' % pid
+
+    _scale = {'kB': 1.0/1024.0, 'mB': 1.0,
+              'KB': 1.0/1024.0, 'MB': 1.0}
+
+     # get pseudo file  /proc/<pid>/status
+    try:
+        t = open(_proc_status)
+        v = t.read()
+        t.close()
+    except:
+        return 0.0  # non-Linux?
+     # get VmKey line e.g. 'VmRSS:  9999  kB\n ...'
+    i = v.index(VmKey)
+    v = v[i:].split(None, 3)  # whitespace
+    if len(v) < 3:
+        return 0.0  # invalid format?
+     # convert Vm value to bytes
+    return float(v[1]) * _scale[v[2]]
+
+
+def memory(pid):
+    '''Return memory usage in bytes.
+    '''
+    return _VmB('VmSize:', pid)
+
+
+def get_white_list():
+    """
+    parses output of qstat -f to get list of nodes
+    """
+
+    qstat = os.popen("qstat -f")
+    qstat.readline()
+
+    node_names = []
+    norm_loads = []
+
+    for line in qstat:
+
+        if not line.startswith("-"):
+            tokens = line.strip().split()
+            node_name = tokens[0]
+
+            if len(tokens) == 6:
+                print node_name, "disabled, skipping"
+        
+            print tokens[2]
+            slots = float(tokens[2].split("/")[2])
+            cpu_load = float(tokens[3])
+
+            norm_load = cpu_load/slots 
+
+            node_names.append(node_name)
+            norm_loads.append(norm_load)
+
+    qstat.close()
+
+    sorted_idx = argsort(norm_loads)
+    sorted_loads = [norm_loads[idx] for idx in sorted_idx]
+    sorted_names = [node_names[idx] for idx in sorted_idx]
+
+    # ignore first 7 percent
+    first_idx = int(float(len(sorted_names))/7.0)
+
+    keepers = sorted_names[first_idx:]
+
+    return keepers
+
+
+#def resident(since=0.0):
+#    '''Return resident memory usage in bytes.
+#    '''
+#    return _VmB('VmRSS:') - since
+#
+#
+#def stacksize(since=0.0):
+#    '''Return stack size in bytes.
+#    '''
+#    return _VmB('VmStk:') - since
+
+
+def argsort(seq):
+    """
+    argsort in basic python
+    """
+
+    # http://stackoverflow.com/questions/3071415/efficient-method-to-calculate-the-rank-vector-of-a-list-in-python
+    return sorted(range(len(seq)), key=seq.__getitem__)
+
+
+################################################################
 #      The following code will be executed on the cluster      #
 ################################################################
 
 
-def heart_beat(job_id):
+def heart_beat(job_id, parent_pid=-1):
     """
     will send reponses to the server with
     information about the current state of
@@ -1021,12 +1088,12 @@ def heart_beat(job_id):
     """
 
     while True:
-        status = get_job_status()
+        status = get_job_status(parent_pid)
         reply = send_zmq_msg(job_id, "heart_beat", status)
-        time.sleep(3)
+        time.sleep(15)
 
 
-def get_job_status():
+def get_job_status(parent_pid):
     """
     script to determine the status of the current 
     worker and its machine (maybe not cross-platform)
@@ -1035,6 +1102,9 @@ def get_job_status():
     #TODO fetch info about memory and cpu hours
     status_container = {}
     status_container["general"] = "awesome"
+
+    if parent_pid != -1:
+        status_container["memory"] = memory(parent_pid)
 
     return status_container
 
@@ -1051,8 +1121,10 @@ def run_job(job_id):
 
     print "input arguments loaded, starting computation"
 
+    parent_pid = os.getpid()
+
     # create heart beat process
-    heart = multiprocessing.Process(target=heart_beat, args=(job_id,))
+    heart = multiprocessing.Process(target=heart_beat, args=(job_id, parent_pid))
     heart.start()
 
     # run job
