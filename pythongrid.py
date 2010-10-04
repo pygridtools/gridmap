@@ -334,7 +334,7 @@ def _process_jobs_locally(jobs, maxNumThreads=1):
     return jobs
 
 
-def submit_jobs(jobs, white_list=""):
+def submit_jobs(jobs, home_address, white_list=""):
     """
     Method used to send a list of jobs onto the cluster.
     @param jobs: list of jobs to be executed
@@ -348,6 +348,11 @@ def submit_jobs(jobs, white_list=""):
     for job in jobs:
         # set job white list
         job.white_list = white_list
+
+        # remember address of submission host
+        job.home_address = home_address
+
+        # append jobs
         jobid = append_job_to_session(session, job)
         jobids.append(jobid)
 
@@ -371,6 +376,7 @@ def append_job_to_session(session, job):
 
     jt = session.createJobTemplate()
 
+    #TODO fix handling of environment variables
     #fetch only specific env vars from shell
     #shell_env = {"LD_LIBRARY_PATH": os.getenv("LD_LIBRARY_PATH"),
     #             "PYTHONPATH": os.getenv("PYTHONPATH"),
@@ -396,7 +402,7 @@ def append_job_to_session(session, job):
         
 
     jt.remoteCommand = os.path.expanduser(PYGRID)
-    jt.args = [job.inputfile]
+    jt.args = [job.inputfile, job.home_address]
     jt.joinFiles = True
     jt.nativeSpecification = job.nativeSpecification
     jt.outputPath = ":" + os.path.expanduser(TEMPDIR)
@@ -501,20 +507,21 @@ def process_jobs(jobs, local=False, maxNumThreads=1):
     
     if (not local and DRMAA_PRESENT):
 
+        # get list of trusted nodes
         white_list = get_white_list()
 
-        # Use submit_jobs and collect_jobs to run jobs and wait for the results.
+        # initialize checker to get port number
+        checker = StatusCheckerZMQ()
+
+        # get interface and port
+        home_address = checker.home_address
+
         # jobid field is attached to each job object
-        (sid, jobids) = submit_jobs(jobs, white_list)
+        (sid, jobids) = submit_jobs(jobs, home_address, white_list)
 
-        print 'checking whether finished'
+        # handling of inputs, outputs and heartbeats
+        checker.check(sid, jobs)
 
-        #checker = StatusChecker(sid, jobs)
-        checker = StatusCheckerZMQ(sid, jobs)
-        checker.check()
-        #while not checker.check():
-        #    time.sleep(5)
-        #return collect_jobs(sid, jobids, jobs, wait=True)
         return jobs
 
     elif (not local and not DRMAA_PRESENT):
@@ -548,57 +555,67 @@ class StatusCheckerZMQ(object):
     switched to next-generation cluster computing :D
     """ 
 
-    def __init__(self, session_id, jobs):
+    def __init__(self):
         """
-        we keep a memory of job ids
+        set up socket
         """
-        
+
+        context = zmq.Context()
+        self.socket = context.socket(zmq.REP)
+
+        self.host_name = socket.gethostname()
+        self.ip_address = socket.gethostbyname(self.host_name)
+        self.interface = "tcp://%s" % (self.ip_address)
+
+        # bind to random port and remember it
+        self.port = self.socket.bind_to_random_port(self.interface)
+        self.home_address = "%s:%i" % (self.interface, self.port)
+
+        print "setting up connection on", self.home_address
+
+        # uninitialized field (set in check method)
+        self.jobs = []
+        self.jobids = []
+        self.session_id = -1
+        self.jobid_to_job = {}
+
+
+    def __del__(self):
+        """
+        clean up open socket
+        """
+
+        self.socket.close()
+
+
+    def check(self, session_id, jobs):
+        """
+        serves input and output data
+        """
+
+        # save list of jobs
         self.jobs = jobs
-        self.jobids = [job.jobid for job in jobs]
 
         # keep track of DRMAA session (for resubmissions)
         self.session_id = session_id
 
         # save some useful mappings
-        self.jobid_to_status = {}.fromkeys(self.jobids, 0)
         self.jobid_to_job = {}
         for job in jobs:
             #self.jobid_to_job[job.jobid] = job
             self.jobid_to_job[job.inputfile] = job
 
-        self._decodestatus = {
-            -42: 'sge and drmaa not in sync',
-            "undetermined": 'process status cannot be determined',
-            "queued_active": 'job is queued and active',
-            "system_on_hold": 'job is queued and in system hold',
-            "user_on_hold": 'job is queued and in user hold',
-            "user_system_on_hold": 'job is in user and system hold',
-            "running": 'job is running',
-            "system_suspended": 'job is system suspended',
-            "user_suspended": 'job is user suspended',
-            "done": 'job finished normally',
-            "failed": 'job finished, but failed',
-        }
-
-
-    def check(self):
-        """
-        serves input and output data
-        """
 
         print "using the NEW and SHINY ZMQ layer"
 
-        context = zmq.Context()
-        socket = context.socket(zmq.REP)
-        socket.bind("tcp://192.168.1.250:5001")
-
-        local_heart = multiprocessing.Process(target=heart_beat, args=(-1,))
+        local_heart = multiprocessing.Process(target=heart_beat, args=(-1, self.home_address))
         local_heart.start()
 
         while not self.all_jobs_done():
     
-            msg_str = socket.recv()
+            msg_str = self.socket.recv()
             msg = zloads(msg_str)
+
             return_msg = zdumps("")
 
             job_id = msg["job_id"]
@@ -626,7 +643,7 @@ class StatusCheckerZMQ(object):
 
             self.check_if_alive()
         
-            socket.send(return_msg)
+            self.socket.send(return_msg)
 
         local_heart.terminate()
 
@@ -667,6 +684,20 @@ class StatusCheckerZMQ(object):
         """
         ask SGE for information on our job
         """
+
+        self._decodestatus = {
+            -42: 'sge and drmaa not in sync',
+            "undetermined": 'process status cannot be determined',
+            "queued_active": 'job is queued and active',
+            "system_on_hold": 'job is queued and in system hold',
+            "user_on_hold": 'job is queued and in user hold',
+            "user_system_on_hold": 'job is in user and system hold',
+            "running": 'job is running',
+            "system_suspended": 'job is system suspended',
+            "user_suspended": 'job is user suspended',
+            "done": 'job finished normally',
+            "failed": 'job finished, but failed',
+        }
         
         s = drmaa.Session()
         s.initialize(self.sid)
@@ -840,9 +871,8 @@ def handle_resubmit(session_id, job):
         if job.heart_beat != None:
             print "last used memory: ", job.heart_beat["memory"], "on node", job.host_name
 
-        #TODO add blacklist
         # remove node from white_list
-        job.white_list.remove(job.host_name)
+        job.white_list.remove("all.q@" + job.host_name)
 
         job.num_resubmits += 1
         # reset timestamp
@@ -976,7 +1006,7 @@ def load(filename):
 
 
 ################################################################
-#      Calculate memory usage
+#      Some handy functions
 ################################################################
 
 
@@ -1016,42 +1046,49 @@ def get_white_list():
     parses output of qstat -f to get list of nodes
     """
 
-    qstat = os.popen("qstat -f")
-    qstat.readline()
+    try:
+        qstat = os.popen("qstat -f")
+        #qstat.readline()
 
-    node_names = []
-    norm_loads = []
+        node_names = []
+        norm_loads = []
 
-    for line in qstat:
+        for line in qstat:
 
-        if not line.startswith("-"):
-            tokens = line.strip().split()
-            node_name = tokens[0]
+            if line.startswith("all.q@"):
+                print line
+                tokens = line.strip().split()
+                node_name = tokens[0]
 
-            if len(tokens) == 6:
-                print node_name, "disabled, skipping"
-        
-            print tokens[2]
-            slots = float(tokens[2].split("/")[2])
-            cpu_load = float(tokens[3])
+                if len(tokens) == 6:
+                    print node_name, "disabled, skipping"
+                    continue
+            
+                print tokens[2]
+                slots = float(tokens[2].split("/")[2])
+                cpu_load = float(tokens[3])
 
-            norm_load = cpu_load/slots 
+                norm_load = cpu_load/slots 
 
-            node_names.append(node_name)
-            norm_loads.append(norm_load)
+                node_names.append(node_name)
+                norm_loads.append(norm_load)
 
-    qstat.close()
+        qstat.close()
 
-    sorted_idx = argsort(norm_loads)
-    sorted_loads = [norm_loads[idx] for idx in sorted_idx]
-    sorted_names = [node_names[idx] for idx in sorted_idx]
+        sorted_idx = argsort(norm_loads)
+        sorted_loads = [norm_loads[idx] for idx in sorted_idx]
+        sorted_names = [node_names[idx] for idx in sorted_idx]
 
-    # ignore first 7 percent
-    first_idx = int(float(len(sorted_names))/7.0)
+        # ignore first 7 percent
+        first_idx = int(float(len(sorted_names))/7.0)
 
-    keepers = sorted_names[first_idx:]
+        keepers = sorted_names[first_idx:]
 
-    return keepers
+        return keepers
+
+    except Exception, details:
+        print "getting whitelist failed", details
+        return ""
 
 
 #def resident(since=0.0):
@@ -1080,7 +1117,7 @@ def argsort(seq):
 ################################################################
 
 
-def heart_beat(job_id, parent_pid=-1):
+def heart_beat(job_id, address, parent_pid=-1):
     """
     will send reponses to the server with
     information about the current state of
@@ -1089,7 +1126,7 @@ def heart_beat(job_id, parent_pid=-1):
 
     while True:
         status = get_job_status(parent_pid)
-        reply = send_zmq_msg(job_id, "heart_beat", status)
+        reply = send_zmq_msg(job_id, "heart_beat", status, address)
         time.sleep(15)
 
 
@@ -1109,7 +1146,7 @@ def get_job_status(parent_pid):
     return status_container
 
 
-def run_job(job_id):
+def run_job(job_id, address):
     """
     This is the code that is executed on the cluster side.
 
@@ -1117,21 +1154,21 @@ def run_job(job_id):
     @type job_id: string
     """
 
-    job = send_zmq_msg(job_id, "fetch_input", data=None)
+    job = send_zmq_msg(job_id, "fetch_input", None, address)
 
     print "input arguments loaded, starting computation"
 
     parent_pid = os.getpid()
 
     # create heart beat process
-    heart = multiprocessing.Process(target=heart_beat, args=(job_id, parent_pid))
+    heart = multiprocessing.Process(target=heart_beat, args=(job_id, address, parent_pid))
     heart.start()
 
     # run job
     job.execute()
 
     # send back result
-    thank_you_note = send_zmq_msg(job_id, "store_output", data=job.ret)
+    thank_you_note = send_zmq_msg(job_id, "store_output", job.ret, address)
     print thank_you_note
 
     # stop heartbeat
@@ -1139,7 +1176,7 @@ def run_job(job_id):
 
 
 
-def send_zmq_msg(job_id, command, data):
+def send_zmq_msg(job_id, command, data, address):
     """
     simple code to send messages back to host
     (and get a reply back)
@@ -1147,7 +1184,7 @@ def send_zmq_msg(job_id, command, data):
 
     context = zmq.Context()
     zsocket = context.socket(zmq.REQ)
-    zsocket.connect("tcp://192.168.1.250:5001")
+    zsocket.connect(address)
 
     host_name = socket.gethostname()
     ip_address = socket.gethostbyname(host_name)
@@ -1198,7 +1235,7 @@ def main(argv=None):
     try:
         try:
             opts, args = getopt.getopt(argv[1:], "h", ["help"])
-            run_job(args[0])
+            run_job(args[0], args[1])
         except getopt.error, msg:
             raise Usage(msg)
 
