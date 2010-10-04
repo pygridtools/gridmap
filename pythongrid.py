@@ -29,7 +29,8 @@ import traceback
 import zmq
 import socket
 import zlib
-import threading
+import string
+import uuid
 from datetime import datetime
 
 #paths on cluster file system
@@ -45,9 +46,6 @@ PYGRID = "~/svn/tools/python/pythongrid/pythongrid.py"
 # ToDO define separate client/server TEMPDIR
 TEMPDIR = "~/tmp/"
 
-
-# used for generating random filenames
-alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 #PPATH = reduce(lambda x,y: x+':'+y, PYTHONPATH)
 #print PPATH
@@ -103,8 +101,6 @@ class Job(object):
         self.kwlist = kwlist
         self.cleanup = cleanup
         self.ret = None
-        self.inputfile = ""
-        self.outputfile = ""
         self.nativeSpecification = ""
         self.exception = None
         self.environment = None
@@ -118,10 +114,7 @@ class Job(object):
             print '%s does not exist. Please create a directory' % outdir
             raise Exception()
 
-        # ToDO: ensure uniqueness of file names
-        self.name = 'pg'+''.join([random.choice(alphabet) for a in xrange(8)])
-        self.inputfile = jp(outdir,self.name + "_in.gz")
-        self.outputfile = jp(outdir,self.name + "_out.gz")
+        self.name = 'pg_' + str(uuid.uuid1())
         self.jobid = ""
 
 
@@ -137,14 +130,6 @@ class Job(object):
 
         return self
 
-
-    def __repr_broken__(self):
-        #ToDO: fix representation
-        retstr1 = ('%s\nargs=%s\nkwlist=%s\nret=%s\ncleanup=%s' %
-                   self.f, self.args, self.kwlist, self.ret, self.cleanup)
-        retstr2 = ('\nnativeSpecification=%s\ninputfile=%s\noutputfile=%s\n' %
-                   self.nativeSpecification, self.inputfile, self.outputfile)
-        return retstr1 + retstr2
 
     def execute(self):
         """
@@ -402,7 +387,7 @@ def append_job_to_session(session, job):
         
 
     jt.remoteCommand = os.path.expanduser(PYGRID)
-    jt.args = [job.inputfile, job.home_address]
+    jt.args = [job.name, job.home_address]
     jt.joinFiles = True
     jt.nativeSpecification = job.nativeSpecification
     jt.outputPath = ":" + os.path.expanduser(TEMPDIR)
@@ -498,6 +483,7 @@ def collect_jobs(sid, jobids, joblist, wait=False):
 
 
     return retJobs
+
 
 
 def process_jobs(jobs, local=False, maxNumThreads=1):
@@ -603,7 +589,7 @@ class StatusCheckerZMQ(object):
         self.jobid_to_job = {}
         for job in jobs:
             #self.jobid_to_job[job.jobid] = job
-            self.jobid_to_job[job.inputfile] = job
+            self.jobid_to_job[job.name] = job
 
 
         print "using the NEW and SHINY ZMQ layer"
@@ -660,6 +646,7 @@ class StatusCheckerZMQ(object):
             if job.timestamp != None:
                 time_delta = current_time - job.timestamp
 
+                #TODO check for memory as cause of death
                 if time_delta.seconds > 120 and job.ret == None:
                     job.cause_of_death = "unknown"
                     if not handle_resubmit(self.session_id, job):
@@ -872,7 +859,10 @@ def handle_resubmit(session_id, job):
             print "last used memory: ", job.heart_beat["memory"], "on node", job.host_name
 
         # remove node from white_list
-        job.white_list.remove("all.q@" + job.host_name)
+        try:
+            job.white_list.remove("all.q@" + job.host_name)
+        except Exception, detail:
+            print "could not remove", job.host_name, "from whitelist", job.white_list
 
         job.num_resubmits += 1
         # reset timestamp
@@ -1048,7 +1038,6 @@ def get_white_list():
 
     try:
         qstat = os.popen("qstat -f")
-        #qstat.readline()
 
         node_names = []
         norm_loads = []
@@ -1089,18 +1078,6 @@ def get_white_list():
     except Exception, details:
         print "getting whitelist failed", details
         return ""
-
-
-#def resident(since=0.0):
-#    '''Return resident memory usage in bytes.
-#    '''
-#    return _VmB('VmRSS:') - since
-#
-#
-#def stacksize(since=0.0):
-#    '''Return stack size in bytes.
-#    '''
-#    return _VmB('VmStk:') - since
 
 
 def argsort(seq):
@@ -1156,13 +1133,20 @@ def run_job(job_id, address):
 
     job = send_zmq_msg(job_id, "fetch_input", None, address)
 
-    print "input arguments loaded, starting computation"
+    print "input arguments loaded, starting computation", job.args
 
     parent_pid = os.getpid()
 
+    print "creating process"
+
     # create heart beat process
     heart = multiprocessing.Process(target=heart_beat, args=(job_id, address, parent_pid))
+
+    print "starting process"
+
     heart.start()
+
+    print "executing job"
 
     # run job
     job.execute()
