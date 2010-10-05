@@ -602,7 +602,7 @@ class StatusCheckerZMQ(object):
             msg_str = self.socket.recv()
             msg = zloads(msg_str)
 
-            return_msg = zdumps("")
+            return_msg = ""
 
             job_id = msg["job_id"]
 
@@ -613,23 +613,27 @@ class StatusCheckerZMQ(object):
                 print msg
 
                 if msg["command"] == "fetch_input":
-                    return_msg = zdumps(self.jobid_to_job[job_id])
+                    return_msg = self.jobid_to_job[job_id]
 
                 if msg["command"] == "store_output":
                     job.ret = msg["data"]
-                    return_msg = zdumps("thanks")
+                    return_msg = "thanks"
 
                 if msg["command"] == "heart_beat":
                     job.heart_beat = msg["data"]
-                    return_msg = zdumps("all good")
+                    return_msg = "all good"
 
                 # store in job object
                 job.timestamp = datetime.now()
                 job.host_name = msg["host_name"]
 
-            self.check_if_alive()
-        
-            self.socket.send(return_msg)
+            
+            else:
+                # run check only on local heart-beat
+                self.check_if_alive()
+
+            # send back compressed response
+            self.socket.send(zdumps(return_msg))
 
         local_heart.terminate()
 
@@ -1052,6 +1056,10 @@ def get_white_list():
                 if len(tokens) == 6:
                     print node_name, "disabled, skipping"
                     continue
+
+                if node_name.find("node1") != -1 and not node_name.find("node14") != -1:
+                    print node_name, "too old, skipping"
+                    continue
             
                 print tokens[2]
                 slots = float(tokens[2].split("/")[2])
@@ -1113,9 +1121,8 @@ def get_job_status(parent_pid):
     worker and its machine (maybe not cross-platform)
     """
 
-    #TODO fetch info about memory and cpu hours
+    #TODO fetch info about cpu hours
     status_container = {}
-    status_container["general"] = "awesome"
 
     if parent_pid != -1:
         status_container["memory"] = memory(parent_pid)
