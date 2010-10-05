@@ -1029,10 +1029,32 @@ def _VmB(VmKey, pid):
     return float(v[1]) * _scale[v[2]]
 
 
-def memory(pid):
-    '''Return memory usage in bytes.
-    '''
+def get_memory_usage(pid):
+    """
+    return memory usage in Mb.
+    """
+
     return _VmB('VmSize:', pid)
+
+
+def get_cpu_load(pid):
+    """
+    return cpu usage of process
+    """
+
+    command = "ps h -o pcpu -p %d" % (pid)
+
+    try:
+        ps_pseudofile = os.popen(command)
+        info = ps_pseudofile.read()
+        ps_pseudofile.close()
+
+        cpu_load = info.strip()
+    except Exception, detail:
+        print "getting cpu info failed:", detail
+        cpu_load = "non-linux?"
+
+    return cpu_load
 
 
 def get_white_list():
@@ -1055,10 +1077,6 @@ def get_white_list():
 
                 if len(tokens) == 6:
                     print node_name, "disabled, skipping"
-                    continue
-
-                if node_name.find("node1") != -1 and not node_name.find("node14") != -1:
-                    print node_name, "too old, skipping"
                     continue
             
                 print tokens[2]
@@ -1118,14 +1136,14 @@ def heart_beat(job_id, address, parent_pid=-1):
 def get_job_status(parent_pid):
     """
     script to determine the status of the current 
-    worker and its machine (maybe not cross-platform)
+    worker and its machine (currently not cross-platform)
     """
 
-    #TODO fetch info about cpu hours
     status_container = {}
 
     if parent_pid != -1:
-        status_container["memory"] = memory(parent_pid)
+        status_container["memory"] = get_memory_usage(parent_pid)
+        status_container["cpu_load"] = get_cpu_load(parent_pid)
 
     return status_container
 
