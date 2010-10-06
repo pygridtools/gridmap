@@ -594,7 +594,7 @@ class StatusCheckerZMQ(object):
 
         print "using the NEW and SHINY ZMQ layer"
 
-        local_heart = multiprocessing.Process(target=heart_beat, args=(-1, self.home_address))
+        local_heart = multiprocessing.Process(target=heart_beat, args=(-1, self.home_address, 60))
         local_heart.start()
 
         while not self.all_jobs_done():
@@ -651,10 +651,13 @@ class StatusCheckerZMQ(object):
                 time_delta = current_time - job.timestamp
 
                 #TODO check for memory as cause of death
-                if time_delta.seconds > 120 and job.ret == None:
+                if time_delta.seconds > 200 and job.ret == None:
                     job.cause_of_death = "unknown"
                     if not handle_resubmit(self.session_id, job):
                         job.ret = "job dead"
+
+                    # break out of loop to avoid too long delay
+                    break
 
 
 
@@ -872,12 +875,10 @@ def handle_resubmit(session_id, job):
         # reset timestamp
         job.timestamp = None
 
-        # append to session
-        session = drmaa.Session()
-        session.initialize(session_id)
-        append_job_to_session(session, job)
-        session.exit()
-
+        print "starting resubmission process"
+        submission_process = multiprocessing.Process(target=resubmit, args=(session_id, job))
+        submission_process.start()
+        
         # TODO: kill off old job (to make sure)
     
         return True
@@ -885,6 +886,18 @@ def handle_resubmit(session_id, job):
     else:
         
         return False
+
+
+def resubmit(session_id, job):
+    """
+    encapsulate creation of session for multiprocessing
+    """
+
+    # append to session
+    session = drmaa.Session()
+    session.initialize(session_id)
+    append_job_to_session(session, job)
+    session.exit()
 
 
 
@@ -1120,7 +1133,7 @@ def argsort(seq):
 ################################################################
 
 
-def heart_beat(job_id, address, parent_pid=-1):
+def heart_beat(job_id, address, parent_pid=-1, wait_sec=45):
     """
     will send reponses to the server with
     information about the current state of
@@ -1130,7 +1143,7 @@ def heart_beat(job_id, address, parent_pid=-1):
     while True:
         status = get_job_status(parent_pid)
         reply = send_zmq_msg(job_id, "heart_beat", status, address)
-        time.sleep(15)
+        time.sleep(wait_sec)
 
 
 def get_job_status(parent_pid):
