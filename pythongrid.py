@@ -254,6 +254,44 @@ class KybJob(Job):
     nativeSpecification = property(getNativeSpecification,
                                    setNativeSpecification)
 
+    
+    def is_out_of_memory(self):
+        """
+        checks if job is out of memory
+        according to requested resources 
+        and the last heart-beat
+        """
+
+        if self.heart_beat != None:
+
+            unit = self.h_vmem[-1]
+            allocated_mb = float(self.h_vmem[0:-1])
+
+            if (unit == "G"):
+                allocated_mb = allocated_mb * 1000
+
+            # if we are within 500M of limit
+            if float(self.heart_beat["memory"]) + 500 > allocated_mb:
+                return True
+
+        return False
+        
+
+    def alter_allocated_memory(self, factor=2.0):
+        """
+        increases requested memory by a certain factor
+        """
+        
+        assert(type(factor)==float)
+
+        if self.h_vmem != "":
+            unit = self.h_vmem[-1]
+            allocated_mb = float(self.h_vmem[0:-1])
+            self.h_vmem = "%f%s" % (factor*allocated_mb, unit)
+
+            print "memory for job %s increased to %s" % (self.name, self.h_vmem)
+
+        return self
 
 
 #only define this class if the multiprocessing module is present
@@ -519,8 +557,6 @@ def process_jobs(jobs, local=False, maxNumThreads=1):
 
 
 
-
-
 def get_status(sid, jobids):
     """
     Get the status of all jobs in jobids.
@@ -534,221 +570,6 @@ def get_status(sid, jobids):
     checker = StatusChecker(sid, jobids)
     return checker.check()
 
-
-
-class StatusCheckerZMQ(object):
-    """
-    switched to next-generation cluster computing :D
-    """ 
-
-    def __init__(self):
-        """
-        set up socket
-        """
-
-        context = zmq.Context()
-        self.socket = context.socket(zmq.REP)
-
-        self.host_name = socket.gethostname()
-        self.ip_address = socket.gethostbyname(self.host_name)
-        self.interface = "tcp://%s" % (self.ip_address)
-
-        # bind to random port and remember it
-        self.port = self.socket.bind_to_random_port(self.interface)
-        self.home_address = "%s:%i" % (self.interface, self.port)
-
-        print "setting up connection on", self.home_address
-
-        # uninitialized field (set in check method)
-        self.jobs = []
-        self.jobids = []
-        self.session_id = -1
-        self.jobid_to_job = {}
-
-
-    def __del__(self):
-        """
-        clean up open socket
-        """
-
-        self.socket.close()
-
-
-    def check(self, session_id, jobs):
-        """
-        serves input and output data
-        """
-
-        # save list of jobs
-        self.jobs = jobs
-
-        # keep track of DRMAA session (for resubmissions)
-        self.session_id = session_id
-
-        # save some useful mappings
-        self.jobid_to_job = {}
-        for job in jobs:
-            #self.jobid_to_job[job.jobid] = job
-            self.jobid_to_job[job.name] = job
-
-
-        print "using the NEW and SHINY ZMQ layer"
-
-        local_heart = multiprocessing.Process(target=heart_beat, args=(-1, self.home_address, 60))
-        local_heart.start()
-
-        while not self.all_jobs_done():
-    
-            msg_str = self.socket.recv()
-            msg = zloads(msg_str)
-
-            return_msg = ""
-
-            job_id = msg["job_id"]
-
-            # only if its not the local beat
-            if job_id != -1:
-
-                job = self.jobid_to_job[job_id] 
-                print msg
-
-                if msg["command"] == "fetch_input":
-                    return_msg = self.jobid_to_job[job_id]
-
-                if msg["command"] == "store_output":
-                    job.ret = msg["data"]
-                    return_msg = "thanks"
-
-                if msg["command"] == "heart_beat":
-                    job.heart_beat = msg["data"]
-                    return_msg = "all good"
-
-                # store in job object
-                job.timestamp = datetime.now()
-                job.host_name = msg["host_name"]
-
-            
-            else:
-                # run check only on local heart-beat
-                self.check_if_alive()
-
-            # send back compressed response
-            self.socket.send(zdumps(return_msg))
-
-        local_heart.terminate()
-
-
-    def check_if_alive(self):
-        """
-        look at jobs and decide what to do
-        """
-
-        current_time = datetime.now()
-
-        for job in self.jobs:
-
-            if job.timestamp != None:
-                time_delta = current_time - job.timestamp
-
-                #TODO check for memory as cause of death
-                if time_delta.seconds > 200 and job.ret == None:
-                    job.cause_of_death = "unknown"
-                    if not handle_resubmit(self.session_id, job):
-                        job.ret = "job dead"
-
-                    # break out of loop to avoid too long delay
-                    break
-
-
-
-    def all_jobs_done(self):
-        """
-        checks for all jobs if they are done
-        """
-
-        for job in self.jobs:
-            if job.ret == None:
-                return False
-
-        return True
-
-
-
-    def check_status_sge(self):
-        """
-        ask SGE for information on our job
-        """
-
-        self._decodestatus = {
-            -42: 'sge and drmaa not in sync',
-            "undetermined": 'process status cannot be determined',
-            "queued_active": 'job is queued and active',
-            "system_on_hold": 'job is queued and in system hold',
-            "user_on_hold": 'job is queued and in user hold',
-            "user_system_on_hold": 'job is in user and system hold',
-            "running": 'job is running',
-            "system_suspended": 'job is system suspended',
-            "user_suspended": 'job is user suspended',
-            "done": 'job finished normally',
-            "failed": 'job finished, but failed',
-        }
-        
-        s = drmaa.Session()
-        s.initialize(self.sid)
-
-        status_summary = {}.fromkeys(self._decodestatus, 0)
-        status_changed = False
-
-        for job in self.jobs:
-
-            jobid = job.jobid
-            old_status = self.jobid_to_status[jobid]
-            
-            try:
-                curstat = s.jobStatus(jobid)
-
-            except Exception, message:
-                # handle case where already finished job
-                # is now out-of-synch with grid engine
-                if old_status == "done":
-                    curstat = "done"
-                else:
-                    curstat = -42
-
-
-            # print job status updates
-            if curstat != old_status:
-
-                # set flag
-                status_changed = True
-
-                # determine node name
-                job.host_name = check_host_name(jobid)
-
-                print "status update for job", jobid, "from", old_status, "to", curstat, "log at", job.log_stdout_fn, "on", job.host_name
-    
-                # check cause of death and resubmit if unnatural
-                if curstat == "done" or curstat == -42:
-                    resubmit = handle_resubmit(s, job)
-
-
-            # remember current status
-            self.jobid_to_status[jobid] = curstat
-            status_summary[curstat] += 1
-
-
-        # print status summary
-        if status_changed:
-            print 'Status of %s at %s' % (self.sid, time.strftime('%d/%m/%Y - %H.%M:%S'))
-            for curkey in status_summary.keys():
-                if status_summary[curkey]>0:
-                    print '%s: %d' % (self._decodestatus[curkey], status_summary[curkey])
-            print "##############################################"
-            status_changed = False
-
-        s.exit()
-
-        return (status_summary["done"] + status_summary[-42]==len(self.jobs))
 
 
 class StatusChecker(object):
@@ -850,6 +671,151 @@ class StatusChecker(object):
 
 
 
+class StatusCheckerZMQ(object):
+    """
+    switched to next-generation cluster computing :D
+    """ 
+
+    def __init__(self):
+        """
+        set up socket
+        """
+
+        context = zmq.Context()
+        self.socket = context.socket(zmq.REP)
+
+        self.host_name = socket.gethostname()
+        self.ip_address = socket.gethostbyname(self.host_name)
+        self.interface = "tcp://%s" % (self.ip_address)
+
+        # bind to random port and remember it
+        self.port = self.socket.bind_to_random_port(self.interface)
+        self.home_address = "%s:%i" % (self.interface, self.port)
+
+        print "setting up connection on", self.home_address
+
+        # uninitialized field (set in check method)
+        self.jobs = []
+        self.jobids = []
+        self.session_id = -1
+        self.jobid_to_job = {}
+
+
+    def __del__(self):
+        """
+        clean up open socket
+        """
+
+        self.socket.close()
+
+
+    def check(self, session_id, jobs):
+        """
+        serves input and output data
+        """
+
+        # save list of jobs
+        self.jobs = jobs
+
+        # keep track of DRMAA session_id (for resubmissions)
+        self.session_id = session_id
+
+        # save useful mapping
+        self.jobid_to_job = {}
+        for job in jobs:
+            self.jobid_to_job[job.name] = job
+
+        # determines in which interval to check if jobs are alive
+        local_heart = multiprocessing.Process(target=heart_beat, args=(-1, self.home_address, -1, 15))
+        local_heart.start()
+
+        print "using the NEW and SHINY ZMQ layer"
+
+        # main loop
+        while not self.all_jobs_done():
+    
+            msg_str = self.socket.recv()
+            msg = zloads(msg_str)
+
+            return_msg = ""
+
+            job_id = msg["job_id"]
+
+            # only if its not the local beat
+            if job_id != -1:
+
+                job = self.jobid_to_job[job_id] 
+                print msg
+
+                if msg["command"] == "fetch_input":
+                    return_msg = self.jobid_to_job[job_id]
+
+                if msg["command"] == "store_output":
+                    job.ret = msg["data"]
+                    return_msg = "thanks"
+
+                if msg["command"] == "heart_beat":
+                    job.heart_beat = msg["data"]
+                    return_msg = "all good"
+
+                # store in job object
+                job.timestamp = datetime.now()
+                job.host_name = msg["host_name"]
+
+            
+            else:
+                # run check only on local heart-beat
+                self.check_if_alive()
+
+            # send back compressed response
+            self.socket.send(zdumps(return_msg))
+
+        local_heart.terminate()
+
+
+    def check_if_alive(self):
+        """
+        look at jobs and decide what to do
+        """
+
+        current_time = datetime.now()
+
+        for job in self.jobs:
+
+            if job.timestamp != None:
+                time_delta = current_time - job.timestamp
+
+
+                if time_delta.seconds > 120 and job.ret == None:
+
+                    if job.is_out_of_memory():
+                        job.cause_of_death = "out_of_memory"
+                    else:
+                        job.cause_of_death = "unknown"
+
+                    if not handle_resubmit(self.session_id, job):
+                        job.ret = "job dead"
+
+                    # break out of loop to avoid too long delay
+                    break
+
+
+
+    def all_jobs_done(self):
+        """
+        checks for all jobs if they are done
+        """
+
+        for job in self.jobs:
+            if job.ret == None:
+                return False
+
+        return True
+
+
+
+
+
 def handle_resubmit(session_id, job):
     """
     heuristic to determine if the job should be resubmitted
@@ -858,28 +824,35 @@ def handle_resubmit(session_id, job):
     job.num_resubmits incremented
     """
 
-    if job.cause_of_death == "unknown" and job.num_resubmits < 3:
+    if job.num_resubmits < 3:
 
         print "looks like job died an unnatural death, resubmitting (previous resubmits = %i)" % (job.num_resubmits)
 
         if job.heart_beat != None:
             print "last used memory: ", job.heart_beat["memory"], "on node", job.host_name
 
-        # remove node from white_list
-        try:
-            job.white_list.remove("all.q@" + job.host_name)
-        except Exception, detail:
-            print "could not remove", job.host_name, "from whitelist", job.white_list
+        if job.cause_of_death == "out_of_memory":
+            job.alter_allocated_memory(2.0)
+
+        else:
+            try:
+                # remove node from white_list
+                job.white_list.remove("all.q@" + job.host_name)
+            except Exception, detail:
+                print "could not remove", job.host_name, "from whitelist", job.white_list
 
         job.num_resubmits += 1
         # reset timestamp
         job.timestamp = None
 
+
+        # TODO: kill off old job (to make sure)
+
+        # resubmit job in independent process to avoid delay
         print "starting resubmission process"
         submission_process = multiprocessing.Process(target=resubmit, args=(session_id, job))
         submission_process.start()
         
-        # TODO: kill off old job (to make sure)
     
         return True
 
@@ -972,13 +945,17 @@ class MapReduce(object):
 
 
 def zdumps(obj):
+    """
+    dumps pickleable object into zlib compressed string
+    """
     return zlib.compress(cPickle.dumps(obj,cPickle.HIGHEST_PROTOCOL),9)
-    #return cPickle.dumps(obj,cPickle.HIGHEST_PROTOCOL)
 
 
 def zloads(zstr):
+    """
+    loads pickleable object from zlib compressed string
+    """
     return cPickle.loads(zlib.decompress(zstr)) 
-    #return cPickle.loads(zstr) 
 
 
 def save(filename, myobj):
@@ -1018,8 +995,9 @@ def load(filename):
 
 
 def _VmB(VmKey, pid):
-    '''Private.
-    '''
+    """
+    get various mem usage properties of process with id pid in MB
+    """
 
     _proc_status = '/proc/%d/status' % pid
 
@@ -1103,16 +1081,7 @@ def get_white_list():
 
         qstat.close()
 
-        sorted_idx = argsort(norm_loads)
-        sorted_loads = [norm_loads[idx] for idx in sorted_idx]
-        sorted_names = [node_names[idx] for idx in sorted_idx]
-
-        # ignore first 7 percent
-        first_idx = int(float(len(sorted_names))/7.0)
-
-        keepers = sorted_names[first_idx:]
-
-        return keepers
+        return node_names
 
     except Exception, details:
         print "getting whitelist failed", details
@@ -1175,12 +1144,10 @@ def run_job(job_id, address):
 
     parent_pid = os.getpid()
 
-    print "creating process"
-
     # create heart beat process
-    heart = multiprocessing.Process(target=heart_beat, args=(job_id, address, parent_pid))
+    heart = multiprocessing.Process(target=heart_beat, args=(job_id, address, parent_pid, 30))
 
-    print "starting process"
+    print "starting heart beat"
 
     heart.start()
 
