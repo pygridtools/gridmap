@@ -149,9 +149,12 @@ class Job(object):
             print "type:", str(type(e))
             print "line number:", sys.exc_info()[2].tb_lineno
             print e
-            traceback.print_exc(file=sys.stdout)
             print "========="
-            self.exception = e
+            self.exception = traceback.format_exc()
+            self.ret = e
+
+            print self.exception
+            traceback.print_exc(file=sys.stdout)
 
 
 class KybJob(Job):
@@ -754,6 +757,10 @@ class StatusCheckerZMQ(object):
                     job.ret = msg["data"]
                     return_msg = "thanks"
 
+                    if isinstance(job.ret, Exception):
+                        print "job", job.name, "encountered exception", job.ret
+                        print job.exception
+
                 if msg["command"] == "heart_beat":
                     job.heart_beat = msg["data"]
                     return_msg = "all good"
@@ -1070,7 +1077,6 @@ def get_white_list():
                     print node_name, "disabled, skipping"
                     continue
             
-                print tokens[2]
                 slots = float(tokens[2].split("/")[2])
                 cpu_load = float(tokens[3])
 
