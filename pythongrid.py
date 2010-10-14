@@ -61,7 +61,7 @@ MULTIPROCESSING_PRESENT = True
 
 try:
     import drmaa
-except ImportError, detail:
+except Exception, detail:
     print "Error importing drmaa. Only local multi-threading supported."
     print "Please check your installation."
     print detail
@@ -69,7 +69,7 @@ except ImportError, detail:
 
 try:
     import multiprocessing
-except ImportError, detail:
+except Exception, detail:
     print "Error importing multiprocessing. Local computing limited to one CPU."
     print "Please install python2.6 or the backport of the multiprocessing package"
     print detail
@@ -729,7 +729,7 @@ class StatusCheckerZMQ(object):
             self.jobid_to_job[job.name] = job
 
         # determines in which interval to check if jobs are alive
-        local_heart = multiprocessing.Process(target=heart_beat, args=(-1, self.home_address, -1, 15))
+        local_heart = multiprocessing.Process(target=heart_beat, args=(-1, self.home_address, -1, "", 15))
         local_heart.start()
 
         print "using the NEW and SHINY ZMQ layer"
@@ -748,13 +748,15 @@ class StatusCheckerZMQ(object):
             if job_id != -1:
 
                 job = self.jobid_to_job[job_id] 
-                print msg
+                print datetime.now().ctime(), msg
 
                 if msg["command"] == "fetch_input":
                     return_msg = self.jobid_to_job[job_id]
 
                 if msg["command"] == "store_output":
-                    job.ret = msg["data"]
+                    # store job object
+                    job = msg["data"]
+                    self.jobid_to_job[job_id] = job
                     return_msg = "thanks"
 
                     if isinstance(job.ret, Exception):
@@ -1069,12 +1071,10 @@ def get_white_list():
         for line in qstat:
 
             if line.startswith("all.q@"):
-                print line
                 tokens = line.strip().split()
                 node_name = tokens[0]
 
                 if len(tokens) == 6:
-                    print node_name, "disabled, skipping"
                     continue
             
                 slots = float(tokens[2].split("/")[2])
@@ -1108,7 +1108,7 @@ def argsort(seq):
 ################################################################
 
 
-def heart_beat(job_id, address, parent_pid=-1, wait_sec=45):
+def heart_beat(job_id, address, parent_pid=-1, log_file="", wait_sec=45):
     """
     will send reponses to the server with
     information about the current state of
@@ -1117,6 +1117,7 @@ def heart_beat(job_id, address, parent_pid=-1, wait_sec=45):
 
     while True:
         status = get_job_status(parent_pid)
+        status["log_file"] = log_file
         reply = send_zmq_msg(job_id, "heart_beat", status, address)
         time.sleep(wait_sec)
 
@@ -1151,7 +1152,7 @@ def run_job(job_id, address):
     parent_pid = os.getpid()
 
     # create heart beat process
-    heart = multiprocessing.Process(target=heart_beat, args=(job_id, address, parent_pid, 30))
+    heart = multiprocessing.Process(target=heart_beat, args=(job_id, address, parent_pid, job.log_stdout_fn, 30))
 
     print "starting heart beat"
 
@@ -1163,7 +1164,7 @@ def run_job(job_id, address):
     job.execute()
 
     # send back result
-    thank_you_note = send_zmq_msg(job_id, "store_output", job.ret, address)
+    thank_you_note = send_zmq_msg(job_id, "store_output", job, address)
     print thank_you_note
 
     # stop heartbeat
