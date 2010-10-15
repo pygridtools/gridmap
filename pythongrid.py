@@ -754,11 +754,20 @@ class StatusCheckerZMQ(object):
                     return_msg = self.jobid_to_job[job_id]
 
                 if msg["command"] == "store_output":
-                    # store job object
-                    job = msg["data"]
-                    self.jobid_to_job[job_id] = job
+                    # be nice
                     return_msg = "thanks"
 
+                    # store tmp job object
+                    tmp_job = msg["data"]
+
+                    # copy relevant fields
+                    job.ret = tmp_job.ret
+                    job.exception = tmp_job.exception
+                    
+                    # is assigned in submission process and not written back server-side
+                    job.log_stdout_fn = tmp_job.log_stdout_fn 
+
+                    # handle exception
                     if isinstance(job.ret, Exception):
                         print "job", job.name, "encountered exception", job.ret
                         print job.exception
@@ -786,6 +795,7 @@ class StatusCheckerZMQ(object):
         """
         look at jobs and decide what to do
         """
+
 
         current_time = datetime.now()
 
@@ -815,7 +825,10 @@ class StatusCheckerZMQ(object):
         checks for all jobs if they are done
         """
 
+        print "checking if done"
+
         for job in self.jobs:
+            print job.ret
             if job.ret == None:
                 return False
 
