@@ -825,10 +825,7 @@ class StatusCheckerZMQ(object):
         checks for all jobs if they are done
         """
 
-        print "checking if done"
-
         for job in self.jobs:
-            print job.ret
             if job.ret == None:
                 return False
 

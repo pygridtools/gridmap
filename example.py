@@ -5,8 +5,8 @@
 # the Free Software Foundation; either version 2 of the License, or
 # (at your option) any later version.
 #
-# Written (W) 2008-2009 Christian Widmer
-# Copyright (C) 2008-2009 Max-Planck-Society
+# Written (W) 2008-2010 Christian Widmer
+# Copyright (C) 2008-2010 Max-Planck-Society
 
 import sys
 import getopt
@@ -24,7 +24,7 @@ def makeJobs():
     Creates a list of Jobs.
     """
     
-    inputvec = [[3], [5], [10], [100000000]]
+    inputvec = [[3], [5], [10], [10000]]
     print 'print computing the factorials of %s' % str(inputvec)
     jobs=[]
 
@@ -128,7 +128,8 @@ def computeFactorial(n):
     """
     computes factorial of n
     """
-    ret=1
+
+    ret = 1
     for i in xrange(n):
         ret=ret*(i+1)
 
