@@ -9,6 +9,7 @@ pre-0.3:
 
 post-0.3:
 + add apply_to_combination as helper
++ Add a simle keyboard handler which allows all jobs to be killed (abort)
 + Unify method jobs, reconsider whether it makes sense to have this
 + Need a better way to set job and file names. Preferably human readable and unique.
 + Clear memory after pickling in the constructor, so reduce memory usage
