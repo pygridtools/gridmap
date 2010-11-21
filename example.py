@@ -91,7 +91,8 @@ def runExample():
     print ""
     print "sending function jobs to cluster"
     print ""
-
+    import pdb
+    pdb.set_trace()
     processedFunctionJobs = process_jobs(functionJobs)
 
     print "ret fields AFTER execution on cluster"

@@ -9,7 +9,6 @@
 # Written (W) 2008-2010 Cheng Soon Ong
 # Copyright (C) 2008-2010 Max-Planck-Society
 
-
 """
 pythongrid provides a high level front-end to DRMAA-python.
 This module provides wrappers that simplify submission and collection of jobs,
@@ -33,18 +32,22 @@ import string
 import uuid
 from datetime import datetime
 
+#import default configuration
+from pythongrid_cfg import *
+
+##CFG structure loaded 
+
 #paths on cluster file system
 # TODo set this in configuration file
-PYTHONPATH = os.environ['PYTHONPATH'] 
 
 # location of pythongrid.py on cluster file system
 # ToDO set this in configuration file
-PYGRID = "~/svn/tools/python/pythongrid/pythongrid.py"
+
 
 # define temp directories for the input and output variables
 # (must be writable from cluster)
-# ToDO define separate client/server TEMPDIR
-TEMPDIR = "~/tmp/"
+# ToDO define separate client/server CFG['TEMPDIR']
+
 
 
 #PPATH = reduce(lambda x,y: x+':'+y, PYTHONPATH)
@@ -105,11 +108,12 @@ class Job(object):
         self.exception = None
         self.environment = None
         self.replace_env = False
+        self.working_dir = None
 
         if param!=None:
             self.__set_parameters(param)
 
-        outdir = os.path.expanduser(TEMPDIR)
+        outdir = os.path.expanduser(CFG['TEMPDIR'])
         if not os.path.isdir(outdir):
             print '%s does not exist. Please create a directory' % outdir
             raise Exception()
@@ -194,6 +198,8 @@ class KybJob(Job):
 
         # black and white lists
         self.white_list = ""
+        #working directory
+        self.working_dir =  os.getcwd()
 
 
     def getNativeSpecification(self):
@@ -295,6 +301,7 @@ class KybJob(Job):
             print "memory for job %s increased to %s" % (self.name, self.h_vmem)
 
         return self
+
 
 
 #only define this class if the multiprocessing module is present
@@ -427,19 +434,19 @@ def append_job_to_session(session, job):
         jt.jobEnvironment = shell_env
         
 
-    jt.remoteCommand = os.path.expanduser(PYGRID)
+    jt.remoteCommand = os.path.expanduser(CFG['PYGRID'])
     jt.args = [job.name, job.home_address]
     jt.joinFiles = True
     jt.nativeSpecification = job.nativeSpecification
-    jt.outputPath = ":" + os.path.expanduser(TEMPDIR)
-    jt.errorPath = ":" + os.path.expanduser(TEMPDIR)
+    jt.outputPath = ":" + os.path.expanduser(CFG['TEMPDIR'])
+    jt.errorPath = ":" + os.path.expanduser(CFG['TEMPDIR'])
 
     jobid = session.runJob(jt)
 
     # set job fields that depend on the jobid assigned by grid engine
     job.jobid = jobid
-    job.log_stdout_fn = (os.path.expanduser(TEMPDIR) + job.name + '.o' + jobid)
-    job.log_stderr_fn = (os.path.expanduser(TEMPDIR) + job.name + '.e' + jobid)
+    job.log_stdout_fn = (os.path.expanduser(CFG['TEMPDIR']) + job.name + '.o' + jobid)
+    job.log_stderr_fn = (os.path.expanduser(CFG['TEMPDIR']) + job.name + '.e' + jobid)
 
     print 'Your job %s has been submitted with id %s' % (job.name, jobid)
     print "stdout:", job.log_stdout_fn
@@ -482,8 +489,8 @@ def collect_jobs(sid, jobids, joblist, wait=False):
     retJobs = []
     for ix, job in enumerate(joblist):
         
-        log_stdout_fn = (os.path.expanduser(TEMPDIR) + job.name + '.o' + jobids[ix])
-        log_stderr_fn = (os.path.expanduser(TEMPDIR) + job.name + '.e' + jobids[ix])
+        log_stdout_fn = (os.path.expanduser(CFG['TEMPDIR']) + job.name + '.o' + jobids[ix])
+        log_stderr_fn = (os.path.expanduser(CFG['TEMPDIR']) + job.name + '.e' + jobids[ix])
         
         try:
             retJob = load(job.outputfile)
@@ -530,6 +537,7 @@ def collect_jobs(sid, jobids, joblist, wait=False):
 def process_jobs(jobs, local=False, maxNumThreads=1):
     """
     Director function to decide whether to run on the cluster or locally
+    local: local or cluster processing
     """
     
     if (not local and DRMAA_PRESENT):
@@ -1167,6 +1175,13 @@ def run_job(job_id, address):
     print "starting heart beat"
 
     heart.start()
+
+    # change working directory
+    print "changing working directory"
+    if 1:
+        if job.working_dir is not None:
+            print "Changing working directory: %s" % job.working_dir
+            os.chdir(job.working_dir)
 
     print "executing job"
 
