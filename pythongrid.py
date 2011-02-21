@@ -1,13 +1,14 @@
 #! /usr/bin/env python
+# -*- coding: utf-8 -*-
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 2 of the License, or
 # (at your option) any later version.
 #
-# Written (W) 2008-2010 Christian Widmer
-# Written (W) 2008-2010 Cheng Soon Ong
-# Copyright (C) 2008-2010 Max-Planck-Society
+# Written (W) 2008-2011 Christian Widmer
+# Written (W) 2008-2011 Cheng Soon Ong
+# Copyright (C) 2008-2011 Max-Planck-Society
 
 """
 pythongrid provides a high level front-end to DRMAA-python.
@@ -29,7 +30,15 @@ import zmq
 import socket
 import zlib
 import string
-import uuid
+import uuid   
+import email
+import smtplib
+import cStringIO
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.image import MIMEImage
+
+
 from datetime import datetime
 
 #import default configuration
@@ -60,7 +69,7 @@ jp = os.path.join
 
 DRMAA_PRESENT = True
 MULTIPROCESSING_PRESENT = True
-
+MATPLOTLIB_PRESENT = True
 
 try:
     import drmaa
@@ -77,6 +86,15 @@ except Exception, detail:
     print "Please install python2.6 or the backport of the multiprocessing package"
     print detail
     MULTIPROCESSING_PRESENT = False
+
+try:
+    import pylab
+except Exception, detail:
+    #print "Error importing pylab. Not plots will be created in debugging emails."
+    #print "Please check your installation."
+    #print detail
+    MATPLOTLIB_PRESENT = False
+
 
 class Job(object):
     """
@@ -195,6 +213,11 @@ class KybJob(Job):
         self.host_name = ""
         self.timestamp = None
         self.heart_beat = None
+        self.exception = None
+        
+        # fields to track mem/cpu-usage
+        self.track_mem = []
+        self.track_cpu = []
 
         # black and white lists
         self.white_list = ""
@@ -271,6 +294,8 @@ class KybJob(Job):
         and the last heart-beat
         """
 
+        # compare memory consumption from
+        # last heart-beat to requested memory
         if self.heart_beat != None:
 
             unit = self.h_vmem[-1]
@@ -279,10 +304,27 @@ class KybJob(Job):
             if (unit == "G"):
                 allocated_mb = allocated_mb * 1000
 
-            # if we are within 500M of limit
-            if float(self.heart_beat["memory"]) + 500 > allocated_mb:
+            # 10% more mem, at least 1G more than last heart-beat
+            upper_bound_mem = max(float(self.heart_beat["memory"]) + 1000, float(self.heart_beat["memory"])*1.10)
+            
+            # if we are within memory limit
+            if upper_bound_mem  > allocated_mb:
                 return True
 
+        # if we have a memory exception
+        if isinstance(self.ret, MemoryError): 
+            return True
+        
+        # Sometimes out-of-memory causes a System Error
+        if isinstance(self.ret, SystemError):
+
+            # we look for memory keyword in exception detail (heuristic but useful)
+            exception_detail = str(self.exception).lower()
+
+            if exception_detail.find("memory") != -1:
+                return True
+
+        # other problem
         return False
         
 
@@ -409,7 +451,7 @@ def append_job_to_session(session, job):
 
     jt = session.createJobTemplate()
 
-    #TODO fix handling of environment variables
+    #TODO: fix handling of environment variables
     #fetch only specific env vars from shell
     #shell_env = {"LD_LIBRARY_PATH": os.getenv("LD_LIBRARY_PATH"),
     #             "PYTHONPATH": os.getenv("PYTHONPATH"),
@@ -773,19 +815,24 @@ class StatusCheckerZMQ(object):
                     job.exception = tmp_job.exception
                     
                     # is assigned in submission process and not written back server-side
-                    job.log_stdout_fn = tmp_job.log_stdout_fn 
-
-                    # handle exception
-                    if isinstance(job.ret, Exception):
-                        print "job", job.name, "encountered exception", job.ret
-                        print job.exception
+                    #job.log_stdout_fn = tmp_job.log_stdout_fn 
+                    job.timestamp = datetime.now()
 
                 if msg["command"] == "heart_beat":
                     job.heart_beat = msg["data"]
+                    job.log_file = msg["data"]["log_file"]
+                    
+                    # keep track of mem and cpu
+                    try:
+                        job.track_mem.append(float(job.heart_beat["memory"]))
+                        job.track_cpu.append(float(job.heart_beat["cpu_load"]))
+                    except:
+                        print "error decoding heart-beat" 
+                    
                     return_msg = "all good"
 
-                # store in job object
-                job.timestamp = datetime.now()
+                    job.timestamp = datetime.now()
+
                 job.host_name = msg["host_name"]
 
             
@@ -801,30 +848,67 @@ class StatusCheckerZMQ(object):
 
     def check_if_alive(self):
         """
-        look at jobs and decide what to do
+        check if jobs are alive and determine cause of death if not
         """
 
 
-        current_time = datetime.now()
-
         for job in self.jobs:
+            
+            # noting was returned yet 
+            if job.ret == None:
 
-            if job.timestamp != None:
-                time_delta = current_time - job.timestamp
+                # exclude first-timers
+                if job.timestamp != None:
+                    
+                    # only check heart-beats if there was a long delay
+                    current_time = datetime.now()
+                    time_delta = current_time - job.timestamp
+    
+                    
+                    if time_delta.seconds > 180:
+                        
+                        # could be out-of-memory    
+                        if job.is_out_of_memory():
+                            print "job was out of memory"
+                            job.cause_of_death = "out_of_memory"
+    
+                        else:
+                            #TODO: check if node is reachable
+                            #TODO: check if network hangs, wait some more if so
+                            print "job died for unknown reason"
+                            job.cause_of_death = "unknown"
+
+                
+            else:
+                
+                # could have been an exception, we check right away
+                if job.is_out_of_memory():
+                    print "job was out of memory"
+                    job.cause_of_death = "out_of_memory"
+                    job.ret = None
+                    
+                elif isinstance(job.ret, Exception):
+                    print "job encountered exception, will not resubmit"
+                    job.cause_of_death = "exception"
+                    send_error_mail(job)
+                    job.ret = "job dead (with non-memory related exception)"
 
 
-                if time_delta.seconds > 120 and job.ret == None:
+            # attempt to resubmit            
+            if job.cause_of_death == "out_of_memory" or job.cause_of_death == "unknown":
 
-                    if job.is_out_of_memory():
-                        job.cause_of_death = "out_of_memory"
-                    else:
-                        job.cause_of_death = "unknown"
+                print "creating error report"
 
-                    if not handle_resubmit(self.session_id, job):
-                        job.ret = "job dead"
-
-                    # break out of loop to avoid too long delay
-                    break
+                # send report
+                send_error_mail(job)
+                    
+                # try to resubmit
+                if not handle_resubmit(self.session_id, job):
+                    print "giving up on job"
+                    job.ret = "job dead"
+                    
+                # break out of loop to avoid too long delay
+                break
 
 
 
@@ -834,7 +918,8 @@ class StatusCheckerZMQ(object):
         """
 
         for job in self.jobs:
-            if job.ret == None:
+            # exceptions will be handled in check_if_alive
+            if job.ret == None or isinstance(job.ret, Exception):
                 return False
 
         return True
@@ -849,17 +934,23 @@ def handle_resubmit(session_id, job):
 
     side-effect: 
     job.num_resubmits incremented
+    job.h_vmem will be doubled, if cause was 'out_of_memory'
     """
+
+
+    # reset some fields
+    job.timestamp = None
+    job.heart_beat = None
+    
 
     if job.num_resubmits < 3:
 
         print "looks like job died an unnatural death, resubmitting (previous resubmits = %i)" % (job.num_resubmits)
 
-        if job.heart_beat != None:
-            print "last used memory: ", job.heart_beat["memory"], "on node", job.host_name
-
         if job.cause_of_death == "out_of_memory":
+            # double memory
             job.alter_allocated_memory(2.0)
+
 
         else:
             try:
@@ -868,19 +959,17 @@ def handle_resubmit(session_id, job):
             except Exception, detail:
                 print "could not remove", job.host_name, "from whitelist", job.white_list
 
+        # increment number of resubmits
         job.num_resubmits += 1
-        # reset timestamp
-        job.timestamp = None
-
-
-        # TODO: kill off old job (to make sure)
-
-        # resubmit job in independent process to avoid delay
-        print "starting resubmission process"
-        submission_process = multiprocessing.Process(target=resubmit, args=(session_id, job))
-        submission_process.start()
+        job.cause_of_death = ""
         
-    
+        resubmit(session_id, job)
+        
+        # resubmit job in independent process to avoid delay        
+        #submission_process = multiprocessing.Process(target=resubmit, args=(session_id, job))
+        #submission_process.start()
+        
+        
         return True
 
     else:
@@ -893,9 +982,22 @@ def resubmit(session_id, job):
     encapsulate creation of session for multiprocessing
     """
 
+    print "starting resubmission process"
+
     # append to session
     session = drmaa.Session()
     session.initialize(session_id)
+    
+    # try to kill off old job
+    try:
+        # TODO: ask SGE more questions about job status etc (maybe re-integrate 
+        # some of the other StatusChecker code
+        session.control(job.jobid, drmaa.JobControlAction.TERMINATE)
+        print "zombie job killed"
+    except Exception:
+        print "could not kill job with SGE id", job.jobid
+    
+    # create new job
     append_job_to_session(session, job)
     session.exit()
 
@@ -917,7 +1019,6 @@ def map(f, input_list, param=None, local=False, maxNumThreads=1, mem="5G"):
     # construct jobs
     for input in input_list:
         job = KybJob(f, [input], param=param)
-        job.key = input
         job.h_vmem = mem
 
         jobs.append(job)
@@ -926,12 +1027,15 @@ def map(f, input_list, param=None, local=False, maxNumThreads=1, mem="5G"):
     # process jobs
     processed_jobs = process_jobs(jobs, local=local, maxNumThreads=maxNumThreads)
 
-
     # store results
-    results = {}
-    for job in processed_jobs:
-        results[job.key] = job.ret
-    
+    results = [job.ret for job in processed_jobs]
+
+    assert(len(jobs) == len(processed_jobs))
+    # make sure results are in the same order
+    # TODO make reasonable check
+    #for idx in range(len(jobs)):
+    #    assert(jobs[idx].args == processed_jobs[idx].args)
+
     return results
 
 
@@ -1019,6 +1123,103 @@ def load(filename):
 ################################################################
 #      Some handy functions
 ################################################################
+
+
+def send_error_mail(job):
+    """
+    send out diagnostic email
+    """
+    
+
+    # create message
+    msg = MIMEMultipart()
+    msg["subject"] = "PYTHONGRID error " + str(job.name)
+    msg["From"] = "pythongrid"
+    msg["To"] = "pythongrid user"
+    
+    
+    # compose error message
+    body_text = ""
+
+    body_text += "job " + str(job.name) + "\n"
+    body_text += "last timestamp: " + str(job.timestamp) + "\n"
+    body_text += "num_resubmits: " + str(job.num_resubmits) + "\n"
+    body_text += "cause_of_death: " + str(job.cause_of_death) + "\n"
+
+    if job.heart_beat:
+        body_text += "last memory usage: " + str(job.heart_beat["memory"]) + "\n"
+        body_text += "last cpu load: " + str(job.heart_beat["cpu_load"]) + "\n"
+        
+    body_text += "requested memory: " + str(job.h_vmem) + "\n"
+    body_text += "host: " + str(job.host_name) + "\n\n"
+    
+    if isinstance(job.ret, Exception):
+        body_text += "job encountered exception: " + str(job.ret) + "\n"
+        body_text += "stacktrace: " + str(job.exception) + "\n\n"
+    
+    print body_text
+    
+    body_msg = MIMEText(body_text)
+    msg.attach(body_msg)
+    
+    
+    # attach log file
+    if job.heart_beat:
+        log_file = open(job.heart_beat["log_file"], "r")
+        log_file_attachement = MIMEText(log_file.read())
+        log_file.close()
+        
+        msg.attach(log_file_attachement)
+
+
+    # if matplotlib is installed
+    if MATPLOTLIB_PRESENT:
+        
+        #TODO: plot to cstring directly (some code is there)
+        #imgData = cStringIO.StringIO()
+        #pylab.savefig(imgData, format='png')
+
+        # rewind the data
+        #imgData.seek(0)
+        #pylab.savefig(imgData, format="png")
+
+        # attack mem plot        
+        img_mem_fn = "/tmp/" + job.name + "_mem.png"
+
+        pylab.figure()
+        pylab.plot(job.track_mem, "-o")
+        pylab.title("memory usage")
+        pylab.savefig(img_mem_fn)
+        
+        img_mem = open(img_mem_fn, "rb")
+        img_mem_attachement = MIMEImage(img_mem.read())
+        img_mem.close()
+        
+        msg.attach(img_mem_attachement)
+
+
+        # attach cpu plot
+        img_cpu_fn = "/tmp/" + job.name + "_cpu.png"
+
+        pylab.figure()
+        pylab.plot(job.track_cpu, "-o")
+        pylab.title("cpu load")
+        pylab.savefig(img_cpu_fn)
+        
+        img_cpu = open(img_cpu_fn, "rb")
+        img_cpu_attachement = MIMEImage(img_cpu.read())
+        img_cpu.close()
+        
+        msg.attach(img_cpu_attachement)
+
+
+    # send out report
+    #TODO: take this from config file
+    s = smtplib.SMTP("mailhost.tuebingen.mpg.de")
+    s.sendmail("cwidmer@tuebingen.mpg.de", "ckwidmer@gmail.com", msg.as_string())
+    s.quit()
+
+
 
 
 def _VmB(VmKey, pid):
@@ -1136,7 +1337,7 @@ def heart_beat(job_id, address, parent_pid=-1, log_file="", wait_sec=45):
     while True:
         status = get_job_status(parent_pid)
         status["log_file"] = log_file
-        reply = send_zmq_msg(job_id, "heart_beat", status, address)
+        send_zmq_msg(job_id, "heart_beat", status, address)
         time.sleep(wait_sec)
 
 
