@@ -70,6 +70,7 @@ jp = os.path.join
 DRMAA_PRESENT = True
 MULTIPROCESSING_PRESENT = True
 MATPLOTLIB_PRESENT = True
+CHERRYPY_PRESENT = True
 
 try:
     import drmaa
@@ -94,6 +95,16 @@ except Exception, detail:
     #print "Please check your installation."
     #print detail
     MATPLOTLIB_PRESENT = False
+
+try:
+    import cherrypy
+except Exception, detail:
+    print "Error importing cherrypy. Web-based monitoring will be disabled."
+    print "Please check your installation."
+    print detail
+    CHERRYPY_PRESENT = False
+
+
 
 
 class Job(object):
@@ -747,6 +758,11 @@ class StatusCheckerZMQ(object):
 
         print "setting up connection on", self.home_address
 
+        if False and CHERRYPY_PRESENT:
+            print "starting web interface"
+            Popen("python pythongrid_web.py " + self.home_address)
+
+
         # uninitialized field (set in check method)
         self.jobs = []
         self.jobids = []
@@ -833,12 +849,22 @@ class StatusCheckerZMQ(object):
 
                     job.timestamp = datetime.now()
 
+                if msg["command"] == "get_job":
+                    # serve job for display
+                    return_msg = job
+
+
                 job.host_name = msg["host_name"]
 
             
             else:
-                # run check only on local heart-beat
+                # run check
                 self.check_if_alive()
+
+                if msg["command"] == "get_jobs":
+                    # serve list of jobs for display
+                    return_msg = self.jobs
+
 
             # send back compressed response
             self.socket.send(zdumps(return_msg))
@@ -991,6 +1017,7 @@ def resubmit(session_id, job):
     # try to kill off old job
     try:
         # TODO: ask SGE more questions about job status etc (maybe re-integrate 
+        # TODO: make sure this works
         # some of the other StatusChecker code
         session.control(job.jobid, drmaa.JobControlAction.TERMINATE)
         print "zombie job killed"
@@ -1320,6 +1347,7 @@ def argsort(seq):
 
     # http://stackoverflow.com/questions/3071415/efficient-method-to-calculate-the-rank-vector-of-a-list-in-python
     return sorted(range(len(seq)), key=seq.__getitem__)
+
 
 
 ################################################################

@@ -32,7 +32,7 @@ def makeJobs():
         # We need to use the full identifier
         # such that the module name is explicit.
         job = KybJob(example.computeFactorial, input) 
-        job.h_vmem="300M"
+        job.h_vmem="600M"
         
         jobs.append(job)
         
@@ -91,8 +91,7 @@ def runExample():
     print ""
     print "sending function jobs to cluster"
     print ""
-    import pdb
-    pdb.set_trace()
+
     processedFunctionJobs = process_jobs(functionJobs)
 
     print "ret fields AFTER execution on cluster"
@@ -129,6 +128,8 @@ def computeFactorial(n):
     """
     computes factorial of n
     """
+
+    time.sleep(60)
 
     ret = 1
     for i in xrange(n):

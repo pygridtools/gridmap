@@ -5,5 +5,5 @@ CFG = {}
 
 #default python path
 CFG['PYTHONPATH'] = os.environ['PYTHONPATH']
-CFG['PYGRID']     = "~/work/ibg/lib/pycluster/pythongrid/pythongrid.py"
-CFG['TEMPDIR']    = "~/clusterout"
+CFG['PYGRID']     = "/fml/ag-raetsch/home/cwidmer/svn/tools/python/pythongrid/pythongrid.py"
+CFG['TEMPDIR']    = "/fml/ag-raetsch/home/cwidmer/tmp/"
