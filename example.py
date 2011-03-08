@@ -5,8 +5,8 @@
 # the Free Software Foundation; either version 2 of the License, or
 # (at your option) any later version.
 #
-# Written (W) 2008-2010 Christian Widmer
-# Copyright (C) 2008-2010 Max-Planck-Society
+# Written (W) 2008-2011 Christian Widmer
+# Copyright (C) 2008-2011 Max-Planck-Society
 
 import sys
 import getopt

@@ -121,7 +121,7 @@ def job_to_html(job):
         body_text += "last cpu load: " + str(job.heart_beat["cpu_load"]) + "\n<br>"
         
     body_text += "requested memory: " + str(job.h_vmem) + "\n<br>"
-    body_text += "host: " + str(job.host_name) + "\n<br>\n<br>"
+    body_text += "host: <a href='http://sambesi.kyb.local/ganglia/?c=Three Towers&h=%s&m=load_one&r=hour&s=descending&hc=5&mc=2'>%s</a><br><br>\n\n" % (job.host_name, job.host_name)
     
     if isinstance(job.ret, Exception):
         body_text += "job encountered exception: " + str(job.ret) + "\n<br>"

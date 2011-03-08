@@ -852,9 +852,9 @@ class StatusCheckerZMQ(object):
                 if msg["command"] == "get_job":
                     # serve job for display
                     return_msg = job
-
-
-                job.host_name = msg["host_name"]
+                else:
+                    # update host name
+                    job.host_name = msg["host_name"]
 
             
             else:
