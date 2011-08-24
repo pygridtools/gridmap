@@ -1036,7 +1036,7 @@ def resubmit(session_id, job):
 
 
 
-def map(f, input_list, param=None, local=False, maxNumThreads=1, mem="5G"):
+def pg_map(f, input_list, param=None, local=False, maxNumThreads=1, mem="5G"):
     """
     provides a generic map function
     """
@@ -1088,7 +1088,7 @@ class MapReduce(object):
         wait for jobs to finish
         """
 
-        intermediate_results = map(self.fun_map, self.input_list, self.param, local, max_num_threads)
+        intermediate_results = pg_map(self.fun_map, self.input_list, self.param, local, max_num_threads)
 
         # apply user-defined reduce function to intermediate result
         result = self.fun_reduce(intermediate_results)
@@ -1308,6 +1308,7 @@ def get_white_list():
     parses output of qstat -f to get list of nodes
     """
 
+    #TODO refactor this, its specific to our naming scheme
     try:
         qstat = os.popen("qstat -f")
 
@@ -1316,7 +1317,8 @@ def get_white_list():
 
         for line in qstat:
 
-            if line.startswith("all.q@"):
+            # we kick out all old nodes, node1XX
+            if line.startswith("all.q@") and not line.startswith("all.q@node1"):
                 tokens = line.strip().split()
                 node_name = tokens[0]
 
