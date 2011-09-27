@@ -1394,6 +1394,8 @@ def run_job(job_id, address):
     @type job_id: string
     """
 
+    time.sleep(5)
+
     job = send_zmq_msg(job_id, "fetch_input", None, address)
 
     print "input arguments loaded, starting computation", job.args
