@@ -1394,7 +1394,9 @@ def run_job(job_id, address):
     @type job_id: string
     """
 
-    time.sleep(5)
+    wait_sec = random.randint(0, 20)
+    print "waiting %i seconds before starting" % (wait_sec)
+    time.sleep(wait_sec)
 
     job = send_zmq_msg(job_id, "fetch_input", None, address)
 
