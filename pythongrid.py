@@ -891,7 +891,7 @@ class StatusCheckerZMQ(object):
                     time_delta = current_time - job.timestamp
     
                     
-                    if time_delta.seconds > 180:
+                    if time_delta.seconds > 90:
                         
                         # could be out-of-memory    
                         if job.is_out_of_memory():
@@ -1407,7 +1407,7 @@ def run_job(job_id, address):
     parent_pid = os.getpid()
 
     # create heart beat process
-    heart = multiprocessing.Process(target=heart_beat, args=(job_id, address, parent_pid, job.log_stdout_fn, 30))
+    heart = multiprocessing.Process(target=heart_beat, args=(job_id, address, parent_pid, job.log_stdout_fn, 10))
 
     print "starting heart beat"
 
