@@ -1,5 +1,7 @@
 TODO
 
+!!! handle the case, where the first heart-beat is never sent
+
 pre-0.3:
 + update to new DRMAA wrapper!
 + clearly document "submit and wait" and "submit and collect"

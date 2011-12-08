@@ -977,24 +977,18 @@ def handle_resubmit(session_id, job):
             # double memory
             job.alter_allocated_memory(2.0)
 
-
         else:
-            try:
-                # remove node from white_list
-                job.white_list.remove("all.q@" + job.host_name)
-            except Exception, detail:
-                print "could not remove", job.host_name, "from whitelist", job.white_list
+
+            # remove node from white_list
+            node_name = "all.q@" + job.host_name
+            if job.white_list.count(node_name) > 0:
+                job.white_list.remove()
 
         # increment number of resubmits
         job.num_resubmits += 1
         job.cause_of_death = ""
         
         resubmit(session_id, job)
-        
-        # resubmit job in independent process to avoid delay        
-        #submission_process = multiprocessing.Process(target=resubmit, args=(session_id, job))
-        #submission_process.start()
-        
         
         return True
 
@@ -1241,9 +1235,17 @@ def send_error_mail(job):
 
 
     # send out report
-    #TODO: take this from config file
-    s = smtplib.SMTP("mailhost.tuebingen.mpg.de")
+    #TODO: take this from config file, examine problem with msg length
+    """
+  File "/fml/ag-raetsch/home/cwidmer/svn/tools/python/pythongrid/pythongrid.py", line 1246, in send_error_mail
     s.sendmail("cwidmer@tuebingen.mpg.de", "ckwidmer@gmail.com", msg.as_string())
+  File "/usr/lib/python2.6/smtplib.py", line 713, in sendmail
+    raise SMTPDataError(code, resp)
+    smtplib.SMTPDataError: (552, 'message line is too long')
+
+    """
+    s = smtplib.SMTP("mailhost.tuebingen.mpg.de")
+    s.sendmail("cwidmer@tuebingen.mpg.de", "ckwidmer@gmail.com", msg.as_string()[0:5000])
     s.quit()
 
 
@@ -1394,7 +1396,7 @@ def run_job(job_id, address):
     @type job_id: string
     """
 
-    wait_sec = random.randint(0, 20)
+    wait_sec = random.randint(0, 5)
     print "waiting %i seconds before starting" % (wait_sec)
     time.sleep(wait_sec)
 
