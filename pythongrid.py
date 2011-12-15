@@ -890,7 +890,6 @@ class StatusCheckerZMQ(object):
                     current_time = datetime.now()
                     time_delta = current_time - job.timestamp
     
-                    
                     if time_delta.seconds > 90:
                         
                         # could be out-of-memory    
@@ -982,7 +981,7 @@ def handle_resubmit(session_id, job):
             # remove node from white_list
             node_name = "all.q@" + job.host_name
             if job.white_list.count(node_name) > 0:
-                job.white_list.remove()
+                job.white_list.remove(node_name)
 
         # increment number of resubmits
         job.num_resubmits += 1
