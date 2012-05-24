@@ -6,20 +6,24 @@
 # the Free Software Foundation; either version 2 of the License, or
 # (at your option) any later version.
 #
-# Written (W) 2008-2011 Christian Widmer
-# Written (W) 2008-2011 Cheng Soon Ong
-# Copyright (C) 2008-2011 Max-Planck-Society
+# Written (W) 2008-2012 Christian Widmer
+# Written (W) 2008-2010 Cheng Soon Ong
+# Copyright (C) 2008-2012 Max-Planck-Society
 
 """
 pythongrid provides a high level front-end to DRMAA-python.
+
 This module provides wrappers that simplify submission and collection of jobs,
 in a more 'pythonic' fashion.
+
+We use pyZMQ to provide a heart beat feature that allows close monitoring
+of submitted jobs and take appropriate action in case of failure.
 """
 
 import sys
 import os
 import os.path
-import subprocess
+import inspect
 import gzip
 import cPickle
 import getopt
@@ -29,11 +33,8 @@ import traceback
 import zmq
 import socket
 import zlib
-import string
 import uuid   
-import email
 import smtplib
-import cStringIO
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
@@ -41,28 +42,10 @@ from email.mime.image import MIMEImage
 
 from datetime import datetime
 
-#import default configuration
-from pythongrid_cfg import *
+# import configuration
+from pythongrid_cfg import CFG
 
 ##CFG structure loaded 
-
-#paths on cluster file system
-# TODo set this in configuration file
-
-# location of pythongrid.py on cluster file system
-# ToDO set this in configuration file
-
-
-# define temp directories for the input and output variables
-# (must be writable from cluster)
-# ToDO define separate client/server CFG['TEMPDIR']
-
-
-
-#PPATH = reduce(lambda x,y: x+':'+y, PYTHONPATH)
-#print PPATH
-#os.environ['PYTHONPATH'] = PPATH
-#sys.path.extend(PYTHONPATH)
 
 
 jp = os.path.join
@@ -128,7 +111,8 @@ class Job(object):
         @param cleanup: flag that determines the cleanup of input and log file
         @type cleanup: boolean
         """
-        self.f = f
+
+        self.__set_function(f)
         self.args = args
         self.kwlist = kwlist
         self.cleanup = cleanup
@@ -149,6 +133,34 @@ class Job(object):
 
         self.name = 'pg_' + str(uuid.uuid1())
         self.jobid = ""
+
+
+    def __set_function(self, f):
+        """
+        setter for function that carefully takes care of 
+        namespace, avoiding __main__ as a module
+        """
+
+        m = inspect.getmodule(f)
+
+        # if module is not __main__, all is good
+        if m.__name__ != "__main__":
+            self.f = f
+
+        else:
+
+            # determine real module name
+            mn = m.__file__.split("/")[-1].replace(".pyc","").replace(".py", "")
+
+            # make sure module is present
+            __import__(mn)
+
+            # get module
+            mod = sys.modules[mn]
+
+            # set function from module
+            self.f = mod.__getattribute__(f.__name__)
+
 
 
     def __set_parameters(self, param):
@@ -462,13 +474,6 @@ def append_job_to_session(session, job):
 
     jt = session.createJobTemplate()
 
-    #TODO: fix handling of environment variables
-    #fetch only specific env vars from shell
-    #shell_env = {"LD_LIBRARY_PATH": os.getenv("LD_LIBRARY_PATH"),
-    #             "PYTHONPATH": os.getenv("PYTHONPATH"),
-    #             "MOSEKLM_LICENSE_FILE": os.getenv("MOSEKLM_LICENSE_FILE"),
-    #             }
-
     # fetch env vars from shell        
     shell_env = os.environ
 
@@ -643,6 +648,10 @@ class StatusChecker(object):
     we need to keep track of finished jobs manually
     and count a out-of-synch job as finished, if it has
     previously had the status "finished"
+
+    WARNING: this class is deprecated, as state determination
+             was too unreliable. In the future, only StatusCheckerZMQ 
+             will be supported
     """ 
 
     def __init__(self, sid, jobs):
@@ -758,6 +767,7 @@ class StatusCheckerZMQ(object):
 
         print "setting up connection on", self.home_address
 
+        #TODO start web-based monitorsing process correctly
         if False and CHERRYPY_PRESENT:
             print "starting web interface"
             Popen("python pythongrid_web.py " + self.home_address)
@@ -795,10 +805,10 @@ class StatusCheckerZMQ(object):
             self.jobid_to_job[job.name] = job
 
         # determines in which interval to check if jobs are alive
-        local_heart = multiprocessing.Process(target=heart_beat, args=(-1, self.home_address, -1, "", 15))
+        local_heart = multiprocessing.Process(target=heart_beat, args=(-1, self.home_address, -1, "", CFG["CHECK_FREQUENCY"]))
         local_heart.start()
 
-        print "using the NEW and SHINY ZMQ layer"
+        print "Using ZMQ layer to keep track of jobs"
 
         # main loop
         while not self.all_jobs_done():
@@ -890,7 +900,7 @@ class StatusCheckerZMQ(object):
                     current_time = datetime.now()
                     time_delta = current_time - job.timestamp
     
-                    if time_delta.seconds > 90:
+                    if time_delta.seconds > CFG["MAX_TIME_BETWEEN_HEARTBEATS"]:
                         
                         # could be out-of-memory    
                         if job.is_out_of_memory():
@@ -968,13 +978,13 @@ def handle_resubmit(session_id, job):
     job.heart_beat = None
     
 
-    if job.num_resubmits < 3:
+    if job.num_resubmits < CFG["NUM_RESUBMITS"]:
 
         print "looks like job died an unnatural death, resubmitting (previous resubmits = %i)" % (job.num_resubmits)
 
         if job.cause_of_death == "out_of_memory":
-            # double memory
-            job.alter_allocated_memory(2.0)
+            # increase memory
+            job.alter_allocated_memory(CFG["OUT_OF_MEM_INCREASE"])
 
         else:
 
@@ -1009,13 +1019,14 @@ def resubmit(session_id, job):
     
     # try to kill off old job
     try:
-        # TODO: ask SGE more questions about job status etc (maybe re-integrate 
-        # TODO: make sure this works
-        # some of the other StatusChecker code
+        # TODO: ask SGE more questions about job status etc (maybe re-integrate StatusChecker)
+        # TODO: write unit test for this
+
         session.control(job.jobid, drmaa.JobControlAction.TERMINATE)
         print "zombie job killed"
-    except Exception:
+    except Exception, detail:
         print "could not kill job with SGE id", job.jobid
+        print detail
     
     # create new job
     append_job_to_session(session, job)
@@ -1243,8 +1254,9 @@ def send_error_mail(job):
     smtplib.SMTPDataError: (552, 'message line is too long')
 
     """
-    s = smtplib.SMTP("mailhost.tuebingen.mpg.de")
-    s.sendmail("cwidmer@tuebingen.mpg.de", "ckwidmer@gmail.com", msg.as_string()[0:5000])
+
+    s = smtplib.SMTP(CFG["SMTPSERVER"])
+    s.sendmail(CFG["ERROR_MAIL_SENDER"], CFG["ERROR_MAIL_RECIPIENT"], msg.as_string()[0:CFG["MAX_MSG_LENGTH"]])
     s.quit()
 
 
@@ -1307,9 +1319,11 @@ def get_cpu_load(pid):
 def get_white_list():
     """
     parses output of qstat -f to get list of nodes
+
+    WARNING: MPI Tuebingen specific
     """
 
-    #TODO refactor this, its specific to our naming scheme
+    #TODO refactor this, its specific to MPI naming scheme
     try:
         qstat = os.popen("qstat -f")
 
@@ -1406,7 +1420,7 @@ def run_job(job_id, address):
     parent_pid = os.getpid()
 
     # create heart beat process
-    heart = multiprocessing.Process(target=heart_beat, args=(job_id, address, parent_pid, job.log_stdout_fn, 10))
+    heart = multiprocessing.Process(target=heart_beat, args=(job_id, address, parent_pid, job.log_stdout_fn, CFG["HEARTBEAT_FREQUENCY"]))
 
     print "starting heart beat"
 

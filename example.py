@@ -5,25 +5,22 @@
 # the Free Software Foundation; either version 2 of the License, or
 # (at your option) any later version.
 #
-# Written (W) 2008-2011 Christian Widmer
-# Copyright (C) 2008-2011 Max-Planck-Society
+# Written (W) 2008-2012 Christian Widmer
+# Copyright (C) 2008-2012 Max-Planck-Society
 
 import sys
 import getopt
-import pythongrid
 from pythongrid import KybJob, Usage
-from pythongrid import process_jobs, submit_jobs, collect_jobs, get_status
+from pythongrid import process_jobs
 import time
-
-#needs to be imported, such that module name can be referred to explicitly
-import example
 
 
 def makeJobs():
     """
     Creates a list of Jobs.
     """
-    
+ 
+
     inputvec = [[3], [5], [10], [10000]]
     print 'print computing the factorials of %s' % str(inputvec)
     jobs=[]
@@ -31,7 +28,7 @@ def makeJobs():
     for input in inputvec:
         # We need to use the full identifier
         # such that the module name is explicit.
-        job = KybJob(example.computeFactorial, input) 
+        job = KybJob(computeFactorial, input) 
         job.h_vmem="600M"
         
         jobs.append(job)
@@ -139,6 +136,9 @@ def computeFactorial(n):
 
 
 def main(argv=None):
+
+
+
     if argv is None:
         argv = sys.argv
 
