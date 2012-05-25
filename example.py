@@ -14,6 +14,8 @@ from pythongrid import KybJob, Usage
 from pythongrid import process_jobs
 import time
 
+from example_fun import wait_a_bit
+
 
 def makeJobs():
     """
@@ -28,8 +30,9 @@ def makeJobs():
     for input in inputvec:
         # We need to use the full identifier
         # such that the module name is explicit.
-        job = KybJob(computeFactorial, input) 
-        job.h_vmem="600M"
+        job = KybJob(wait_a_bit, input) 
+        #job = KybJob(computeFactorial, input) 
+        job.h_vmem="1000M"
         
         jobs.append(job)
         

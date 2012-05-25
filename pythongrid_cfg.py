@@ -9,7 +9,7 @@ CFG['PYGRID']     = "/fml/ag-raetsch/home/cwidmer/svn/tools/python/pythongrid/py
 CFG['TEMPDIR']    = "/fml/ag-raetsch/home/cwidmer/tmp/"
 CFG['node_blacklist']    = []
 
-# error messages
+# error emails
 CFG['SMTPSERVER'] = "mailhost.tuebingen.mpg.de"
 CFG['ERROR_MAIL_SENDER'] = "cwidmer@tuebingen.mpg.de"
 CFG['ERROR_MAIL_RECIPIENT'] = "ckwidmer@gmail.com"
