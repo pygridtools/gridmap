@@ -1070,36 +1070,6 @@ def pg_map(f, args_list, param=None, local=False, maxNumThreads=1, mem="5G"):
     return results
 
 
-
-class MapReduce(object):
-    """
-    convenient high-level API for map-reduce interface
-    """
-
-    def __init__(self, fun_map, fun_reduce, input_list, param=None, name=None):
-        """
-        combines all that is needed for map-reduce
-        """
-
-        self.fun_map = fun_map
-        self.fun_reduce = fun_reduce
-        self.input_list = input_list
-        self.param = param
-        self.name = name
-
-    def wait(self, local=True, max_num_threads=1):
-        """
-        wait for jobs to finish
-        """
-
-        intermediate_results = pg_map(self.fun_map, self.input_list, self.param, local, max_num_threads)
-
-        # apply user-defined reduce function to intermediate result
-        result = self.fun_reduce(intermediate_results)
-
-        return result
-
-
 #####################################################################
 # Data persistence
 #####################################################################

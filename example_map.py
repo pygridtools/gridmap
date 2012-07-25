@@ -39,7 +39,7 @@ def runExample():
     args = [1, 2, 4, 8, 16]
     local = True
     max_num_threads = 3
-    param = {}
+    param = {"h_vmem": "1G"}
 
     intermediate_results = pg_map(computeFactorial, args, param, local, max_num_threads)
 
