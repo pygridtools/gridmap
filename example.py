@@ -10,7 +10,22 @@
 
 
 from pythongrid import KybJob, process_jobs
-from example_fun import compute_factorial
+
+import time
+
+
+def compute_factorial(n):
+    """
+    computes factorial of n
+    """
+
+    time.sleep(5)
+
+    ret = 1
+    for i in xrange(n):
+        ret=ret*(i+1)
+
+    return ret
 
 
 def make_jobs():
