@@ -8,19 +8,19 @@
 # Written (W) 2011-2012 Christian Widmer
 # Copyright (C) 2011-2012 Max-Planck-Society
 
+
 import time
 
-def wait_a_bit(n):
+def compute_factorial(n):
     """
     computes factorial of n
     """
 
-    time.sleep(20)
+    time.sleep(5)
 
     ret = 1
     for i in xrange(n):
         ret=ret*(i+1)
 
     return ret
-
 

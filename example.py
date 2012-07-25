@@ -8,30 +8,31 @@
 # Written (W) 2008-2012 Christian Widmer
 # Copyright (C) 2008-2012 Max-Planck-Society
 
-import sys
-import getopt
-from pythongrid import KybJob, Usage
-from pythongrid import process_jobs
-import time
 
-from example_fun import wait_a_bit
+from pythongrid import KybJob, process_jobs
+from example_fun import compute_factorial
 
 
-def makeJobs():
+def make_jobs():
     """
-    Creates a list of Jobs.
+    creates a list of KybJob objects,
+    which carry all information needed
+    for a function to be executed on SGE:
+    - function object
+    - arguments
+    - settings
     """
- 
 
-    inputvec = [[3], [5], [10], [10000]]
-    print 'print computing the factorials of %s' % str(inputvec)
+    # set up list of arguments
+    inputvec = [[3], [5], [10], [20]]
+
+    # create empty job vector
     jobs=[]
 
-    for input in inputvec:
-        # We need to use the full identifier
-        # such that the module name is explicit.
-        job = KybJob(wait_a_bit, input) 
-        #job = KybJob(computeFactorial, input) 
+    # create job objects
+    for arg in inputvec:
+
+        job = KybJob(compute_factorial, arg) 
         job.h_vmem="1000M"
         
         jobs.append(job)
@@ -40,10 +41,10 @@ def makeJobs():
     return jobs
 
 
-def runExample():
-    '''
-    execute example    
-    ''' 
+def run_example_local_multithreading():
+    """
+    run a set of jobs on local machine using several cores
+    """
 
     print "====================================="
     print "======  Local Multithreading  ======="
@@ -53,26 +54,28 @@ def runExample():
 
     print "generating function jobs"
 
-    functionJobs = makeJobs()
+    functionJobs = make_jobs()
 
-    #print "output ret field in each job before multithreaded computation"
-    #for (i, job) in enumerate(functionJobs):
-    #    #print "Job #", i, "- ret: ", job.ret
+    # KybJob object start out with an empty ret field, which is only filled after execution
+    print "output ret field in each job before multithreaded computation"
+    for (i, job) in enumerate(functionJobs):
+        print "Job #", i, "- ret: ", job.ret
 
-    #print ""
-    #print "executing jobs on local machine using 3 threads"
-    #if not pythongrid.MULTIPROCESSING_PRESENT:
-    #    #print 'multiprocessing not found, serial computation'
-    #print ""
+    print ""
+    print "executing jobs on local machine using 3 threads"
+
+    processedFunctionJobs = process_jobs(functionJobs, local=True, maxNumThreads=3)
+
+    print "ret fields AFTER execution on local machine"
+    for (i, job) in enumerate(processedFunctionJobs):
+        print "Job #", i, "- ret: ", str(job.ret)[0:10]
+ 
 
 
-    #processedFunctionJobs = process_jobs(functionJobs, local=True, maxNumThreads=3)
-    #
-
-    #print "ret fields AFTER execution on local machine"
-    #for (i, job) in enumerate(processedFunctionJobs):
-    #    #print "Job #", i, "- ret: ", str(job.ret)[0:10]
-    #
+def run_example_cluster():
+    """
+    run a set of jobs on cluster
+    """
     
     print ""
     print ""
@@ -82,7 +85,7 @@ def runExample():
     print ""
     print ""
 
-    functionJobs = makeJobs()
+    functionJobs = make_jobs()
 
     print "output ret field in each job before sending it onto the cluster"
     for (i, job) in enumerate(functionJobs):
@@ -99,65 +102,17 @@ def runExample():
         print "Job #", i, "- ret: ", str(job.ret)[0:10]
 
 
-    #print ""
-    #print ""
-    #print "====================================="
-    #print "=======  Submit and Forget   ========"
-    #print "====================================="
-    #print ""
-    #print ""
-
-
-    #print 'demo session'
-    #myjobs = makeJobs()
-
-    #(sid, jobids) = submit_jobs(myjobs)
-
-    #print 'checking whether finished'
-    #while not get_status(sid, myjobs):
-    #    time.sleep(7)
-    #print 'collecting jobs'
-    #retjobs = collect_jobs(sid, jobids, myjobs)
-    #print "ret fields AFTER execution on cluster"
-    #for (i, job) in enumerate(retjobs):
-    #    print "Job #", i, "- ret: ", str(job.ret)[0:10]
-    #print '--------------'
-
-
-def computeFactorial(n):
-    """
-    computes factorial of n
-    """
-
-    time.sleep(60)
-
-    ret = 1
-    for i in xrange(n):
-        ret=ret*(i+1)
-
-    return ret
-
 
 def main(argv=None):
+    """
+    main function to set up example
+    """
 
+    # first we use local multithreading
+    run_example_local_multithreading()
 
-
-    if argv is None:
-        argv = sys.argv
-
-    try:
-        try:
-            opts, args = getopt.getopt(argv[1:], "h", ["help"])
-            runExample()
-
-        except getopt.error, msg:
-            raise Usage(msg)
-
-    except Usage, err:
-        print >>sys.stderr, err.msg
-        print >>sys.stderr, "for help use --help"
-
-        return 2
+    # next we execute function on the cluster
+    run_example_cluster()
 
 
 if __name__ == "__main__":

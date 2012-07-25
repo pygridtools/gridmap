@@ -5,7 +5,7 @@ CFG = {}
 
 #default python path
 CFG['PYTHONPATH'] = os.environ['PYTHONPATH']
-CFG['PYGRID']     = "/fml/ag-raetsch/home/cwidmer/svn/tools/python/pythongrid/pythongrid.py"
+CFG['PYGRID']     = "/fml/ag-raetsch/home/cwidmer/Documents/phd/projects/pythongrid/pythongrid.py"
 CFG['TEMPDIR']    = "/fml/ag-raetsch/home/cwidmer/tmp/"
 CFG['node_blacklist']    = []
 
