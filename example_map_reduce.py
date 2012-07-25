@@ -5,17 +5,12 @@
 # the Free Software Foundation; either version 2 of the License, or
 # (at your option) any later version.
 #
-# Written (W) 2010 Christian Widmer
-# Copyright (C) 2010 Max-Planck-Society
+# Written (W) 2010-2012 Christian Widmer
+# Copyright (C) 2010-2012 Max-Planck-Society
 
 import sys
-import os
 import getopt
-
-from pythongrid import map, reduce, MapReduce
-
-#needs to be imported, such that module name can be referred to explicitly
-import example
+from pythongrid import MapReduce
 
 
 def computeFactorial(n):
@@ -32,6 +27,8 @@ def computeFactorial(n):
 def show_list(my_list):
     """
     displays string version of list
+
+    serves as a user-defines reduce function
     """
 
     return str(my_list)
@@ -41,12 +38,14 @@ def runExample():
     '''
     execute map_reduce example
     ''' 
+    intermediate_results = pg_map(self.fun_map, self.input_list, self.param, local, max_num_threads)
+
 
     param = {"h_vmem": "1G"}
-    input = [[20000],[20000],[20000],[20000],[20000],[20000],[20000],[20000],[20000],[20000]]
-    map_reduce = MapReduce(example.computeFactorial, show_list, input, param)
+    args = [200 ,200 ,200 ,200 ,200 ,200 ,200 ,200 ,200 ,200]
+    map_reduce = MapReduce(computeFactorial, show_list, args, param)
 
-    results = map_reduce.wait(False)
+    results = map_reduce.wait(True)
 
     print results
 
@@ -66,4 +65,5 @@ def main(argv=None):
 
 if __name__ == "__main__":
     main()
+
 

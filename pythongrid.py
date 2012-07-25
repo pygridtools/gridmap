@@ -1040,16 +1040,16 @@ def resubmit(session_id, job):
 
 
 
-def pg_map(f, input_list, param=None, local=False, maxNumThreads=1, mem="5G"):
+def pg_map(f, args_list, param=None, local=False, maxNumThreads=1, mem="5G"):
     """
     provides a generic map function
     """
 
-    jobs=[]
+    jobs = []
 
     # construct jobs
-    for input in input_list:
-        job = KybJob(f, [input], param=param)
+    for args in args_list:
+        job = KybJob(f, [args], param=param)
         job.h_vmem = mem
 
         jobs.append(job)
