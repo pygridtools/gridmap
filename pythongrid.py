@@ -20,6 +20,7 @@ We use pyZMQ to provide a heart beat feature that allows close monitoring
 of submitted jobs and take appropriate action in case of failure.
 """
 
+import re
 import sys
 import os
 import os.path
@@ -258,6 +259,9 @@ class KybJob(Job):
         if (self.name != ""):
             ret = ret + " -N " + str(self.name)
         if (self.h_vmem != ""):
+            h_mem = re.sub("(\d+)\.?\d*(\w)", "\g<1>\g<2>", self.h_vmem)
+            if h_mem != self.h_vmem:
+                print "Warning:", self.h_vmem, "replaced by", h_mem, " for native spec!"
             ret = ret + " -l " + "h_vmem" + "=" + str(self.h_vmem)
         if (self.arch != ""):
             ret = ret + " -l " + "arch" + "=" + str(self.arch)
