@@ -605,7 +605,7 @@ def process_jobs(jobs, local=False, maxNumThreads=1):
     if (not local and DRMAA_PRESENT):
 
         # get list of trusted nodes
-        white_list = get_white_list()
+        white_list = CFG['WHITELIST']
 
         # initialize checker to get port number
         checker = StatusCheckerZMQ()
@@ -1288,47 +1288,6 @@ def get_cpu_load(pid):
         cpu_load = "non-linux?"
 
     return cpu_load
-
-
-def get_white_list():
-    """
-    parses output of qstat -f to get list of nodes
-
-    WARNING: MPI Tuebingen specific
-    """
-
-    #TODO refactor this, its specific to MPI naming scheme
-    try:
-        qstat = os.popen("qstat -f")
-
-        node_names = []
-        norm_loads = []
-
-        for line in qstat:
-
-            # we kick out all old nodes, node1XX
-            if line.startswith("all.q@") and not line.startswith("all.q@node1"):
-                tokens = line.strip().split()
-                node_name = tokens[0]
-
-                if len(tokens) == 6:
-                    continue
-            
-                slots = float(tokens[2].split("/")[2])
-                cpu_load = float(tokens[3])
-
-                norm_load = cpu_load/slots 
-
-                node_names.append(node_name)
-                norm_loads.append(norm_load)
-
-        qstat.close()
-
-        return node_names
-
-    except Exception, details:
-        print "getting whitelist failed", details
-        return ""
 
 
 def argsort(seq):
