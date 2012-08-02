@@ -1387,7 +1387,19 @@ def run_job(job_id, address):
     print "waiting %i seconds before starting" % (wait_sec)
     time.sleep(wait_sec)
 
-    job = send_zmq_msg(job_id, "fetch_input", None, address)
+    try:
+        job = send_zmq_msg(job_id, "fetch_input", None, address)
+    except Exception, e:
+        # here we will catch errors caused by pickled objects
+        # of classes defined in modules not in PYTHONPATH
+        print e
+
+        # send back exception
+        thank_you_note = send_zmq_msg(job_id, "store_output", e, address)
+        print thank_you_note
+
+        return
+
 
     print "input arguments loaded, starting computation", job.args
 
