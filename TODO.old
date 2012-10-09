@@ -1,0 +1,22 @@
+TODO
+
+
+- clean up TODO :)
+- handle the case, where the first heart-beat is never sent
+- also catch missing import exceptions when loading job file (maybe split information in two)?
+- One suggestion(?) related with runJob() and runBulkJobs() is you might need to check the returned "jobid" for robustness. I've seen lots of cases where it returns non-valid jobid if actual job submission is failed, especially when there are many users using a cluster.
+
+pre-0.3:
++ update to new DRMAA wrapper!
++ clearly document "submit and wait" and "submit and collect"
+
+post-0.3:
++ add apply_to_combination as helper
++ Add a simle keyboard handler which allows all jobs to be killed (abort)
++ Unify method jobs, reconsider whether it makes sense to have this
++ Need a better way to set job and file names. Preferably human readable and unique.
++ Clear memory after pickling in the constructor, so reduce memory usage
++ validate member flags for KybJob
++ hold interface
++ add feature of sending out email when jobs have finished
+

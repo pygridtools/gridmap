@@ -37,7 +37,7 @@ def runExample():
     """
 
     args = [1, 2, 4, 8, 16]
-    local = True
+    local = False
     max_num_threads = 3
     param = {"h_vmem": "1G"}
 

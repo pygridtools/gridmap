@@ -13,25 +13,25 @@ def get_white_list():
         qstat = os.popen("qstat -f")
 
         node_names = []
-        norm_loads = []
+        # norm_loads = []
 
         for line in qstat:
 
             # we kick out all old nodes, node1XX
-            if line.startswith("all.q@") and not line.startswith("all.q@node1"):
+            if line.startswith("all.q@") or line.startswith("nlp.q"):
                 tokens = line.strip().split()
                 node_name = tokens[0]
 
                 if len(tokens) == 6:
                     continue
             
-                slots = float(tokens[2].split("/")[2])
-                cpu_load = float(tokens[3])
+                # slots = float(tokens[2].split("/")[2])
+                # cpu_load = float(tokens[3])
 
-                norm_load = cpu_load/slots 
+                # norm_load = cpu_load/slots 
 
                 node_names.append(node_name)
-                norm_loads.append(norm_load)
+                # norm_loads.append(norm_load)
 
         qstat.close()
 
@@ -46,13 +46,16 @@ CFG = {}
 
 #default python path
 CFG['PYTHONPATH'] = os.environ['PYTHONPATH']
-CFG['PYGRID']     = "/fml/ag-raetsch/home/cwidmer/Documents/phd/projects/pythongrid/pythongrid.py"
-CFG['TEMPDIR']    = "/fml/ag-raetsch/home/cwidmer/tmp/"
+CFG['PYGRID']     = "/home/research/dblanchard/pythongrid/pythongrid.py"
+#CFG['PYGRID']     = "/opt/python/2.7/lib/python2.7/site-packages/pythongrid/pythongrid.py"
+CFG['TEMPDIR']    = "~/tmp/"
+if not os.path.exists(os.path.expanduser(CFG['TEMPDIR'])):
+    os.makedirs(os.path.expanduser(CFG['TEMPDIR']))
 
 # error emails
-CFG['SMTPSERVER'] = "mailhost.tuebingen.mpg.de"
-CFG['ERROR_MAIL_SENDER'] = "cwidmer@tuebingen.mpg.de"
-CFG['ERROR_MAIL_RECIPIENT'] = "ckwidmer@gmail.com"
+CFG['SMTPSERVER'] = "research.ets.org"
+CFG['ERROR_MAIL_SENDER'] = os.environ['USER'] + "@ets.org"
+CFG['ERROR_MAIL_RECIPIENT'] = os.environ['USER'] + "@ets.org"
 CFG['MAX_MSG_LENGTH'] = 5000
 
 
@@ -83,7 +86,7 @@ CFG['HEARTBEAT_FREQUENCY'] = 10
 CFG['WHITELIST'] = get_white_list()
 
 # black-list of nodes
-CFG['BLACKLIST'] = ["all.q@node305"]
+CFG['BLACKLIST'] = []
 
 # remove black-list from white-list
 for node in CFG['BLACKLIST']:
