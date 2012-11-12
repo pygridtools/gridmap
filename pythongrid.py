@@ -33,7 +33,7 @@ import random
 import traceback
 import zmq
 import socket
-import zlib
+import bz2
 import uuid
 import smtplib
 from email.mime.multipart import MIMEMultipart
@@ -1086,16 +1086,16 @@ def pg_map(f, args_list, param=None, local=False, maxNumThreads=1, mem="5G"):
 
 def zdumps(obj):
     """
-    dumps pickleable object into zlib compressed string
+    dumps pickleable object into bz2 compressed string
     """
-    return zlib.compress(cPickle.dumps(obj, cPickle.HIGHEST_PROTOCOL), 9)
+    return bz2.compress(cPickle.dumps(obj, cPickle.HIGHEST_PROTOCOL), 9)
 
 
 def zloads(zstr):
     """
-    loads pickleable object from zlib compressed string
+    loads pickleable object from bz2 compressed string
     """
-    return cPickle.loads(zlib.decompress(zstr))
+    return cPickle.loads(bz2.decompress(zstr))
 
 
 def save(filename, myobj):
