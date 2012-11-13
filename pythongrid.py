@@ -20,36 +20,32 @@ We use pyZMQ to provide a heart beat feature that allows close monitoring
 of submitted jobs and take appropriate action in case of failure.
 """
 
-import re
-import sys
-import os
-import os.path
-import inspect
-import gzip
+import bz2
 import cPickle
 import getopt
-import time
+import gzip
+import inspect
+import os
+import os.path
 import random
-import traceback
-import zmq
-import socket
-import bz2
-import uuid
+import re
 import smtplib
+import socket
+import sys
+import time
+import traceback
+import uuid
+from datetime import datetime
+from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.mime.image import MIMEImage
 
-
-from datetime import datetime
+import zmq
 
 # import configuration
 from pythongrid_cfg import CFG
 
 ##CFG structure loaded
-
-
-jp = os.path.join
 
 DRMAA_PRESENT = True
 MULTIPROCESSING_PRESENT = True
@@ -58,7 +54,7 @@ CHERRYPY_PRESENT = True
 
 try:
     import drmaa
-except Exception, detail:
+except ImportError as detail:
     print "Error importing drmaa. Only local multi-threading supported."
     print "Please check your installation."
     print detail
@@ -66,7 +62,7 @@ except Exception, detail:
 
 try:
     import multiprocessing
-except Exception, detail:
+except ImportError as detail:
     print "Error importing multiprocessing. Local computing limited to one CPU."
     print "Please install python2.6 or the backport of the multiprocessing package"
     print detail
@@ -74,7 +70,7 @@ except Exception, detail:
 
 try:
     import pylab
-except Exception, detail:
+except ImportError as detail:
     #print "Error importing pylab. Not plots will be created in debugging emails."
     #print "Please check your installation."
     #print detail
@@ -82,13 +78,11 @@ except Exception, detail:
 
 try:
     import cherrypy
-except Exception, detail:
+except ImportError as detail:
     print "Error importing cherrypy. Web-based monitoring will be disabled."
     print "Please check your installation."
     print detail
     CHERRYPY_PRESENT = False
-
-
 
 
 class Job(object):
@@ -132,7 +126,7 @@ class Job(object):
             print '%s does not exist. Please create a directory' % outdir
             raise Exception()
 
-        self.name = 'pg_' + str(uuid.uuid1())
+        self.name = 'pg_{}'.format(uuid.uuid1())
         self.jobid = ""
 
 
@@ -189,10 +183,10 @@ class Job(object):
         try:
             self.ret = apply(self.f, self.args, self.kwlist)
 
-        except Exception, e:
+        except Exception as e:
 
             print "exception encountered"
-            print "type:", str(type(e))
+            print "type: {}".format(type(e))
             print "line number:", sys.exc_info()[2].tb_lineno
             print e
             print "========="
@@ -209,10 +203,11 @@ class KybJob(Job):
     the system at MPI Biol. Cyber. Tuebingen.
     """
 
-    def __init__(self, f, args, kwlist={}, param=None, cleanup=True):
+    def __init__(self, f, args, kwlist=None, param=None, cleanup=True):
         """
         constructor of KybJob
         """
+        kwlist = kwlist or {}
         Job.__init__(self, f, args, kwlist, param=param, cleanup=cleanup)
         self.h_vmem = "5G"
         self.arch = ""
@@ -258,42 +253,42 @@ class KybJob(Job):
         ret = ""
 
         if (self.name != ""):
-            ret = ret + " -N " + str(self.name)
+            ret = ret + " -N {}".format(self.name)
         if (self.h_vmem != ""):
             h_mem = re.sub("(\d+)\.?\d*(\w)", "\g<1>\g<2>", self.h_vmem)
             if h_mem != self.h_vmem:
                 print "Warning:", self.h_vmem, "replaced by", h_mem, " for native spec!"
-            ret = ret + " -l " + "h_vmem" + "=" + str(self.h_vmem)
+            ret = ret + " -l " + "h_vmem" + "={}".format(self.h_vmem)
         if (self.arch != ""):
-            ret = ret + " -l " + "arch" + "=" + str(self.arch)
+            ret = ret + " -l " + "arch" + "={}".format(self.arch)
         if (self.tmpfree != ""):
-            ret = ret + " -l " + "tmpfree" + "=" + str(self.tmpfree)
+            ret = ret + " -l " + "tmpfree" + "={}".format(self.tmpfree)
         if (self.h_cpu != ""):
-            ret = ret + " -l " + "h_cpu" + "=" + str(self.h_cpu)
+            ret = ret + " -l " + "h_cpu" + "={}".format(self.h_cpu)
         if (self.h_rt != ""):
-            ret = ret + " -l " + "h_rt" + "=" + str(self.h_rt)
+            ret = ret + " -l " + "h_rt" + "={}".format(self.h_rt)
         if (self.express != ""):
-            ret = ret + " -l " + "express" + "=" + str(self.express)
+            ret = ret + " -l " + "express" + "={}".format(self.express)
         if (self.matlab != ""):
-            ret = ret + " -l " + "matlab" + "=" + str(self.matlab)
+            ret = ret + " -l " + "matlab" + "={}".format(self.matlab)
         if (self.simulink != ""):
-            ret = ret + " -l " + "simulink" + "=" + str(self.simulink)
+            ret = ret + " -l " + "simulink" + "={}".format(self.simulink)
         if (self.compiler != ""):
-            ret = ret + " -l " + "compiler" + "=" + str(self.compiler)
+            ret = ret + " -l " + "compiler" + "={}".format(self.compiler)
         if (self.imagetb != ""):
-            ret = ret + " -l " + "imagetb" + "=" + str(self.imagetb)
+            ret = ret + " -l " + "imagetb" + "={}".format(self.imagetb)
         if (self.opttb != ""):
-            ret = ret + " -l " + "opttb" + "=" + str(self.opttb)
+            ret = ret + " -l " + "opttb" + "={}".format(self.opttb)
         if (self.stattb != ""):
-            ret = ret + " -l " + "stattb" + "=" + str(self.stattb)
+            ret = ret + " -l " + "stattb" + "={}".format(self.stattb)
         if (self.sigtb != ""):
-            ret = ret + " -l " + "sigtb" + "=" + str(self.sigtb)
+            ret = ret + " -l " + "sigtb" + "={}".format(self.sigtb)
         if (self.cplex != ""):
-            ret = ret + " -l " + "cplex" + "=" + str(self.cplex)
+            ret = ret + " -l " + "cplex" + "={}".format(self.cplex)
         if (self.nicetohave != ""):
-            ret = ret + " -l " + "nicetohave" + "=" + str(self.nicetohave)
+            ret = ret + " -l " + "nicetohave" + "={}".format(self.nicetohave)
         if (self.pe != ""):
-            ret = ret + " -pe " + str(self.pe)
+            ret = ret + " -pe {}".format(self.pe)
 
 
         if (self.white_list != ""):
@@ -350,7 +345,7 @@ class KybJob(Job):
         if isinstance(self.ret, SystemError):
 
             # we look for memory keyword in exception detail (heuristic but useful)
-            exception_detail = str(self.exception).lower()
+            exception_detail = '{}'.format(self.exception).lower()
 
             if exception_detail.find("memory") != -1:
                 return True
@@ -565,7 +560,7 @@ def collect_jobs(sid, jobids, joblist, wait=False):
 
             #print exceptions
             if retJob.exception != None:
-                print str(type(retJob.exception))
+                print '{}'.format(type(retJob.exception))
                 print "Exception encountered in job with log file:"
                 print log_stdout_fn
                 print retJob.exception
@@ -584,8 +579,7 @@ def collect_jobs(sid, jobids, joblist, wait=False):
                     print "cleaning up:", log_stderr_fn
                     #os.remove(log_stderr_fn)
 
-
-        except Exception, detail:
+        except Exception as detail:
             print "error while unpickling file: " + job.outputfile
             print "this could caused by a problem with the cluster environment, imports or environment variables"
             print "check log files for more information: "
@@ -633,125 +627,6 @@ def process_jobs(jobs, local=False, maxNumThreads=1):
         return  _process_jobs_locally(jobs, maxNumThreads=maxNumThreads)
 
 
-
-def get_status(sid, jobids):
-    """
-    Get the status of all jobs in jobids.
-    Returns True if all jobs are finished.
-
-    Using the state-aware StatusChecker now, this
-    function maintains the previous
-    interface.
-    """
-
-    checker = StatusChecker(sid, jobids)
-    return checker.check()
-
-
-
-class StatusChecker(object):
-    """
-    To deal with the fact that grid engine seems
-    to forget about finished jobs after a little while,
-    we need to keep track of finished jobs manually
-    and count a out-of-synch job as finished, if it has
-    previously had the status "finished"
-
-    WARNING: this class is deprecated, as state determination
-             was too unreliable. In the future, only StatusCheckerZMQ
-             will be supported
-    """
-
-    def __init__(self, sid, jobs):
-        """
-        we keep a memory of job ids
-        """
-
-        self.jobs = jobs
-        self.jobids = [job.jobid for job in jobs]
-        self.sid = sid
-        self.jobid_to_status = {}.fromkeys(self.jobids, 0)
-
-        self._decodestatus = {
-            -42: 'sge and drmaa not in sync',
-            "undetermined": 'process status cannot be determined',
-            "queued_active": 'job is queued and active',
-            "system_on_hold": 'job is queued and in system hold',
-            "user_on_hold": 'job is queued and in user hold',
-            "user_system_on_hold": 'job is in user and system hold',
-            "running": 'job is running',
-            "system_suspended": 'job is system suspended',
-            "user_suspended": 'job is user suspended',
-            "done": 'job finished normally',
-            "failed": 'job finished, but failed',
-        }
-
-
-    def check(self):
-        """
-        Get the status of all jobs.
-        Returns True if all jobs are finished.
-        """
-
-        s = drmaa.Session()
-        s.initialize(self.sid)
-
-        status_summary = {}.fromkeys(self._decodestatus, 0)
-        status_changed = False
-
-        for job in self.jobs:
-
-            jobid = job.jobid
-            old_status = self.jobid_to_status[jobid]
-
-            try:
-                curstat = s.jobStatus(jobid)
-
-            except Exception, message:
-                # handle case where already finished job
-                # is now out-of-synch with grid engine
-                if old_status == "done":
-                    curstat = "done"
-                else:
-                    curstat = -42
-
-
-            # print job status updates
-            if curstat != old_status:
-
-                # set flag
-                status_changed = True
-
-                # determine node name
-                job.host_name = check_host_name(jobid)
-
-                print "status update for job", jobid, "from", old_status, "to", curstat, "log at", job.log_stdout_fn, "on", job.host_name
-
-                # check cause of death and resubmit if unnatural
-                if curstat == "done" or curstat == -42:
-                    resubmit = handle_resubmit(s, job)
-
-
-            # remember current status
-            self.jobid_to_status[jobid] = curstat
-            status_summary[curstat] += 1
-
-
-        # print status summary
-        if status_changed:
-            print 'Status of %s at %s' % (self.sid, time.strftime('%d/%m/%Y - %H.%M:%S'))
-            for curkey in status_summary.keys():
-                if status_summary[curkey] > 0:
-                    print '%s: %d' % (self._decodestatus[curkey], status_summary[curkey])
-            print "##############################################"
-            status_changed = False
-
-        s.exit()
-
-        return (status_summary["done"] + status_summary[-42]==len(self.jobs))
-
-
-
 class StatusCheckerZMQ(object):
     """
     switched to next-generation cluster computing :D
@@ -778,7 +653,7 @@ class StatusCheckerZMQ(object):
         #TODO start web-based monitorsing process correctly
         if False and CHERRYPY_PRESENT:
             print "starting web interface"
-            Popen("python pythongrid_web.py " + self.home_address)
+            os.popen("python pythongrid_web.py " + self.home_address)
 
 
         # uninitialized field (set in check method)
@@ -845,8 +720,15 @@ class StatusCheckerZMQ(object):
                     tmp_job = msg["data"]
 
                     # copy relevant fields
-                    job.ret = tmp_job.ret
-                    job.exception = tmp_job.exception
+                    try:
+                        job.ret = tmp_job.ret
+                        job.exception = tmp_job.exception
+                    except AttributeError:  # This should only happen if the tmp_job is actually some type of exception and not a Job
+                        print "job encountered exception, will not resubmit: \n{}".format(tmp_job)
+                        job.cause_of_death = "exception"
+                        job.ret = job.exception = tmp_job
+                        send_error_mail(job)
+                        job.ret = "job dead (with non-memory related exception)"
 
                     # is assigned in submission process and not written back server-side
                     #job.log_stdout_fn = tmp_job.log_stdout_fn
@@ -1032,7 +914,7 @@ def resubmit(session_id, job):
 
         session.control(job.jobid, drmaa.JobControlAction.TERMINATE)
         print "zombie job killed"
-    except Exception, detail:
+    except Exception as detail:
         print "could not kill job with SGE id", job.jobid
         print detail
 
@@ -1142,7 +1024,7 @@ def send_error_mail(job):
 
     # create message
     msg = MIMEMultipart()
-    msg["subject"] = "PYTHONGRID error " + str(job.name)
+    msg["subject"] = "PYTHONGRID error {}".format(job.name)
     msg["From"] = "pythongrid"
     msg["To"] = "pythongrid user"
 
@@ -1150,21 +1032,21 @@ def send_error_mail(job):
     # compose error message
     body_text = ""
 
-    body_text += "job " + str(job.name) + "\n"
-    body_text += "last timestamp: " + str(job.timestamp) + "\n"
-    body_text += "num_resubmits: " + str(job.num_resubmits) + "\n"
-    body_text += "cause_of_death: " + str(job.cause_of_death) + "\n"
+    body_text += "job {}".format(job.name) + "\n"
+    body_text += "last timestamp: {}".format(job.timestamp) + "\n"
+    body_text += "num_resubmits: {}".format(job.num_resubmits) + "\n"
+    body_text += "cause_of_death: {}".format(job.cause_of_death) + "\n"
 
     if job.heart_beat:
-        body_text += "last memory usage: " + str(job.heart_beat["memory"]) + "\n"
-        body_text += "last cpu load: " + str(job.heart_beat["cpu_load"]) + "\n"
+        body_text += "last memory usage: {}".format(job.heart_beat["memory"]) + "\n"
+        body_text += "last cpu load: {}".format(job.heart_beat["cpu_load"]) + "\n"
 
-    body_text += "requested memory: " + str(job.h_vmem) + "\n"
-    body_text += "host: " + str(job.host_name) + "\n\n"
+    body_text += "requested memory: {}".format(job.h_vmem) + "\n"
+    body_text += "host: {}".format(job.host_name) + "\n\n"
 
     if isinstance(job.ret, Exception):
-        body_text += "job encountered exception: " + str(job.ret) + "\n"
-        body_text += "stacktrace: " + str(job.exception) + "\n\n"
+        body_text += "job encountered exception: {}".format(job.ret) + "\n"
+        body_text += "stacktrace: {}".format(job.exception) + "\n\n"
 
     print body_text
 
@@ -1287,7 +1169,7 @@ def get_cpu_load(pid):
         ps_pseudofile.close()
 
         cpu_load = info.strip()
-    except Exception, detail:
+    except Exception as detail:
         print "getting cpu info failed:", detail
         cpu_load = "non-linux?"
 
@@ -1352,12 +1234,14 @@ def run_job(job_id, address):
 
     try:
         job = send_zmq_msg(job_id, "fetch_input", None, address)
-    except Exception, e:
+    except Exception as e:
         # here we will catch errors caused by pickled objects
         # of classes defined in modules not in PYTHONPATH
         print e
 
         # send back exception
+
+        ## This doesn't seem to work (either the old version or the new one)
         thank_you_note = send_zmq_msg(job_id, "store_output", e, address)
         print thank_you_note
 
@@ -1460,11 +1344,11 @@ def main(argv=None):
             raise Usage(msg)
 
 
-    except Usage, err:
+    except Usage as err:
         print >> sys.stderr, err.msg
         print >> sys.stderr, "for help use --help"
 
         return 2
 
 if __name__ == "__main__":
-    main(sys.argv)
+    main()

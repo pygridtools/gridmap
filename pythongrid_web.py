@@ -23,8 +23,7 @@ from pythongrid import send_zmq_msg
 
 class WelcomePage:
 
-
-
+    @cherrypy.expose
     def index(self):
 
         return '''
@@ -33,8 +32,6 @@ class WelcomePage:
             <input type="text" name="address" /><br /><br />
             <input type="submit" />
             </form>'''
-    index.exposed = True
-
 
     def list_jobs(self, address):
         """
@@ -63,7 +60,7 @@ class WelcomePage:
             <tr><td>sge job id</td><td>job done</td><td>cause of death</td><tr>
             '''
 
-        
+
         for job in self.jobs:
             out_html += "<tr><td><a href='/view_job?address=%s&job_id=%s'>%s</td>" % (address, str(job.name), str(job.jobid))
             out_html += "<td>%s</td>" % (str(job.ret!=None))
@@ -92,7 +89,7 @@ class WelcomePage:
         job = send_zmq_msg(job_id, "get_job", "", address)
 
         out_html = ""
-        
+
         details = job_to_html(job)
 
         out_html += details
@@ -119,22 +116,22 @@ def job_to_html(job):
     if job.heart_beat:
         body_text += "last memory usage: " + str(job.heart_beat["memory"]) + "\n<br>"
         body_text += "last cpu load: " + str(job.heart_beat["cpu_load"]) + "\n<br>"
-        
+
     body_text += "requested memory: " + str(job.h_vmem) + "\n<br>"
     body_text += "host: <a href='http://sambesi.kyb.local/ganglia/?c=Three Towers&h=%s&m=load_one&r=hour&s=descending&hc=5&mc=2'>%s</a><br><br>\n\n" % (job.host_name, job.host_name)
-    
+
     if isinstance(job.ret, Exception):
         body_text += "job encountered exception: " + str(job.ret) + "\n<br>"
         body_text += "stacktrace: " + str(job.exception) + "\n<br>\n<br>"
-    
-    
+
+
     # attach log file
     if job.heart_beat:
         log_file = open(job.heart_beat["log_file"], "r")
         log_file_attachement = log_file.read().replace("\n", "<br>\n")
         log_file.close()
 
-        body_text += "<br><br><br>" + log_file_attachement       
+        body_text += "<br><br><br>" + log_file_attachement
 
 
     return body_text
@@ -153,4 +150,4 @@ if __name__ == '__main__':
     #response.headers['Content-Type'] = 'application/json'
     #response.body = encoder.iterencode(response.body)
     cherrypy.quickstart(config=os.path.join(thisdir, 'pythongrid_web.conf'))
-  
+
