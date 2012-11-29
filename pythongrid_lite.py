@@ -69,6 +69,7 @@ class Job(object):
         @type db_dir: C{basestring}
         """
 
+        self.path = None
         self._f = None
         self.function = f
         self.args = args
@@ -83,7 +84,6 @@ class Job(object):
         self.num_slots = num_slots
         self.mem_free = mem_free
         self.white_list = []
-        self.path = None
         self.db_dir = db_dir
         self.name = name
 
@@ -100,7 +100,10 @@ class Job(object):
         """
 
         m = inspect.getmodule(f)
-        self.path = os.path.dirname(m.__file__)
+        try:
+            self.path = _clean_path(os.path.dirname(os.path.abspath(inspect.getsourcefile(f))))
+        except TypeError:
+            self.path = ''
 
         # if module is not __main__, all is good
         if m.__name__ != "__main__":
@@ -210,7 +213,7 @@ def _append_job_to_session(session, job, pickle_db, job_num, temp_dir='/scratch/
         jt.jobEnvironment = shell_env
 
     jt.remoteCommand = _clean_path(os.path.abspath(__file__))
-    jt.args = [pickle_db, job_num, job.path]
+    jt.args = [pickle_db, '{}'.format(job_num), job.path]
     jt.nativeSpecification = job.native_specification
     jt.outputPath = ":" + temp_dir
     jt.errorPath = ":" + temp_dir
@@ -277,10 +280,10 @@ def _collect_jobs(sid, jobids, joblist, con, db_filename, temp_dir='/scratch/', 
 
             #remove files
             elif job.cleanup:
-                # print("cleaning up:", log_stdout_fn)
+                # print("cleaning up:", log_stdout_fn, file=sys.stderr)
                 os.remove(log_stdout_fn)
 
-                # print("cleaning up:", log_stderr_fn)
+                # print("cleaning up:", log_stderr_fn, file=sys.stderr)
                 os.remove(log_stderr_fn)
 
         except Exception as detail:
@@ -309,7 +312,7 @@ def process_jobs(jobs, db_dir='/home/nlp-text/dynamic/dblanchard/pythongrid_dbs/
     """
 
     # Get new filename for temporary database
-    with NamedTemporaryFile(dir=db_dir, delete=False) as temp_db_file:
+    with NamedTemporaryFile(dir=db_dir, delete=False, suffix='.db3') as temp_db_file:
         db_filename = temp_db_file.name
 
     # Create new sqlite database with pickled jobs
@@ -320,6 +323,7 @@ def process_jobs(jobs, db_dir='/home/nlp-text/dynamic/dblanchard/pythongrid_dbs/
         con.execute("CREATE TABLE job(id INTEGER, data BLOB)")
         con.execute("CREATE TABLE output(id INTEGER, data BLOB)")
 
+    # Save jobs to database
     for job_id, job in enumerate(jobs):
         _zsave_db(job, con, 'job', job_id)
 
@@ -327,7 +331,12 @@ def process_jobs(jobs, db_dir='/home/nlp-text/dynamic/dblanchard/pythongrid_dbs/
     sids, jobids = _submit_jobs(jobs, db_filename, white_list=white_list, temp_dir=temp_dir)
 
     # Retrieve outputs
-    return _collect_jobs(sids, jobids, jobs, con, db_filename, temp_dir=temp_dir)
+    job_outputs = _collect_jobs(sids, jobids, jobs, con, db_filename, temp_dir=temp_dir)
+
+    # Close database connection
+    con.close()
+
+    return job_outputs
 
 
 #####################################################################
