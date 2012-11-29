@@ -9,6 +9,8 @@
 # Written (W) 2008-2012 Christian Widmer
 # Written (W) 2008-2010 Cheng Soon Ong
 # Copyright (C) 2008-2012 Max-Planck-Society
+#
+# Mostly rewritten by Dan Blanchard, November 2012
 
 """
 pythongrid provides a high level front-end to DRMAA-python.
@@ -16,73 +18,22 @@ pythongrid provides a high level front-end to DRMAA-python.
 This module provides wrappers that simplify submission and collection of jobs,
 in a more 'pythonic' fashion.
 
-We use pyZMQ to provide a heart beat feature that allows close monitoring
-of submitted jobs and take appropriate action in case of failure.
 """
 
+from __future__ import print_function, unicode_literals
+
+import argparse
 import bz2
-import cPickle
-import getopt
-import gzip
+import cPickle as pickle
 import inspect
 import os
 import os.path
-import random
 import re
-import smtplib
-import socket
+import sqlite3
 import sys
-import time
-import traceback
-import uuid
-from datetime import datetime
-from email.mime.image import MIMEImage
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
+from tempfile import NamedTemporaryFile
 
-import zmq
-
-# import configuration
-from pythongrid_cfg import CFG
-
-##CFG structure loaded
-
-DRMAA_PRESENT = True
-MULTIPROCESSING_PRESENT = True
-MATPLOTLIB_PRESENT = True
-CHERRYPY_PRESENT = True
-
-try:
-    import drmaa
-except ImportError as detail:
-    print "Error importing drmaa. Only local multi-threading supported."
-    print "Please check your installation."
-    print detail
-    DRMAA_PRESENT = False
-
-try:
-    import multiprocessing
-except ImportError as detail:
-    print "Error importing multiprocessing. Local computing limited to one CPU."
-    print "Please install python2.6 or the backport of the multiprocessing package"
-    print detail
-    MULTIPROCESSING_PRESENT = False
-
-try:
-    import pylab
-except ImportError as detail:
-    #print "Error importing pylab. Not plots will be created in debugging emails."
-    #print "Please check your installation."
-    #print detail
-    MATPLOTLIB_PRESENT = False
-
-try:
-    import cherrypy
-except ImportError as detail:
-    print "Error importing cherrypy. Web-based monitoring will be disabled."
-    print "Please check your installation."
-    print detail
-    CHERRYPY_PRESENT = False
+import drmaa
 
 
 class Job(object):
@@ -93,7 +44,11 @@ class Job(object):
     the execute method gets called
     """
 
-    def __init__(self, f, args, kwlist={}, param=None, cleanup=True):
+    __slots__ = ('_f', 'args', 'jobid', 'kwlist', 'cleanup', 'ret', 'exception', 'environment', 'replace_env', 'working_dir', 'num_slots', 'mem_free', 'white_list', 'path',
+                 'db_dir', 'name', 'queue')
+
+    def __init__(self, f, args, kwlist=None, cleanup=True, mem_free="1G", name='pythongrid_job', num_slots=1, db_dir='/home/nlp-text/dynamic/dblanchard/pythongrid_dbs/',
+                 queue='nlp.q'):
         """
         constructor of Job
 
@@ -101,51 +56,67 @@ class Job(object):
         @type f: function
         @param args: argument list of function f
         @type args: list
-        @param kwlist: dictionary of keyword arguments
+        @param kwlist: dictionary of keyword arguments for f
         @type kwlist: dict
         @param cleanup: flag that determines the cleanup of input and log file
         @type cleanup: boolean
+        @param mem_free: Estimate of how much memory this job will need (for scheduling)
+        @type mem_free: C{basestring}
+        @param name: Name to give this job
+        @type name: C{basestring}
+        @param num_slots: Number of slots this job should use.
+        @type num_slots: C{int}
+        @param db_dir: Directory to store the temporary sqlite database used behind the scenes. Must be on the SAN so that all nodes can access it.
+        @type db_dir: C{basestring}
+        @param queue: SGE queue to schedule job on.
+        @type queue: C{basestring}
         """
 
-        self.__set_function(f)
+        self.path = None
+        self._f = None
+        self.function = f
         self.args = args
-        self.kwlist = kwlist
+        self.jobid = -1
+        self.kwlist = kwlist if kwlist is not None else {}
         self.cleanup = cleanup
         self.ret = None
-        self.nativeSpecification = ""
         self.exception = None
         self.environment = None
         self.replace_env = False
-        self.working_dir = None
+        self.working_dir = os.getcwd()
+        self.num_slots = num_slots
+        self.mem_free = mem_free
+        self.white_list = []
+        self.db_dir = db_dir
+        self.name = name
+        self.queue = queue
 
-        if param!=None:
-            self.__set_parameters(param)
+    @property
+    def function(self):
+        ''' Function this job will execute. '''
+        return self._f
 
-        outdir = os.path.expanduser(CFG['TEMPDIR'])
-        if not os.path.isdir(outdir):
-            print '%s does not exist. Please create a directory' % outdir
-            raise Exception()
-
-        self.name = 'pg_{}'.format(uuid.uuid1())
-        self.jobid = ""
-
-
-    def __set_function(self, f):
+    @function.setter
+    def function(self, f):
         """
         setter for function that carefully takes care of
         namespace, avoiding __main__ as a module
         """
 
         m = inspect.getmodule(f)
+        try:
+            self.path = _clean_path(os.path.dirname(os.path.abspath(inspect.getsourcefile(f))))
+        except TypeError:
+            self.path = ''
 
         # if module is not __main__, all is good
         if m.__name__ != "__main__":
-            self.f = f
+            self._f = f
 
         else:
 
             # determine real module name
-            mn = m.__file__.split("/")[-1].replace(".pyc","").replace(".py", "")
+            mn = os.path.splitext(os.path.basename(m.__file__))[0]
 
             # make sure module is present
             __import__(mn)
@@ -154,22 +125,8 @@ class Job(object):
             mod = sys.modules[mn]
 
             # set function from module
-            self.f = mod.__getattribute__(f.__name__)
-
-
-
-    def __set_parameters(self, param):
-        """
-        method to set parameters from dict
-        """
-
-        assert(param!=None)
-
-        for (key, value) in param.items():
-            setattr(self, key, value)
-
-        return self
-
+            # self._f = mod.__getattribute__(f.__name__)
+            self._f = getattr(mod, f.__name__)
 
     def execute(self):
         """
@@ -181,261 +138,34 @@ class Job(object):
         Input data is removed after execution to save space.
         """
         try:
-            self.ret = apply(self.f, self.args, self.kwlist)
-
+            self.ret = self.function(*self.args, **self.kwlist)
         except Exception as e:
-
-            print "exception encountered"
-            print "type: {}".format(type(e))
-            print "line number:", sys.exc_info()[2].tb_lineno
-            print e
-            print "========="
-            self.exception = traceback.format_exc()
             self.ret = e
 
-            print self.exception
-            traceback.print_exc(file=sys.stdout)
-
-
-class KybJob(Job):
-    """
-    Specialization of generic Job that provides an interface to
-    the system at MPI Biol. Cyber. Tuebingen.
-    """
-
-    def __init__(self, f, args, kwlist=None, param=None, cleanup=True):
-        """
-        constructor of KybJob
-        """
-        kwlist = kwlist or {}
-        Job.__init__(self, f, args, kwlist, param=param, cleanup=cleanup)
-        self.h_vmem = "5G"
-        self.arch = ""
-        self.tmpfree = ""
-        self.h_cpu = ""
-        self.h_rt = ""
-        self.express = ""
-        self.matlab = ""
-        self.simulink = ""
-        self.compiler = ""
-        self.imagetb = ""
-        self.opttb = ""
-        self.stattb = ""
-        self.sigtb = ""
-        self.cplex = ""
-        self.nicetohave = ""
-        self.pe = ""
-
-        # additional fields for robustness
-        self.num_resubmits = 0
-        self.cause_of_death = ""
-        self.jobid = -1
-        self.host_name = ""
-        self.timestamp = None
-        self.heart_beat = None
-        self.exception = None
-
-        # fields to track mem/cpu-usage
-        self.track_mem = []
-        self.track_cpu = []
-
-        # black and white lists
-        self.white_list = ""
-        #working directory
-        self.working_dir =  os.getcwd()
-
-
-    def getNativeSpecification(self):
+    @property
+    def native_specification(self):
         """
         define python-style getter
         """
 
         ret = ""
 
-        if (self.name != ""):
-            ret = ret + " -N {}".format(self.name)
-        if (self.h_vmem != ""):
-            h_mem = re.sub("(\d+)\.?\d*(\w)", "\g<1>\g<2>", self.h_vmem)
-            if h_mem != self.h_vmem:
-                print "Warning:", self.h_vmem, "replaced by", h_mem, " for native spec!"
-            ret = ret + " -l " + "h_vmem" + "={}".format(self.h_vmem)
-        if (self.arch != ""):
-            ret = ret + " -l " + "arch" + "={}".format(self.arch)
-        if (self.tmpfree != ""):
-            ret = ret + " -l " + "tmpfree" + "={}".format(self.tmpfree)
-        if (self.h_cpu != ""):
-            ret = ret + " -l " + "h_cpu" + "={}".format(self.h_cpu)
-        if (self.h_rt != ""):
-            ret = ret + " -l " + "h_rt" + "={}".format(self.h_rt)
-        if (self.express != ""):
-            ret = ret + " -l " + "express" + "={}".format(self.express)
-        if (self.matlab != ""):
-            ret = ret + " -l " + "matlab" + "={}".format(self.matlab)
-        if (self.simulink != ""):
-            ret = ret + " -l " + "simulink" + "={}".format(self.simulink)
-        if (self.compiler != ""):
-            ret = ret + " -l " + "compiler" + "={}".format(self.compiler)
-        if (self.imagetb != ""):
-            ret = ret + " -l " + "imagetb" + "={}".format(self.imagetb)
-        if (self.opttb != ""):
-            ret = ret + " -l " + "opttb" + "={}".format(self.opttb)
-        if (self.stattb != ""):
-            ret = ret + " -l " + "stattb" + "={}".format(self.stattb)
-        if (self.sigtb != ""):
-            ret = ret + " -l " + "sigtb" + "={}".format(self.sigtb)
-        if (self.cplex != ""):
-            ret = ret + " -l " + "cplex" + "={}".format(self.cplex)
-        if (self.nicetohave != ""):
-            ret = ret + " -l " + "nicetohave" + "={}".format(self.nicetohave)
-        if (self.pe != ""):
-            ret = ret + " -pe {}".format(self.pe)
-
-
-        if (self.white_list != ""):
-            ret = ret + " -q "
-            for i in range(len(self.white_list)-1):
-                ret = ret + self.white_list[i] + ","
-            ret = ret + self.white_list[-1]
+        if self.name:
+            ret += " -N {}".format(self.name)
+        # Currently commented out until we enable mem_free on the cluster
+        # if self.mem_free:
+        #     ret += " -l mem_free={}".format(self.mem_free)
+        if self.num_slots and self.num_slots > 1:
+            ret += " -pe smp {}".format(self.num_slots)
+        if self.white_list:
+            ret += " -l h={}".format('|'.join(self.white_list))
+        if self.queue:
+            ret += " -q {}".format(self.queue)
 
         return ret
 
 
-    def setNativeSpecification(self, x):
-        """
-        define python-style setter
-        @param x: nativeSpecification string to be set
-        @type x: string
-        """
-
-        self.__nativeSpecification = x
-
-    nativeSpecification = property(getNativeSpecification,
-                                   setNativeSpecification)
-
-
-    def is_out_of_memory(self):
-        """
-        checks if job is out of memory
-        according to requested resources
-        and the last heart-beat
-        """
-
-        # compare memory consumption from
-        # last heart-beat to requested memory
-        if self.heart_beat != None:
-
-            unit = self.h_vmem[-1]
-            allocated_mb = float(self.h_vmem[0:-1])
-
-            if (unit == "G"):
-                allocated_mb = allocated_mb * 1000
-
-            # 10% more mem, at least 1G more than last heart-beat
-            upper_bound_mem = max(float(self.heart_beat["memory"]) + 1000, float(self.heart_beat["memory"])*1.10)
-
-            # if we are within memory limit
-            if upper_bound_mem  > allocated_mb:
-                return True
-
-        # if we have a memory exception
-        if isinstance(self.ret, MemoryError):
-            return True
-
-        # Sometimes out-of-memory causes a System Error
-        if isinstance(self.ret, SystemError):
-
-            # we look for memory keyword in exception detail (heuristic but useful)
-            exception_detail = '{}'.format(self.exception).lower()
-
-            if exception_detail.find("memory") != -1:
-                return True
-
-        # other problem
-        return False
-
-
-    def alter_allocated_memory(self, factor=2.0):
-        """
-        increases requested memory by a certain factor
-        """
-
-        assert(type(factor)==float)
-
-        if self.h_vmem != "":
-            unit = self.h_vmem[-1]
-            allocated_mb = float(self.h_vmem[0:-1])
-            self.h_vmem = "%f%s" % (factor*allocated_mb, unit)
-
-            print "memory for job %s increased to %s" % (self.name, self.h_vmem)
-
-        return self
-
-
-
-#only define this class if the multiprocessing module is present
-if MULTIPROCESSING_PRESENT:
-
-    class JobsProcess(multiprocessing.Process):
-        """
-        In case jobs are to be computed locally, a number of Jobs (possibly one)
-        are assinged to one thread.
-        """
-
-        def __init__(self, jobs):
-            """
-            Constructor
-            @param jobs: list of jobs
-            @type jobs: list of Job objects
-            """
-
-            self.jobs = jobs
-            multiprocessing.Process.__init__(self)
-
-        def run(self):
-            """
-            Executes each job in job list
-            """
-            for job in self.jobs:
-                job.execute()
-
-
-def _execute(job):
-    """Cannot pickle method instances, so fake a function.
-    Used by _process_jobs_locally"""
-
-    return apply(job.f, job.args, job.kwlist)
-
-
-
-def _process_jobs_locally(jobs, maxNumThreads=1):
-    """
-    Local execution using the package multiprocessing, if present
-
-    @param jobs: jobs to be executed
-    @type jobs: list<Job>
-    @param maxNumThreads: maximal number of threads
-    @type maxNumThreads: int
-
-    @return: list of jobs, each with return in job.ret
-    @rtype: list<Job>
-    """
-
-    print "using %i threads" % (maxNumThreads)
-
-    if (not MULTIPROCESSING_PRESENT or maxNumThreads == 1):
-        #perform sequential computation
-        for job in jobs:
-            job.execute()
-    else:
-        po = multiprocessing.Pool(maxNumThreads)
-        result = po.map(_execute, jobs)
-        for ix, job in enumerate(jobs):
-            job.ret = result[ix]
-
-    return jobs
-
-
-def submit_jobs(jobs, home_address, white_list=""):
+def _submit_jobs(jobs, pickle_db, temp_dir='/scratch', white_list=None):
     """
     Method used to send a list of jobs onto the cluster.
     @param jobs: list of jobs to be executed
@@ -446,15 +176,12 @@ def submit_jobs(jobs, home_address, white_list=""):
     session.initialize()
     jobids = []
 
-    for job in jobs:
+    for job_num, job in enumerate(jobs):
         # set job white list
         job.white_list = white_list
 
-        # remember address of submission host
-        job.home_address = home_address
-
         # append jobs
-        jobid = append_job_to_session(session, job)
+        jobid = _append_job_to_session(session, job, pickle_db, job_num, temp_dir=temp_dir)
         jobids.append(jobid)
 
     sid = session.contact
@@ -463,16 +190,13 @@ def submit_jobs(jobs, home_address, white_list=""):
     return (sid, jobids)
 
 
-
-def append_job_to_session(session, job):
+def _append_job_to_session(session, job, pickle_db, job_num, temp_dir='/scratch/'):
     """
     For an active session, append new job
     based on information stored in job object
 
     side-effects:
     - job.jobid set to jobid determined by grid-engine
-    - job.log_stdout_fn set to std::out file
-    - job.log_stderr_fn set to std::err file
     """
 
     jt = session.createJobTemplate()
@@ -494,32 +218,25 @@ def append_job_to_session(session, job):
         # only consider env vars from shell
         jt.jobEnvironment = shell_env
 
-
-    jt.remoteCommand = os.path.expanduser(CFG['PYGRID'])
-    jt.args = [job.name, job.home_address]
-    jt.joinFiles = True
-    jt.nativeSpecification = job.nativeSpecification
-    jt.outputPath = ":" + os.path.expanduser(CFG['TEMPDIR'])
-    jt.errorPath = ":" + os.path.expanduser(CFG['TEMPDIR'])
+    jt.remoteCommand = _clean_path(os.path.abspath(__file__))
+    jt.args = [pickle_db, '{}'.format(job_num), job.path]
+    jt.nativeSpecification = job.native_specification
+    jt.outputPath = ":" + temp_dir
+    jt.errorPath = ":" + temp_dir
 
     jobid = session.runJob(jt)
 
     # set job fields that depend on the jobid assigned by grid engine
     job.jobid = jobid
-    job.log_stdout_fn = (os.path.expanduser(CFG['TEMPDIR']) + job.name + '.o' + jobid)
-    job.log_stderr_fn = (os.path.expanduser(CFG['TEMPDIR']) + job.name + '.e' + jobid)
 
-    print 'Your job %s has been submitted with id %s' % (job.name, jobid)
-    print "stdout:", job.log_stdout_fn
-    print "stderr:", job.log_stderr_fn
-    print ""
+    print('Your job {} has been submitted with id {}'.format(job.name, jobid), file=sys.stderr)
 
     session.deleteJobTemplate(jt)
 
     return jobid
 
 
-def collect_jobs(sid, jobids, joblist, wait=False):
+def _collect_jobs(sid, jobids, joblist, con, db_filename, temp_dir='/scratch/', wait=True):
     """
     Collect the results from the jobids, returns a list of Jobs
 
@@ -527,8 +244,12 @@ def collect_jobs(sid, jobids, joblist, wait=False):
     @type sid: string returned by cluster
     @param jobids: list of job identifiers returned by the cluster
     @type jobids: list of strings
+    @param con: Open connection to the sqlite3 database where the results will be stored.
+    @type con: C{sqlite3.Connection}
     @param wait: Wait for jobs to finish?
     @type wait: Boolean, defaults to False
+    @param temp_dir: Local temporary directory for storing output for an individual job.
+    @type temp_dir: C{basestring}
     """
 
     for ix in xrange(len(jobids)):
@@ -543,812 +264,236 @@ def collect_jobs(sid, jobids, joblist, wait=False):
         drmaaWait = drmaa.Session.TIMEOUT_NO_WAIT
 
     s.synchronize(jobids, drmaaWait, True)
-    print "success: all jobs finished"
+    # print("success: all jobs finished", file=sys.stderr)
     s.exit()
 
-    #attempt to collect results
-    retJobs = []
+    # attempt to collect results
+    job_output_list = []
     for ix, job in enumerate(joblist):
 
-        log_stdout_fn = (os.path.expanduser(CFG['TEMPDIR']) + job.name + '.o' + jobids[ix])
-        log_stderr_fn = (os.path.expanduser(CFG['TEMPDIR']) + job.name + '.e' + jobids[ix])
+        log_stdout_fn = (os.path.join(temp_dir, job.name + '.o' + jobids[ix]))
+        log_stderr_fn = (os.path.join(temp_dir, job.name + '.e' + jobids[ix]))
 
         try:
-            retJob = load(job.outputfile)
-            assert(retJob.name == job.name)
-            retJobs.append(retJob)
+            job_output = _zload_db(con, 'output', ix)
 
             #print exceptions
-            if retJob.exception != None:
-                print '{}'.format(type(retJob.exception))
-                print "Exception encountered in job with log file:"
-                print log_stdout_fn
-                print retJob.exception
+            if isinstance(job_output, Exception):
+                print("Exception encountered in job with log file:", file=sys.stderr)
+                print(log_stdout_fn, file=sys.stderr)
+                print(job_output, file=sys.stderr)
+                print(file=sys.stderr)
 
             #remove files
-            elif retJob.cleanup:
+            elif job.cleanup:
+                # print("cleaning up:", log_stdout_fn, file=sys.stderr)
+                os.remove(log_stdout_fn)
 
-                print "cleaning up:", job.outputfile
-                os.remove(job.outputfile)
-
-                if retJob != None:
-
-                    print "cleaning up:", log_stdout_fn
-                    os.remove(log_stdout_fn)
-
-                    print "cleaning up:", log_stderr_fn
-                    #os.remove(log_stderr_fn)
+                # print("cleaning up:", log_stderr_fn, file=sys.stderr)
+                os.remove(log_stderr_fn)
 
         except Exception as detail:
-            print "error while unpickling file: " + job.outputfile
-            print "this could caused by a problem with the cluster environment, imports or environment variables"
-            print "check log files for more information: "
-            print "stdout:", log_stdout_fn
-            print "stderr:", log_stderr_fn
+            print("Error while unpickling output for pythongrid job from sqlite database {}".format(db_filename), file=sys.stderr)
+            print("This could caused by a problem with the cluster environment, imports or environment variables.", file=sys.stderr)
+            print("Check log files for more information: ", file=sys.stderr)
+            print("stdout:", log_stdout_fn, file=sys.stderr)
+            print("stderr:", log_stderr_fn, file=sys.stderr)
+            raise detail
 
-            print detail
+        job_output_list.append(job_output)
 
-
-
-    return retJobs
-
+    return job_output_list
 
 
-def process_jobs(jobs, local=False, maxNumThreads=1):
+def process_jobs(jobs, db_dir='/home/nlp-text/dynamic/dblanchard/pythongrid_dbs/', temp_dir='/scratch/', wait=True, white_list=None):
     """
-    Director function to decide whether to run on the cluster or locally
-    local: local or cluster processing
-    """
+    Take a list of jobs and process them on the cluster.
 
-    if (not local and DRMAA_PRESENT):
-
-        # get list of trusted nodes
-        white_list = CFG['WHITELIST']
-
-        # initialize checker to get port number
-        checker = StatusCheckerZMQ()
-
-        # get interface and port
-        home_address = checker.home_address
-
-        # jobid field is attached to each job object
-        (sid, jobids) = submit_jobs(jobs, home_address, white_list)
-
-        # handling of inputs, outputs and heartbeats
-        checker.check(sid, jobs)
-
-        return jobs
-
-    elif (not local and not DRMAA_PRESENT):
-        print 'Warning: import drmaa failed, computing locally'
-        return  _process_jobs_locally(jobs, maxNumThreads=maxNumThreads)
-
-    else:
-        return  _process_jobs_locally(jobs, maxNumThreads=maxNumThreads)
-
-
-class StatusCheckerZMQ(object):
-    """
-    switched to next-generation cluster computing :D
+    @param db_dir: Directory to store the temporary sqlite database used behind the scenes. Must be on the SAN so that all nodes can access it.
+    @type db_dir: C{basestring}
+    @param temp_dir: Local temporary directory for storing output for an individual job.
+    @type temp_dir: C{basestring}
+    @param wait: Should we wait for jobs to finish? (Should only be false if the function you're running doesn't return anything)
+    @type wait: C{bool}
+    @param white_list: If specified, limit nodes used to only those in list.
+    @type white_list: C{list} of C{basestring}
     """
 
-    def __init__(self):
-        """
-        set up socket
-        """
+    # Get new filename for temporary database
+    with NamedTemporaryFile(dir=db_dir, delete=False, suffix='.db3') as temp_db_file:
+        db_filename = temp_db_file.name
 
-        context = zmq.Context()
-        self.socket = context.socket(zmq.REP)
+    # Create new sqlite database with pickled jobs
+    con = sqlite3.connect(db_filename)
 
-        self.host_name = socket.gethostname()
-        self.ip_address = socket.gethostbyname(self.host_name)
-        self.interface = "tcp://%s" % (self.ip_address)
+    # Create tables
+    with con:
+        con.execute("CREATE TABLE job(id INTEGER, data BLOB)")
+        con.execute("CREATE TABLE output(id INTEGER, data BLOB)")
 
-        # bind to random port and remember it
-        self.port = self.socket.bind_to_random_port(self.interface)
-        self.home_address = "%s:%i" % (self.interface, self.port)
+    # Save jobs to database
+    for job_id, job in enumerate(jobs):
+        _zsave_db(job, con, 'job', job_id)
 
-        print "setting up connection on", self.home_address
+    # Submit jobs to cluster
+    sids, jobids = _submit_jobs(jobs, db_filename, white_list=white_list, temp_dir=temp_dir)
 
-        #TODO start web-based monitorsing process correctly
-        if False and CHERRYPY_PRESENT:
-            print "starting web interface"
-            os.popen("python pythongrid_web.py " + self.home_address)
+    # Retrieve outputs
+    job_outputs = _collect_jobs(sids, jobids, jobs, con, db_filename, temp_dir=temp_dir, wait=wait)
 
+    # Close database connection
+    con.close()
 
-        # uninitialized field (set in check method)
-        self.jobs = []
-        self.jobids = []
-        self.session_id = -1
-        self.jobid_to_job = {}
-
-
-    def __del__(self):
-        """
-        clean up open socket
-        """
-
-        self.socket.close()
-
-
-    def check(self, session_id, jobs):
-        """
-        serves input and output data
-        """
-
-        # save list of jobs
-        self.jobs = jobs
-
-        # keep track of DRMAA session_id (for resubmissions)
-        self.session_id = session_id
-
-        # save useful mapping
-        self.jobid_to_job = {}
-        for job in jobs:
-            self.jobid_to_job[job.name] = job
-
-        # determines in which interval to check if jobs are alive
-        local_heart = multiprocessing.Process(target=heart_beat, args=(-1, self.home_address, -1, "", CFG["CHECK_FREQUENCY"]))
-        local_heart.start()
-
-        print "Using ZMQ layer to keep track of jobs"
-
-        # main loop
-        while not self.all_jobs_done():
-
-            msg_str = self.socket.recv()
-            msg = zloads(msg_str)
-
-            return_msg = ""
-
-            job_id = msg["job_id"]
-
-            # only if its not the local beat
-            if job_id != -1:
-
-                job = self.jobid_to_job[job_id]
-                print datetime.now().ctime(), msg
-
-                if msg["command"] == "fetch_input":
-                    return_msg = self.jobid_to_job[job_id]
-
-                if msg["command"] == "store_output":
-                    # be nice
-                    return_msg = "thanks"
-
-                    # store tmp job object
-                    tmp_job = msg["data"]
-
-                    # copy relevant fields
-                    try:
-                        job.ret = tmp_job.ret
-                        job.exception = tmp_job.exception
-                    except AttributeError:  # This should only happen if the tmp_job is actually some type of exception and not a Job
-                        print "job encountered exception, will not resubmit: \n{}".format(tmp_job)
-                        job.cause_of_death = "exception"
-                        job.ret = job.exception = tmp_job
-                        send_error_mail(job)
-                        job.ret = "job dead (with non-memory related exception)"
-
-                    # is assigned in submission process and not written back server-side
-                    #job.log_stdout_fn = tmp_job.log_stdout_fn
-                    job.timestamp = datetime.now()
-
-                if msg["command"] == "heart_beat":
-                    job.heart_beat = msg["data"]
-                    job.log_file = msg["data"]["log_file"]
-
-                    # keep track of mem and cpu
-                    try:
-                        job.track_mem.append(float(job.heart_beat["memory"]))
-                        job.track_cpu.append(float(job.heart_beat["cpu_load"]))
-                    except:
-                        print "error decoding heart-beat"
-
-                    return_msg = "all good"
-
-                    job.timestamp = datetime.now()
-
-                if msg["command"] == "get_job":
-                    # serve job for display
-                    return_msg = job
-                else:
-                    # update host name
-                    job.host_name = msg["host_name"]
-
-
-            else:
-                # run check
-                self.check_if_alive()
-
-                if msg["command"] == "get_jobs":
-                    # serve list of jobs for display
-                    return_msg = self.jobs
-
-
-            # send back compressed response
-            self.socket.send(zdumps(return_msg))
-
-        local_heart.terminate()
-
-
-    def check_if_alive(self):
-        """
-        check if jobs are alive and determine cause of death if not
-        """
-
-
-        for job in self.jobs:
-
-            # noting was returned yet
-            if job.ret == None:
-
-                # exclude first-timers
-                if job.timestamp != None:
-
-                    # only check heart-beats if there was a long delay
-                    current_time = datetime.now()
-                    time_delta = current_time - job.timestamp
-
-                    if time_delta.seconds > CFG["MAX_TIME_BETWEEN_HEARTBEATS"]:
-
-                        # could be out-of-memory
-                        if job.is_out_of_memory():
-                            print "job was out of memory"
-                            job.cause_of_death = "out_of_memory"
-
-                        else:
-                            #TODO: check if node is reachable
-                            #TODO: check if network hangs, wait some more if so
-                            print "job died for unknown reason"
-                            job.cause_of_death = "unknown"
-
-
-            else:
-
-                # could have been an exception, we check right away
-                if job.is_out_of_memory():
-                    print "job was out of memory"
-                    job.cause_of_death = "out_of_memory"
-                    job.ret = None
-
-                elif isinstance(job.ret, Exception):
-                    print "job encountered exception, will not resubmit"
-                    job.cause_of_death = "exception"
-                    send_error_mail(job)
-                    job.ret = "job dead (with non-memory related exception)"
-
-
-            # attempt to resubmit
-            if job.cause_of_death == "out_of_memory" or job.cause_of_death == "unknown":
-
-                print "creating error report"
-
-                # send report
-                send_error_mail(job)
-
-                # try to resubmit
-                if not handle_resubmit(self.session_id, job):
-                    print "giving up on job"
-                    job.ret = "job dead"
-
-                # break out of loop to avoid too long delay
-                break
-
-
-
-    def all_jobs_done(self):
-        """
-        checks for all jobs if they are done
-        """
-
-        for job in self.jobs:
-            # exceptions will be handled in check_if_alive
-            if job.ret == None or isinstance(job.ret, Exception):
-                return False
-
-        return True
-
-
-
-
-
-def handle_resubmit(session_id, job):
-    """
-    heuristic to determine if the job should be resubmitted
-
-    side-effect:
-    job.num_resubmits incremented
-    job.h_vmem will be doubled, if cause was 'out_of_memory'
-    """
-
-
-    # reset some fields
-    job.timestamp = None
-    job.heart_beat = None
-
-
-    if job.num_resubmits < CFG["NUM_RESUBMITS"]:
-
-        print "looks like job died an unnatural death, resubmitting (previous resubmits = %i)" % (job.num_resubmits)
-
-        if job.cause_of_death == "out_of_memory":
-            # increase memory
-            job.alter_allocated_memory(CFG["OUT_OF_MEM_INCREASE"])
-
-        else:
-
-            # remove node from white_list
-            node_name = "all.q@" + job.host_name
-            if job.white_list.count(node_name) > 0:
-                job.white_list.remove(node_name)
-
-        # increment number of resubmits
-        job.num_resubmits += 1
-        job.cause_of_death = ""
-
-        resubmit(session_id, job)
-
-        return True
-
-    else:
-
-        return False
-
-
-def resubmit(session_id, job):
-    """
-    encapsulate creation of session for multiprocessing
-    """
-
-    print "starting resubmission process"
-
-    # append to session
-    session = drmaa.Session()
-    session.initialize(session_id)
-
-    # try to kill off old job
-    try:
-        # TODO: ask SGE more questions about job status etc (maybe re-integrate StatusChecker)
-        # TODO: write unit test for this
-
-        session.control(job.jobid, drmaa.JobControlAction.TERMINATE)
-        print "zombie job killed"
-    except Exception as detail:
-        print "could not kill job with SGE id", job.jobid
-        print detail
-
-    # create new job
-    append_job_to_session(session, job)
-    session.exit()
-
+    return job_outputs
 
 
 #####################################################################
 # MapReduce Interface
 #####################################################################
-
-
-
-def pg_map(f, args_list, param=None, local=False, maxNumThreads=1, mem="5G"):
+def pg_map(f, args_list, cleanup=True, mem_free="1G", name='pythongrid_job', num_slots=1, db_dir='/home/nlp-text/dynamic/dblanchard/pythongrid_dbs/',
+           temp_dir='/scratch/', white_list=None, queue='nlp.q'):
     """
     provides a generic map function
+    @param f: The function to map on args_list
+    @type f: C{function}
+    @param args_list: List of arguments to pass to f
+    @type args_list: C{args_list}
+    @param cleanup: flag that determines the cleanup of input and log file
+    @type cleanup: boolean
+    @param mem_free: Estimate of how much memory each job will need (for scheduling)
+    @type mem_free: C{basestring}
+    @param name: Base name to give each job (will have number add to end)
+    @type name: C{basestring}
+    @param num_slots: Number of slots each job should use.
+    @type num_slots: C{int}
+    @param db_dir: Directory to store the temporary sqlite database used behind the scenes. Must be on the SAN so that all nodes can access it.
+    @type db_dir: C{basestring}
+    @param temp_dir: Local temporary directory for storing output for an individual job.
+    @type temp_dir: C{basestring}
+    @param white_list: If specified, limit nodes used to only those in list.
+    @type white_list: C{list} of C{basestring}
+    @param queue: The SGE queue to use for scheduling.
+    @type queue: C{basestring}
     """
 
-    jobs = []
-
     # construct jobs
-    for args in args_list:
-        job = KybJob(f, [args], param=param)
-        job.h_vmem = mem
-
-        jobs.append(job)
-
+    jobs = [Job(f, [args], cleanup=cleanup, mem_free=mem_free, name='{}{}'.format(name, job_num), num_slots=num_slots, db_dir=db_dir, queue=queue)
+            for job_num, args in enumerate(args_list)]
 
     # process jobs
-    processed_jobs = process_jobs(jobs, local=local, maxNumThreads=maxNumThreads)
+    job_results = process_jobs(jobs, db_dir=db_dir, temp_dir=temp_dir, white_list=white_list)
 
-    # store results
-    results = [job.ret for job in processed_jobs]
+    assert(len(jobs) == len(job_results))
 
-    assert(len(jobs) == len(processed_jobs))
-    # make sure results are in the same order
-    # TODO make reasonable check
-    #for idx in range(len(jobs)):
-    #    assert(jobs[idx].args == processed_jobs[idx].args)
-
-    return results
+    return job_results
 
 
 #####################################################################
 # Data persistence
 #####################################################################
+def _clean_path(path):
+    ''' Replace all weird SAN paths with normal paths '''
+
+    path = re.sub(r'/\.automount/\w+/SAN/NLP/(\w+)-(dynamic|static)', r'/home/nlp-\1/\2', path)
+    path = re.sub(r'/\.automount/[^/]+/SAN/Research/HomeResearch', '/home/research', path)
+    return path
 
 
-
-def zdumps(obj):
+def _zsave_db(obj, con, table, job_num):
     """
-    dumps pickleable object into bz2 compressed string
-    """
-    return bz2.compress(cPickle.dumps(obj, cPickle.HIGHEST_PROTOCOL), 9)
+    Saves an object/function as bz2-compressed pickled data in an sqlite database table
 
-
-def zloads(zstr):
-    """
-    loads pickleable object from bz2 compressed string
-    """
-    return cPickle.loads(bz2.decompress(zstr))
-
-
-def save(filename, myobj):
-    """
-    Save myobj to filename using pickle
-    """
-    try:
-        f = gzip.GzipFile(filename, 'wb')
-    except IOError, details:
-        sys.stderr.write('File ' + filename + ' cannot be written\n')
-        sys.stderr.write(details)
-        return
-
-    cPickle.dump(myobj, f, protocol=2)
-    f.close()
-
-
-def load(filename):
-    """
-    Load from filename using pickle
-    """
-    try:
-        f = gzip.GzipFile(filename, 'rb')
-    except IOError, details:
-        sys.stderr.write('File ' + filename + ' cannot be read\n')
-        sys.stderr.write(details)
-        return
-
-    myobj = cPickle.load(f)
-    f.close()
-    return myobj
-
-
-################################################################
-#      Some handy functions
-################################################################
-
-
-def send_error_mail(job):
-    """
-    send out diagnostic email
+    @param obj: The object/function to store.
+    @type obj: C{object} or C{function}
+    @param con: An open connection to the sqlite database
+    @type con: C{sqlite3.Connection}
+    @param table: The name of the table to retrieve data from.
+    @type table: C{basestring}
+    @param job_num: The ID of the job this data is for.
+    @type job_num: C{int}
     """
 
+    # Pickle the obj
+    pickled_data = bz2.compress(pickle.dumps(obj, pickle.HIGHEST_PROTOCOL), 9)
 
-    # create message
-    msg = MIMEMultipart()
-    msg["subject"] = "PYTHONGRID error {}".format(job.name)
-    msg["From"] = "pythongrid"
-    msg["To"] = "pythongrid user"
-
-
-    # compose error message
-    body_text = ""
-
-    body_text += "job {}".format(job.name) + "\n"
-    body_text += "last timestamp: {}".format(job.timestamp) + "\n"
-    body_text += "num_resubmits: {}".format(job.num_resubmits) + "\n"
-    body_text += "cause_of_death: {}".format(job.cause_of_death) + "\n"
-
-    if job.heart_beat:
-        body_text += "last memory usage: {}".format(job.heart_beat["memory"]) + "\n"
-        body_text += "last cpu load: {}".format(job.heart_beat["cpu_load"]) + "\n"
-
-    body_text += "requested memory: {}".format(job.h_vmem) + "\n"
-    body_text += "host: {}".format(job.host_name) + "\n\n"
-
-    if isinstance(job.ret, Exception):
-        body_text += "job encountered exception: {}".format(job.ret) + "\n"
-        body_text += "stacktrace: {}".format(job.exception) + "\n\n"
-
-    print body_text
-
-    body_msg = MIMEText(body_text)
-    msg.attach(body_msg)
+    # Insert the pickled data into the database
+    with con:
+        con.execute("INSERT INTO {}(id, data) VALUES (:id, :data)".format(table), {"id": job_num, "data": sqlite3.Binary(pickled_data)})
 
 
-    # attach log file
-    if job.heart_beat:
-        log_file = open(job.heart_beat["log_file"], "r")
-        log_file_attachement = MIMEText(log_file.read())
-        log_file.close()
-
-        msg.attach(log_file_attachement)
-
-
-    # if matplotlib is installed
-    if MATPLOTLIB_PRESENT:
-
-        #TODO: plot to cstring directly (some code is there)
-        #imgData = cStringIO.StringIO()
-        #pylab.savefig(imgData, format='png')
-
-        # rewind the data
-        #imgData.seek(0)
-        #pylab.savefig(imgData, format="png")
-
-        # attack mem plot
-        img_mem_fn = "/tmp/" + job.name + "_mem.png"
-
-        pylab.figure()
-        pylab.plot(job.track_mem, "-o")
-        pylab.title("memory usage")
-        pylab.savefig(img_mem_fn)
-
-        img_mem = open(img_mem_fn, "rb")
-        img_mem_attachement = MIMEImage(img_mem.read())
-        img_mem.close()
-
-        msg.attach(img_mem_attachement)
-
-
-        # attach cpu plot
-        img_cpu_fn = "/tmp/" + job.name + "_cpu.png"
-
-        pylab.figure()
-        pylab.plot(job.track_cpu, "-o")
-        pylab.title("cpu load")
-        pylab.savefig(img_cpu_fn)
-
-        img_cpu = open(img_cpu_fn, "rb")
-        img_cpu_attachement = MIMEImage(img_cpu.read())
-        img_cpu.close()
-
-        msg.attach(img_cpu_attachement)
-
-
-    # send out report
-    #TODO: take this from config file, examine problem with msg length
-  #   """
-  # File "/fml/ag-raetsch/home/cwidmer/svn/tools/python/pythongrid/pythongrid.py", line 1246, in send_error_mail
-  #   s.sendmail("cwidmer@tuebingen.mpg.de", "ckwidmer@gmail.com", msg.as_string())
-  # File "/usr/lib/python2.6/smtplib.py", line 713, in sendmail
-  #   raise SMTPDataError(code, resp)
-  #   smtplib.SMTPDataError: (552, 'message line is too long')
-
-  #   """
-
-    s = smtplib.SMTP(CFG["SMTPSERVER"])
-    s.sendmail(CFG["ERROR_MAIL_SENDER"], CFG["ERROR_MAIL_RECIPIENT"], msg.as_string()[0:CFG["MAX_MSG_LENGTH"]])
-    s.quit()
-
-
-
-
-def _VmB(VmKey, pid):
+def _zload_db(con, table, job_num):
     """
-    get various mem usage properties of process with id pid in MB
+    Loads bz2-compressed pickled object from sqlite database table
+
+    @param con: An open connection to the sqlite database
+    @type con: C{sqlite3.Connection}
+    @param table: The name of the table to retrieve data from.
+    @type table: C{basestring}
+    @param job_num: The ID of the job this data is for.
+    @type job_num: C{int}
     """
-
-    _proc_status = '/proc/%d/status' % pid
-
-    _scale = {'kB': 1.0/1024.0, 'mB': 1.0,
-              'KB': 1.0/1024.0, 'MB': 1.0}
-
-     # get pseudo file  /proc/<pid>/status
-    try:
-        t = open(_proc_status)
-        v = t.read()
-        t.close()
-    except:
-        return 0.0  # non-Linux?
-     # get VmKey line e.g. 'VmRSS:  9999  kB\n ...'
-    i = v.index(VmKey)
-    v = v[i:].split(None, 3)  # whitespace
-    if len(v) < 3:
-        return 0.0  # invalid format?
-     # convert Vm value to bytes
-    return float(v[1]) * _scale[v[2]]
-
-
-def get_memory_usage(pid):
-    """
-    return memory usage in Mb.
-    """
-
-    return _VmB('VmSize:', pid)
-
-
-def get_cpu_load(pid):
-    """
-    return cpu usage of process
-    """
-
-    command = "ps h -o pcpu -p %d" % (pid)
-
-    try:
-        ps_pseudofile = os.popen(command)
-        info = ps_pseudofile.read()
-        ps_pseudofile.close()
-
-        cpu_load = info.strip()
-    except Exception as detail:
-        print "getting cpu info failed:", detail
-        cpu_load = "non-linux?"
-
-    return cpu_load
-
-
-def argsort(seq):
-    """
-    argsort in basic python
-    """
-
-    # http://stackoverflow.com/questions/3071415/efficient-method-to-calculate-the-rank-vector-of-a-list-in-python
-    return sorted(range(len(seq)), key=seq.__getitem__)
-
+    with con:
+        cur = con.cursor()
+        cur.execute('SELECT data FROM {} WHERE id={}'.format(table, job_num))
+        pickled_data = cur.fetchone()[0]
+    return pickle.loads(bz2.decompress(str(pickled_data)))
 
 
 ################################################################
 #      The following code will be executed on the cluster      #
 ################################################################
-
-
-def heart_beat(job_id, address, parent_pid=-1, log_file="", wait_sec=45):
+def _run_job(pickle_db, job_num):
     """
-    will send reponses to the server with
-    information about the current state of
-    the process
+    Execute the pickled job and produce pickled output (all in the SQLite3 database).
+
+    @param pickle_db: Path to SQLite3 database that must contain tables called "job" and "output" where both contains two columns: "id" and "data"
+                      (corresponding to the IDs and the actual job/output for each job).
+    @type pickle_db: C{basestring}
+    @param job_num: The index for this job's content in the job and output tables.
+    @type job_num: C{int}
+
     """
+    con = sqlite3.connect(pickle_db)
 
-    while True:
-        status = get_job_status(parent_pid)
-        status["log_file"] = log_file
-        send_zmq_msg(job_id, "heart_beat", status, address)
-        time.sleep(wait_sec)
+    print("Loading job...", end="", file=sys.stderr)
+    sys.stderr.flush()
+    job = _zload_db(con, 'job', job_num)
+    print("done", file=sys.stderr)
 
-
-def get_job_status(parent_pid):
-    """
-    script to determine the status of the current
-    worker and its machine (currently not cross-platform)
-    """
-
-    status_container = {}
-
-    if parent_pid != -1:
-        status_container["memory"] = get_memory_usage(parent_pid)
-        status_container["cpu_load"] = get_cpu_load(parent_pid)
-
-    return status_container
-
-
-def run_job(job_id, address):
-    """
-    This is the code that is executed on the cluster side.
-
-    @param job_id: unique id of job
-    @type job_id: string
-    """
-
-    wait_sec = random.randint(0, 5)
-    print "waiting %i seconds before starting" % (wait_sec)
-    time.sleep(wait_sec)
-
-    try:
-        job = send_zmq_msg(job_id, "fetch_input", None, address)
-    except Exception as e:
-        # here we will catch errors caused by pickled objects
-        # of classes defined in modules not in PYTHONPATH
-        print e
-
-        # send back exception
-
-        ## This doesn't seem to work (either the old version or the new one)
-        thank_you_note = send_zmq_msg(job_id, "store_output", e, address)
-        print thank_you_note
-
-        return
-
-
-    print "input arguments loaded, starting computation", job.args
-
-    parent_pid = os.getpid()
-
-    # create heart beat process
-    heart = multiprocessing.Process(target=heart_beat, args=(job_id, address, parent_pid, job.log_stdout_fn, CFG["HEARTBEAT_FREQUENCY"]))
-
-    print "starting heart beat"
-
-    heart.start()
-
-    # change working directory
-    print "changing working directory"
-    if 1:
-        if job.working_dir is not None:
-            print "Changing working directory: %s" % job.working_dir
-            os.chdir(job.working_dir)
-
-    print "executing job"
-
-    # run job
+    print("Running job...", end="", file=sys.stderr)
+    sys.stderr.flush()
     job.execute()
+    print("done", file=sys.stderr)
 
-    # send back result
-    thank_you_note = send_zmq_msg(job_id, "store_output", job, address)
-    print thank_you_note
+    print("Writing output to database for job {}...".format(job_num), end="", file=sys.stderr)
+    sys.stderr.flush()
+    _zsave_db(job.ret, con, 'output', job_num)
+    print("done", file=sys.stderr)
 
-    # stop heartbeat
-    heart.terminate()
+    con.close()
 
 
-
-def send_zmq_msg(job_id, command, data, address):
+def main():
     """
-    simple code to send messages back to host
-    (and get a reply back)
-    """
-
-    context = zmq.Context()
-    zsocket = context.socket(zmq.REQ)
-    zsocket.connect(address)
-
-    host_name = socket.gethostname()
-    ip_address = socket.gethostbyname(host_name)
-
-    msg_container = {}
-    msg_container["job_id"] = job_id
-    msg_container["host_name"] = host_name
-    msg_container["ip_address"] = ip_address
-    msg_container["command"] = command
-    msg_container["data"] = data
-
-    msg_string = zdumps(msg_container)
-
-    zsocket.send(msg_string)
-    msg = zloads(zsocket.recv())
-
-    return msg
-
-
-class Usage(Exception):
-    """
-    Simple Exception for cmd-line user-interface.
+    Parse the command line inputs and call _run_job
     """
 
-    def __init__(self, msg):
-        """
-        Constructor of simple Exception.
+    # Get command line arguments
+    parser = argparse.ArgumentParser(description="This wrapper script will run a pickled Python function on some pickled data in a sqlite3 database, " +
+                                                 "and write the results back to the database. You almost never want to run this yourself.",
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+                                     conflict_handler='resolve')
+    parser.add_argument('pickle_db', help='SQLite3 database containing the pickled job, the input data, and a table for output data.')
+    parser.add_argument('job_number', help='Which job number should be run. Dictates which input data is read from database and where output data is stored.', type=int)
+    parser.add_argument('module_dir', help='Directory that contains module containing pickled function. This will get added to PYTHONPATH temporarily.')
+    args = parser.parse_args()
 
-        @param msg: exception message
-        @type msg: string
-        """
+    print("Appended {} to PYTHONPATH".format(args.module_dir), file=sys.stderr)
+    sys.path.append(_clean_path(args.module_dir))
 
-        self.msg = msg
+    # Process the database and get job started
+    _run_job(args.pickle_db, args.job_number)
 
-
-def main(argv=None):
-    """
-    Parse the command line inputs and call run_job
-
-    @param argv: list of arguments
-    @type argv: list of strings
-    """
-
-
-    if argv is None:
-        argv = sys.argv
-
-    try:
-        try:
-            opts, args = getopt.getopt(argv[1:], "h", ["help"])
-            run_job(args[0], args[1])
-        except getopt.error, msg:
-            raise Usage(msg)
-
-
-    except Usage as err:
-        print >> sys.stderr, err.msg
-        print >> sys.stderr, "for help use --help"
-
-        return 2
 
 if __name__ == "__main__":
     main()
