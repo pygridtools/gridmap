@@ -7,9 +7,11 @@
 #
 # Written (W) 2008-2012 Christian Widmer
 # Copyright (C) 2008-2012 Max-Planck-Society
+#
+# Modified to use new API by Daniel Blanchard, November 2012
 
 
-from pythongrid import KybJob, process_jobs
+from pythongrid import Job, process_jobs
 
 import time
 
@@ -47,51 +49,19 @@ def make_jobs():
     # create job objects
     for arg in inputvec:
 
-        job = KybJob(compute_factorial, arg) 
-        job.h_vmem="1000M"
-        
+        job = Job(compute_factorial, arg)
+
         jobs.append(job)
-        
+
 
     return jobs
-
-
-def run_example_local_multithreading():
-    """
-    run a set of jobs on local machine using several cores
-    """
-
-    print "====================================="
-    print "======  Local Multithreading  ======="
-    print "====================================="
-    print ""
-    print ""
-
-    print "generating function jobs"
-
-    functionJobs = make_jobs()
-
-    # KybJob object start out with an empty ret field, which is only filled after execution
-    print "output ret field in each job before multithreaded computation"
-    for (i, job) in enumerate(functionJobs):
-        print "Job #", i, "- ret: ", job.ret
-
-    print ""
-    print "executing jobs on local machine using 3 threads"
-
-    processedFunctionJobs = process_jobs(functionJobs, local=True, maxNumThreads=3)
-
-    print "ret fields AFTER execution on local machine"
-    for (i, job) in enumerate(processedFunctionJobs):
-        print "Job #", i, "- ret: ", str(job.ret)[0:10]
- 
 
 
 def run_example_cluster():
     """
     run a set of jobs on cluster
     """
-    
+
     print ""
     print ""
     print "====================================="
@@ -110,11 +80,11 @@ def run_example_cluster():
     print "sending function jobs to cluster"
     print ""
 
-    processedFunctionJobs = process_jobs(functionJobs)
+    job_outputs = process_jobs(functionJobs, temp_dir='/home/nlp-text/dynamic/dblanchard/pythongrid_dbs/')
 
     print "ret fields AFTER execution on cluster"
-    for (i, job) in enumerate(processedFunctionJobs):
-        print "Job #", i, "- ret: ", str(job.ret)[0:10]
+    for (i, result) in enumerate(job_outputs):
+        print "Job {}- ret: {}".format(i, result)
 
 
 
@@ -122,9 +92,6 @@ def main(argv=None):
     """
     main function to set up example
     """
-
-    # first we use local multithreading
-    run_example_local_multithreading()
 
     # next we execute function on the cluster
     run_example_cluster()

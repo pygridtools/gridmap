@@ -7,6 +7,9 @@
 #
 # Written (W) 2010-2012 Christian Widmer
 # Copyright (C) 2010-2012 Max-Planck-Society
+#
+# Modified to use new API by Daniel Blanchard, November 2012
+
 
 """
 pythongrid provides a high level map interface "pg_map" that can
@@ -37,11 +40,8 @@ def runExample():
     """
 
     args = [1, 2, 4, 8, 16]
-    local = False
-    max_num_threads = 3
-    param = {"h_vmem": "1G"}
 
-    intermediate_results = pg_map(computeFactorial, args, param, local, max_num_threads)
+    intermediate_results = pg_map(computeFactorial, args, cleanup=False, temp_dir='/home/nlp-text/dynamic/dblanchard/pythongrid_dbs/')
 
     print "reducing result"
     for i, ret in enumerate(intermediate_results):
