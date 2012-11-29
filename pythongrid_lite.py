@@ -45,9 +45,10 @@ class Job(object):
     """
 
     __slots__ = ('_f', 'args', 'jobid', 'kwlist', 'cleanup', 'ret', 'exception', 'environment', 'replace_env', 'working_dir', 'num_slots', 'mem_free', 'white_list', 'path',
-                 'db_dir', 'name')
+                 'db_dir', 'name', 'queue')
 
-    def __init__(self, f, args, kwlist=None, cleanup=True, mem_free="1G", name='pythongrid_job', num_slots=1, db_dir='/home/nlp-text/dynamic/dblanchard/pythongrid_dbs/'):
+    def __init__(self, f, args, kwlist=None, cleanup=True, mem_free="1G", name='pythongrid_job', num_slots=1, db_dir='/home/nlp-text/dynamic/dblanchard/pythongrid_dbs/',
+                 queue='nlp.q'):
         """
         constructor of Job
 
@@ -67,6 +68,8 @@ class Job(object):
         @type num_slots: C{int}
         @param db_dir: Directory to store the temporary sqlite database used behind the scenes. Must be on the SAN so that all nodes can access it.
         @type db_dir: C{basestring}
+        @param queue: SGE queue to schedule job on.
+        @type queue: C{basestring}
         """
 
         self.path = None
@@ -86,6 +89,7 @@ class Job(object):
         self.white_list = []
         self.db_dir = db_dir
         self.name = name
+        self.queue = queue
 
     @property
     def function(self):
@@ -155,6 +159,8 @@ class Job(object):
             ret += " -pe smp {}".format(self.num_slots)
         if self.white_list:
             ret += " -l h={}".format('|'.join(self.white_list))
+        if self.queue:
+            ret += " -q {}".format(self.queue)
 
         return ret
 
@@ -299,7 +305,7 @@ def _collect_jobs(sid, jobids, joblist, con, db_filename, temp_dir='/scratch/', 
     return job_output_list
 
 
-def process_jobs(jobs, db_dir='/home/nlp-text/dynamic/dblanchard/pythongrid_dbs/', temp_dir='/scratch/', white_list=None):
+def process_jobs(jobs, db_dir='/home/nlp-text/dynamic/dblanchard/pythongrid_dbs/', temp_dir='/scratch/', wait=True, white_list=None):
     """
     Take a list of jobs and process them on the cluster.
 
@@ -307,6 +313,8 @@ def process_jobs(jobs, db_dir='/home/nlp-text/dynamic/dblanchard/pythongrid_dbs/
     @type db_dir: C{basestring}
     @param temp_dir: Local temporary directory for storing output for an individual job.
     @type temp_dir: C{basestring}
+    @param wait: Should we wait for jobs to finish? (Should only be false if the function you're running doesn't return anything)
+    @type wait: C{bool}
     @param white_list: If specified, limit nodes used to only those in list.
     @type white_list: C{list} of C{basestring}
     """
@@ -331,7 +339,7 @@ def process_jobs(jobs, db_dir='/home/nlp-text/dynamic/dblanchard/pythongrid_dbs/
     sids, jobids = _submit_jobs(jobs, db_filename, white_list=white_list, temp_dir=temp_dir)
 
     # Retrieve outputs
-    job_outputs = _collect_jobs(sids, jobids, jobs, con, db_filename, temp_dir=temp_dir)
+    job_outputs = _collect_jobs(sids, jobids, jobs, con, db_filename, temp_dir=temp_dir, wait=wait)
 
     # Close database connection
     con.close()
@@ -343,7 +351,7 @@ def process_jobs(jobs, db_dir='/home/nlp-text/dynamic/dblanchard/pythongrid_dbs/
 # MapReduce Interface
 #####################################################################
 def pg_map(f, args_list, cleanup=True, mem_free="1G", name='pythongrid_job', num_slots=1, db_dir='/home/nlp-text/dynamic/dblanchard/pythongrid_dbs/',
-           temp_dir='/scratch/', white_list=None):
+           temp_dir='/scratch/', white_list=None, queue='nlp.q'):
     """
     provides a generic map function
     @param f: The function to map on args_list
@@ -364,10 +372,13 @@ def pg_map(f, args_list, cleanup=True, mem_free="1G", name='pythongrid_job', num
     @type temp_dir: C{basestring}
     @param white_list: If specified, limit nodes used to only those in list.
     @type white_list: C{list} of C{basestring}
+    @param queue: The SGE queue to use for scheduling.
+    @type queue: C{basestring}
     """
 
     # construct jobs
-    jobs = [Job(f, [args], cleanup=cleanup, mem_free=mem_free, name='{}{}'.format(name, job_num), num_slots=num_slots, db_dir=db_dir) for job_num, args in enumerate(args_list)]
+    jobs = [Job(f, [args], cleanup=cleanup, mem_free=mem_free, name='{}{}'.format(name, job_num), num_slots=num_slots, db_dir=db_dir, queue=queue)
+            for job_num, args in enumerate(args_list)]
 
     # process jobs
     job_results = process_jobs(jobs, db_dir=db_dir, temp_dir=temp_dir, white_list=white_list)
