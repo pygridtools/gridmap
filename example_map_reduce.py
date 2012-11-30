@@ -40,7 +40,7 @@ def main():
 
     args = [1, 2, 4, 8, 16]
 
-    intermediate_results = pg_map(computeFactorial, args)
+    intermediate_results = pg_map(computeFactorial, args, quiet=False)
 
     print("reducing result")
     for i, ret in enumerate(intermediate_results):

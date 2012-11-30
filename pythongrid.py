@@ -233,8 +233,8 @@ def _append_job_to_session(session, job, uniq_id, job_num, temp_dir='/scratch/',
         # only consider env vars from shell
         jt.jobEnvironment = shell_env
 
-    jt.remoteCommand = 'python'  # This has to be python calling the script, because otherwise it uses the .pyc from previous runs and the jobs never runs. I have no idea why.
-    jt.args = [_clean_path(os.path.abspath(__file__)), '{}'.format(uniq_id), '{}'.format(job_num), job.path, temp_dir]
+    jt.remoteCommand = re.sub(r'\.pyc$', '.py', _clean_path(os.path.abspath(__file__)))  # Make sure to use the .py and not the .pyc version of the module.
+    jt.args = ['{}'.format(uniq_id), '{}'.format(job_num), job.path, temp_dir]
     jt.nativeSpecification = job.native_specification
     jt.outputPath = ":" + temp_dir
     jt.errorPath = ":" + temp_dir

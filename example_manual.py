@@ -63,29 +63,21 @@ def main():
     run a set of jobs on cluster
     """
 
-    print("")
-    print("")
     print("=====================================")
     print("========   Submit and Wait   ========")
     print("=====================================")
     print("")
-    print("")
 
     functionJobs = make_jobs()
 
-    print("output ret field in each job before sending it onto the cluster")
-    for (i, job) in enumerate(functionJobs):
-        print("Job #", i, "- ret: ", job.ret)
-
-    print("")
     print("sending function jobs to cluster")
     print("")
 
-    job_outputs = process_jobs(functionJobs, temp_dir='/home/nlp-text/dynamic/dblanchard/pythongrid_dbs/')
+    job_outputs = process_jobs(functionJobs)
 
-    print("ret fields AFTER execution on cluster")
+    print("results from each job")
     for (i, result) in enumerate(job_outputs):
-        print("Job {}- ret: {}".format(i, result))
+        print("Job {}- result: {}".format(i, result))
 
 
 if __name__ == "__main__":
