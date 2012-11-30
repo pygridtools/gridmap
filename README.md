@@ -7,4 +7,4 @@ This is a fork of a fairly unmaintained project on Google Code. It's much more r
 
 For some examples of how to use it, check out example_map_reduce.py (for a simple example of how you can map a function onto the cluster) and example_manual.py (for an example of how you can create list of jobs yourself).
 
-
+The PyDoc is available here: http://nlp.research.ets.org/~dnapolitano/pythongrid/
