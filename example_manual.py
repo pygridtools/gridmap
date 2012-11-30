@@ -10,29 +10,30 @@
 #
 # Modified to use new API by Daniel Blanchard, November 2012
 
+"""
+In addition to the high level map interface "pg_map", pythongrid also allows one to
+easily create a list of jobs (that potentially run different functions) and execute
+them on the cluster as well.
+"""
+
+from __future__ import print_function, unicode_literals
 
 from pythongrid import Job, process_jobs
-
-import time
 
 
 def compute_factorial(n):
     """
     computes factorial of n
     """
-
-    time.sleep(5)
-
     ret = 1
     for i in xrange(n):
-        ret=ret*(i+1)
-
+        ret = ret * (i + 1)
     return ret
 
 
 def make_jobs():
     """
-    creates a list of KybJob objects,
+    creates a list of Job objects,
     which carry all information needed
     for a function to be executed on SGE:
     - function object
@@ -44,57 +45,44 @@ def make_jobs():
     inputvec = [[3], [5], [10], [20]]
 
     # create empty job vector
-    jobs=[]
+    jobs = []
 
     # create job objects
     for arg in inputvec:
-
         job = Job(compute_factorial, arg)
-
         jobs.append(job)
-
 
     return jobs
 
 
-def run_example_cluster():
+def main():
     """
     run a set of jobs on cluster
     """
 
-    print ""
-    print ""
-    print "====================================="
-    print "========   Submit and Wait   ========"
-    print "====================================="
-    print ""
-    print ""
+    print("")
+    print("")
+    print("=====================================")
+    print("========   Submit and Wait   ========")
+    print("=====================================")
+    print("")
+    print("")
 
     functionJobs = make_jobs()
 
-    print "output ret field in each job before sending it onto the cluster"
+    print("output ret field in each job before sending it onto the cluster")
     for (i, job) in enumerate(functionJobs):
-        print "Job #", i, "- ret: ", job.ret
+        print("Job #", i, "- ret: ", job.ret)
 
-    print ""
-    print "sending function jobs to cluster"
-    print ""
+    print("")
+    print("sending function jobs to cluster")
+    print("")
 
     job_outputs = process_jobs(functionJobs, temp_dir='/home/nlp-text/dynamic/dblanchard/pythongrid_dbs/')
 
-    print "ret fields AFTER execution on cluster"
+    print("ret fields AFTER execution on cluster")
     for (i, result) in enumerate(job_outputs):
-        print "Job {}- ret: {}".format(i, result)
-
-
-
-def main(argv=None):
-    """
-    main function to set up example
-    """
-
-    # next we execute function on the cluster
-    run_example_cluster()
+        print("Job {}- ret: {}".format(i, result))
 
 
 if __name__ == "__main__":

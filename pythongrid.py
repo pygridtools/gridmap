@@ -38,10 +38,10 @@ import MySQLdb as mysql
 
 class Job(object):
     """
-    Central entity that wraps a function and its data. Basically,
-    a job consists of a function, its argument list, its
-    keyword list and a field "ret" which is filled, when
-    the execute method gets called
+    Central entity that wraps a function and its data. Basically, a job consists of a function, its argument list, its keyword list and a field "ret" which is filled, when
+    the execute method gets called.
+
+    @note: This can only be used to wrap picklable functions (i.e., those that are defined at the module or class level).
     """
 
     __slots__ = ('_f', 'args', 'jobid', 'kwlist', 'cleanup', 'ret', 'exception', 'environment', 'replace_env', 'working_dir', 'num_slots', 'mem_free', 'white_list', 'path',
@@ -49,7 +49,7 @@ class Job(object):
 
     def __init__(self, f, args, kwlist=None, cleanup=True, mem_free="1G", name='pythongrid_job', num_slots=1, queue='nlp.q'):
         """
-        constructor of Job
+        Initializes a new Job.
 
         @param f: a function, which should be executed.
         @type f: function
@@ -374,6 +374,7 @@ def process_jobs(jobs, temp_dir='/scratch/', wait=True, white_list=None, quiet=T
 def pg_map(f, args_list, cleanup=True, mem_free="1G", name='pythongrid_job', num_slots=1, temp_dir='/scratch/', white_list=None, queue='nlp.q', quiet=True):
     """
     Maps a function onto the cluster.
+    @note: This can only be used with picklable functions (i.e., those that are defined at the module or class level).
 
     @param f: The function to map on args_list
     @type f: C{function}

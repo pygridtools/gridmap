@@ -18,8 +18,8 @@ be used interchangably with python's built in map command.
 This example demonstrates how to use that interface.
 """
 
-import sys
-import getopt
+from __future__ import print_function, unicode_literals
+
 from pythongrid import pg_map
 
 
@@ -27,38 +27,24 @@ def computeFactorial(n):
     """
     computes factorial of n
     """
-    ret=1
+    ret = 1
     for i in xrange(n):
-        ret=ret*(i+1)
-
+        ret = ret * (i + 1)
     return ret
 
 
-def runExample():
+def main():
     """
     execute map example
     """
 
     args = [1, 2, 4, 8, 16]
 
-    intermediate_results = pg_map(computeFactorial, args, cleanup=False, temp_dir='/home/nlp-text/dynamic/dblanchard/pythongrid_dbs/')
+    intermediate_results = pg_map(computeFactorial, args)
 
-    print "reducing result"
+    print("reducing result")
     for i, ret in enumerate(intermediate_results):
-        print "f(%i) = %i" % (args[i], ret)
-
-
-def main(argv=None):
-    if argv is None:
-        argv = sys.argv
-
-    try:
-        opts, args = getopt.getopt(argv[1:], "h", ["help"])
-        runExample()
-
-    except getopt.error, msg:
-        print msg
-
+        print("f({}) = {}".format(args[i], ret))
 
 
 if __name__ == "__main__":
