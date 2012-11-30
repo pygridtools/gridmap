@@ -24,25 +24,17 @@ from __future__ import print_function, unicode_literals
 
 import argparse
 import bz2
-try:
-    import cPickle as pickle
-except ImportError:
-    import pickle
+import cPickle as pickle
 import inspect
 import os
 import os.path
 import re
 import sys
+import traceback
 import uuid
 
 import drmaa
 import MySQLdb as mysql
-
-# Make this work in Python 2 or 3
-try:
-    xrange(5)
-except NameError:
-    xrange = range
 
 
 class Job(object):
@@ -242,7 +234,7 @@ def _append_job_to_session(session, job, uniq_id, job_num, temp_dir='/scratch/',
         jt.jobEnvironment = shell_env
 
     jt.remoteCommand = _clean_path(os.path.abspath(__file__))
-    jt.args = ['{}'.format(uniq_id), '{}'.format(job_num), job.path]
+    jt.args = ['{}'.format(uniq_id), '{}'.format(job_num), job.path, temp_dir]
     jt.nativeSpecification = job.native_specification
     jt.outputPath = ":" + temp_dir
     jt.errorPath = ":" + temp_dir
@@ -295,8 +287,8 @@ def _collect_jobs(sid, jobids, joblist, con, uniq_id, temp_dir='/scratch/', wait
     job_output_list = []
     for ix, job in enumerate(joblist):
 
-        log_stdout_fn = (os.path.join(temp_dir, job.name + '.o' + jobids[ix]))
-        log_stderr_fn = (os.path.join(temp_dir, job.name + '.e' + jobids[ix]))
+        log_stdout_fn = os.path.join(temp_dir, job.name + '.o' + jobids[ix])
+        log_stderr_fn = os.path.join(temp_dir, job.name + '.e' + jobids[ix])
 
         try:
             job_output = _zload_db(con, 'output{}'.format(uniq_id), ix)
@@ -308,21 +300,15 @@ def _collect_jobs(sid, jobids, joblist, con, uniq_id, temp_dir='/scratch/', wait
                 print(job_output, file=sys.stderr)
                 print(file=sys.stderr)
 
-            #remove files
-            elif job.cleanup:
-                # print("cleaning up:", log_stdout_fn, file=sys.stderr)
-                os.remove(log_stdout_fn)
-
-                # print("cleaning up:", log_stderr_fn, file=sys.stderr)
-                os.remove(log_stderr_fn)
-
         except Exception as detail:
-            print("Error while unpickling output for pythongrid job from table pythongrid.output{0}".format(uniq_id), file=sys.stderr)
+            print("Error while unpickling output for pythongrid job {1} from table pythongrid.output{0}".format(uniq_id, ix), file=sys.stderr)
             print("This could caused by a problem with the cluster environment, imports or environment variables.", file=sys.stderr)
+            print("Try running `./pythongrid.py {} {} {} {}` to see if your job crashed before writing its output.".format(uniq_id, ix, job.path, temp_dir), file=sys.stderr)
             print("Check log files for more information: ", file=sys.stderr)
             print("stdout:", log_stdout_fn, file=sys.stderr)
             print("stderr:", log_stderr_fn, file=sys.stderr)
-            raise detail
+            traceback.print_exc(detail)
+            sys.exit(2)
 
         job_output_list.append(job_output)
 
@@ -344,7 +330,7 @@ def process_jobs(jobs, temp_dir='/scratch/', wait=True, white_list=None, quiet=T
     """
 
     # Create new sqlite database with pickled jobs
-    con = mysql.connect(db="pythongrid", host="loki.research.ets.org", user="dnapolitano", passwd="wiki")
+    con = mysql.connect(db="pythongrid", host="loki.research.ets.org", user="dblanchard", passwd="Friday30")
 
     # Generate random name for tables
     uniq_id = uuid.uuid4()
@@ -464,13 +450,13 @@ def _zload_db(con, table, job_num):
     cur = con.cursor()
     cur.execute('SELECT data FROM `{}` WHERE id={}'.format(table, job_num))
     pickled_data = cur.fetchone()[0]
-    return pickle.loads(bz2.decompress(bytes(pickled_data)))
+    return pickle.loads(bz2.decompress(str(pickled_data)))
 
 
 ################################################################
 #      The following code will be executed on the cluster      #
 ################################################################
-def _run_job(uniq_id, job_num):
+def _run_job(uniq_id, job_num, temp_dir):
     """
     Execute the pickled job and produce pickled output (all in the SQLite3 database).
 
@@ -478,7 +464,8 @@ def _run_job(uniq_id, job_num):
     @type uniq_id: C{basestring}
     @param job_num: The index for this job's content in the job and output tables.
     @type job_num: C{int}
-
+    @param temp_dir: Local temporary directory for storing output for an individual job.
+    @type temp_dir: C{basestring}
     """
     con = mysql.connect(db="pythongrid", host="loki.research.ets.org", user="dblanchard", passwd="Friday30")  # Yup, that's my MySQL password sitting right there.
 
@@ -497,6 +484,17 @@ def _run_job(uniq_id, job_num):
     _zsave_db(job.ret, con, 'output{}'.format(uniq_id), job_num)
     print("done", file=sys.stderr)
 
+    #remove files
+    if job.cleanup:
+        log_stdout_fn = os.path.join(temp_dir, '{}.o{}'.format(job.name, job.jobid))
+        log_stderr_fn = os.path.join(temp_dir, '{}.e{}'.format(job.name, job.jobid))
+
+        try:
+            os.remove(log_stdout_fn)
+            os.remove(log_stderr_fn)
+        except OSError:
+            pass
+
     con.close()
 
 
@@ -513,13 +511,14 @@ def _main():
     parser.add_argument('uniq_id', help='The unique suffix for the tables corresponding to this job in the database.')
     parser.add_argument('job_number', help='Which job number should be run. Dictates which input data is read from database and where output data is stored.', type=int)
     parser.add_argument('module_dir', help='Directory that contains module containing pickled function. This will get added to PYTHONPATH temporarily.')
+    parser.add_argument('temp_dir', help='Directory that temporary output will be stored in.')
     args = parser.parse_args()
 
     print("Appended {} to PYTHONPATH".format(args.module_dir), file=sys.stderr)
     sys.path.append(_clean_path(args.module_dir))
 
     # Process the database and get job started
-    _run_job(args.uniq_id, args.job_number)
+    _run_job(args.uniq_id, args.job_number, _clean_path(args.temp_dir))
 
 
 if __name__ == "__main__":

@@ -18,6 +18,8 @@ them on the cluster as well.
 
 from __future__ import print_function, unicode_literals
 
+import time
+
 from pythongrid import Job, process_jobs
 
 
@@ -25,6 +27,7 @@ def compute_factorial(n):
     """
     computes factorial of n
     """
+    time.sleep(10)
     ret = 1
     for i in xrange(n):
         ret = ret * (i + 1)
