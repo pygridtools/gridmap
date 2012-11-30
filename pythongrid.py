@@ -379,7 +379,7 @@ def pg_map(f, args_list, cleanup=True, mem_free="1G", name='pythongrid_job', num
     @param f: The function to map on args_list
     @type f: C{function}
     @param args_list: List of arguments to pass to f
-    @type args_list: C{args_list}
+    @type args_list: C{list}
     @param cleanup: Should we remove the stdout and stderr temporary files for each job when we're done? (They are left in place if there's an error.)
     @type cleanup: C{bool}
     @param mem_free: Estimate of how much memory each job will need (for scheduling). (Not currently used, because our cluster does not have that setting enabled.)
