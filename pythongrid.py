@@ -29,11 +29,11 @@ import inspect
 import os
 import os.path
 import re
-import sqlite3
 import sys
-from tempfile import NamedTemporaryFile
+import uuid
 
 import drmaa
+import MySQLdb as mysql
 
 
 class Job(object):
@@ -45,10 +45,9 @@ class Job(object):
     """
 
     __slots__ = ('_f', 'args', 'jobid', 'kwlist', 'cleanup', 'ret', 'exception', 'environment', 'replace_env', 'working_dir', 'num_slots', 'mem_free', 'white_list', 'path',
-                 'db_dir', 'name', 'queue')
+                 'uniq_id', 'name', 'queue')
 
-    def __init__(self, f, args, kwlist=None, cleanup=True, mem_free="1G", name='pythongrid_job', num_slots=1, db_dir='/home/nlp-text/dynamic/dblanchard/pythongrid_dbs/',
-                 queue='nlp.q'):
+    def __init__(self, f, args, kwlist=None, cleanup=True, mem_free="1G", name='pythongrid_job', num_slots=1, queue='nlp.q'):
         """
         constructor of Job
 
@@ -66,8 +65,8 @@ class Job(object):
         @type name: C{basestring}
         @param num_slots: Number of slots this job should use.
         @type num_slots: C{int}
-        @param db_dir: Directory to store the temporary sqlite database used behind the scenes. Must be on the SAN so that all nodes can access it.
-        @type db_dir: C{basestring}
+        @param uniq_id: The unique suffix for the tables corresponding to this job in the database.
+        @type uniq_id: C{basestring}
         @param queue: SGE queue to schedule job on.
         @type queue: C{basestring}
         """
@@ -87,7 +86,7 @@ class Job(object):
         self.num_slots = num_slots
         self.mem_free = mem_free
         self.white_list = []
-        self.db_dir = db_dir
+        self.uniq_id = None
         self.name = name
         self.queue = queue
 
@@ -165,11 +164,19 @@ class Job(object):
         return ret
 
 
-def _submit_jobs(jobs, pickle_db, temp_dir='/scratch', white_list=None):
+def _submit_jobs(jobs, uniq_id, temp_dir='/scratch', white_list=None, quiet=True):
     """
     Method used to send a list of jobs onto the cluster.
     @param jobs: list of jobs to be executed
-    @type jobs: list<Job>
+    @type jobs: c{list} of L{Job}
+    @param uniq_id: The unique suffix for the tables corresponding to this job in the database.
+    @type uniq_id: C{basestring}
+    @param temp_dir: Local temporary directory for storing output for an individual job.
+    @type temp_dir: C{basestring}
+    @param white_list: List of acceptable nodes to use for scheduling job. If None, all are used.
+    @type white_list: C{list} of C{basestring}
+    @param quiet: When true, do not output information about the jobs that have been submitted.
+    @type quiet: C{bool}
     """
 
     session = drmaa.Session()
@@ -181,7 +188,7 @@ def _submit_jobs(jobs, pickle_db, temp_dir='/scratch', white_list=None):
         job.white_list = white_list
 
         # append jobs
-        jobid = _append_job_to_session(session, job, pickle_db, job_num, temp_dir=temp_dir)
+        jobid = _append_job_to_session(session, job, uniq_id, job_num, temp_dir=temp_dir, quiet=quiet)
         jobids.append(jobid)
 
     sid = session.contact
@@ -190,13 +197,22 @@ def _submit_jobs(jobs, pickle_db, temp_dir='/scratch', white_list=None):
     return (sid, jobids)
 
 
-def _append_job_to_session(session, job, pickle_db, job_num, temp_dir='/scratch/'):
+def _append_job_to_session(session, job, uniq_id, job_num, temp_dir='/scratch/', quiet=True):
     """
-    For an active session, append new job
-    based on information stored in job object
+    For an active session, append new job based on information stored in job object. Also sets job.job_id to the ID of the job on the grid.
 
-    side-effects:
-    - job.jobid set to jobid determined by grid-engine
+    @param session: The current DRMAA session with the grid engine.
+    @type session: C{drmaa.Session}
+    @param job: The Job to add to the queue.
+    @type job: L{Job}
+    @param uniq_id: The unique suffix for the tables corresponding to this job in the database.
+    @type uniq_id: C{basestring}
+    @param job_num: The row in the table to store/retrieve data on. This is only non-zero for jobs created via pg_map.
+    @type job_num: C{int}
+    @param temp_dir: Local temporary directory for storing output for an individual job.
+    @type temp_dir: C{basestring}
+    @param quiet: When true, do not output information about the jobs that have been submitted.
+    @type quiet: C{bool}
     """
 
     jt = session.createJobTemplate()
@@ -219,7 +235,7 @@ def _append_job_to_session(session, job, pickle_db, job_num, temp_dir='/scratch/
         jt.jobEnvironment = shell_env
 
     jt.remoteCommand = _clean_path(os.path.abspath(__file__))
-    jt.args = [pickle_db, '{}'.format(job_num), job.path]
+    jt.args = ['{}'.format(uniq_id), '{}'.format(job_num), job.path]
     jt.nativeSpecification = job.native_specification
     jt.outputPath = ":" + temp_dir
     jt.errorPath = ":" + temp_dir
@@ -229,14 +245,15 @@ def _append_job_to_session(session, job, pickle_db, job_num, temp_dir='/scratch/
     # set job fields that depend on the jobid assigned by grid engine
     job.jobid = jobid
 
-    print('Your job {} has been submitted with id {}'.format(job.name, jobid), file=sys.stderr)
+    if not quiet:
+        print('Your job {} has been submitted with id {}'.format(job.name, jobid), file=sys.stderr)
 
     session.deleteJobTemplate(jt)
 
     return jobid
 
 
-def _collect_jobs(sid, jobids, joblist, con, db_filename, temp_dir='/scratch/', wait=True):
+def _collect_jobs(sid, jobids, joblist, con, uniq_id, temp_dir='/scratch/', wait=True):
     """
     Collect the results from the jobids, returns a list of Jobs
 
@@ -244,8 +261,8 @@ def _collect_jobs(sid, jobids, joblist, con, db_filename, temp_dir='/scratch/', 
     @type sid: string returned by cluster
     @param jobids: list of job identifiers returned by the cluster
     @type jobids: list of strings
-    @param con: Open connection to the sqlite3 database where the results will be stored.
-    @type con: C{sqlite3.Connection}
+    @param con: Open connection to the database where the results will be stored.
+    @type con: C{MySQLdb.Connection}
     @param wait: Wait for jobs to finish?
     @type wait: Boolean, defaults to False
     @param temp_dir: Local temporary directory for storing output for an individual job.
@@ -275,7 +292,7 @@ def _collect_jobs(sid, jobids, joblist, con, db_filename, temp_dir='/scratch/', 
         log_stderr_fn = (os.path.join(temp_dir, job.name + '.e' + jobids[ix]))
 
         try:
-            job_output = _zload_db(con, 'output', ix)
+            job_output = _zload_db(con, 'output{}'.format(uniq_id), ix)
 
             #print exceptions
             if isinstance(job_output, Exception):
@@ -293,7 +310,7 @@ def _collect_jobs(sid, jobids, joblist, con, db_filename, temp_dir='/scratch/', 
                 os.remove(log_stderr_fn)
 
         except Exception as detail:
-            print("Error while unpickling output for pythongrid job from sqlite database {}".format(db_filename), file=sys.stderr)
+            print("Error while unpickling output for pythongrid job from table pythongrid.output{0}".format(uniq_id), file=sys.stderr)
             print("This could caused by a problem with the cluster environment, imports or environment variables.", file=sys.stderr)
             print("Check log files for more information: ", file=sys.stderr)
             print("stdout:", log_stdout_fn, file=sys.stderr)
@@ -305,41 +322,47 @@ def _collect_jobs(sid, jobids, joblist, con, db_filename, temp_dir='/scratch/', 
     return job_output_list
 
 
-def process_jobs(jobs, db_dir='/home/nlp-text/dynamic/dblanchard/pythongrid_dbs/', temp_dir='/scratch/', wait=True, white_list=None):
+def process_jobs(jobs, temp_dir='/scratch/', wait=True, white_list=None, quiet=True):
     """
     Take a list of jobs and process them on the cluster.
 
-    @param db_dir: Directory to store the temporary sqlite database used behind the scenes. Must be on the SAN so that all nodes can access it.
-    @type db_dir: C{basestring}
     @param temp_dir: Local temporary directory for storing output for an individual job.
     @type temp_dir: C{basestring}
     @param wait: Should we wait for jobs to finish? (Should only be false if the function you're running doesn't return anything)
     @type wait: C{bool}
     @param white_list: If specified, limit nodes used to only those in list.
     @type white_list: C{list} of C{basestring}
+    @param quiet: When true, do not output information about the jobs that have been submitted.
+    @type quiet: C{bool}
     """
 
-    # Get new filename for temporary database
-    with NamedTemporaryFile(dir=db_dir, delete=False, suffix='.db3') as temp_db_file:
-        db_filename = temp_db_file.name
-
     # Create new sqlite database with pickled jobs
-    con = sqlite3.connect(db_filename)
+    con = mysql.connect(db="pythongrid", host="loki.research.ets.org", user="dnapolitano", passwd="wiki")
+
+    # Generate random name for tables
+    uniq_id = uuid.uuid4()
 
     # Create tables
-    with con:
-        con.execute("CREATE TABLE job(id INTEGER, data BLOB)")
-        con.execute("CREATE TABLE output(id INTEGER, data BLOB)")
+    cur = con.cursor()
+    cur.execute("CREATE TABLE `job{}` (`id` INT NOT NULL, `data` LONGBLOB NOT NULL)".format(uniq_id))
+    cur.execute("CREATE TABLE `output{}` (`id` INT NOT NULL, `data` LONGBLOB NOT NULL)".format(uniq_id))
 
     # Save jobs to database
     for job_id, job in enumerate(jobs):
-        _zsave_db(job, con, 'job', job_id)
+        _zsave_db(job, con, 'job{}'.format(uniq_id), job_id)
 
     # Submit jobs to cluster
-    sids, jobids = _submit_jobs(jobs, db_filename, white_list=white_list, temp_dir=temp_dir)
+    sids, jobids = _submit_jobs(jobs, uniq_id, white_list=white_list, temp_dir=temp_dir, quiet=quiet)
 
     # Retrieve outputs
-    job_outputs = _collect_jobs(sids, jobids, jobs, con, db_filename, temp_dir=temp_dir, wait=wait)
+    job_outputs = _collect_jobs(sids, jobids, jobs, con, uniq_id, temp_dir=temp_dir, wait=wait)
+
+    # Make sure we have enough output
+    assert(len(jobs) == len(job_outputs))
+
+    # Drop tables
+    cur.execute("DROP TABLE `job{}`".format(uniq_id))
+    cur.execute("DROP TABLE `output{}`".format(uniq_id))
 
     # Close database connection
     con.close()
@@ -350,8 +373,7 @@ def process_jobs(jobs, db_dir='/home/nlp-text/dynamic/dblanchard/pythongrid_dbs/
 #####################################################################
 # MapReduce Interface
 #####################################################################
-def pg_map(f, args_list, cleanup=True, mem_free="1G", name='pythongrid_job', num_slots=1, db_dir='/home/nlp-text/dynamic/dblanchard/pythongrid_dbs/',
-           temp_dir='/scratch/', white_list=None, queue='nlp.q'):
+def pg_map(f, args_list, cleanup=True, mem_free="1G", name='pythongrid_job', num_slots=1, temp_dir='/scratch/', white_list=None, queue='nlp.q', quiet=True):
     """
     provides a generic map function
     @param f: The function to map on args_list
@@ -366,24 +388,21 @@ def pg_map(f, args_list, cleanup=True, mem_free="1G", name='pythongrid_job', num
     @type name: C{basestring}
     @param num_slots: Number of slots each job should use.
     @type num_slots: C{int}
-    @param db_dir: Directory to store the temporary sqlite database used behind the scenes. Must be on the SAN so that all nodes can access it.
-    @type db_dir: C{basestring}
     @param temp_dir: Local temporary directory for storing output for an individual job.
     @type temp_dir: C{basestring}
     @param white_list: If specified, limit nodes used to only those in list.
     @type white_list: C{list} of C{basestring}
     @param queue: The SGE queue to use for scheduling.
     @type queue: C{basestring}
+    @param quiet: When true, do not output information about the jobs that have been submitted.
+    @type quiet: C{bool}
     """
 
     # construct jobs
-    jobs = [Job(f, [args], cleanup=cleanup, mem_free=mem_free, name='{}{}'.format(name, job_num), num_slots=num_slots, db_dir=db_dir, queue=queue)
-            for job_num, args in enumerate(args_list)]
+    jobs = [Job(f, [args], cleanup=cleanup, mem_free=mem_free, name='{}{}'.format(name, job_num), num_slots=num_slots, queue=queue) for job_num, args in enumerate(args_list)]
 
     # process jobs
-    job_results = process_jobs(jobs, db_dir=db_dir, temp_dir=temp_dir, white_list=white_list)
-
-    assert(len(jobs) == len(job_results))
+    job_results = process_jobs(jobs, temp_dir=temp_dir, white_list=white_list, quiet=quiet)
 
     return job_results
 
@@ -405,8 +424,8 @@ def _zsave_db(obj, con, table, job_num):
 
     @param obj: The object/function to store.
     @type obj: C{object} or C{function}
-    @param con: An open connection to the sqlite database
-    @type con: C{sqlite3.Connection}
+    @param con: An open connection to the database
+    @type con: C{MySQLdb.Connection}
     @param table: The name of the table to retrieve data from.
     @type table: C{basestring}
     @param job_num: The ID of the job this data is for.
@@ -417,47 +436,46 @@ def _zsave_db(obj, con, table, job_num):
     pickled_data = bz2.compress(pickle.dumps(obj, pickle.HIGHEST_PROTOCOL), 9)
 
     # Insert the pickled data into the database
-    with con:
-        con.execute("INSERT INTO {}(id, data) VALUES (:id, :data)".format(table), {"id": job_num, "data": sqlite3.Binary(pickled_data)})
+    cur = con.cursor()
+    # print("Job num type: {}\tJob num value: {}".format(type(job_num), job_num))
+    cur.execute("INSERT INTO `" + table + "`(id, data) VALUES (%s, %s)", (job_num, mysql.Binary(pickled_data)))
 
 
 def _zload_db(con, table, job_num):
     """
     Loads bz2-compressed pickled object from sqlite database table
 
-    @param con: An open connection to the sqlite database
-    @type con: C{sqlite3.Connection}
+    @param con: An open connection to the database
+    @type con: C{MySQLdb.Connection}
     @param table: The name of the table to retrieve data from.
     @type table: C{basestring}
     @param job_num: The ID of the job this data is for.
     @type job_num: C{int}
     """
-    with con:
-        cur = con.cursor()
-        cur.execute('SELECT data FROM {} WHERE id={}'.format(table, job_num))
-        pickled_data = cur.fetchone()[0]
+    cur = con.cursor()
+    cur.execute('SELECT data FROM `{}` WHERE id={}'.format(table, job_num))
+    pickled_data = cur.fetchone()[0]
     return pickle.loads(bz2.decompress(str(pickled_data)))
 
 
 ################################################################
 #      The following code will be executed on the cluster      #
 ################################################################
-def _run_job(pickle_db, job_num):
+def _run_job(uniq_id, job_num):
     """
     Execute the pickled job and produce pickled output (all in the SQLite3 database).
 
-    @param pickle_db: Path to SQLite3 database that must contain tables called "job" and "output" where both contains two columns: "id" and "data"
-                      (corresponding to the IDs and the actual job/output for each job).
-    @type pickle_db: C{basestring}
+    @param uniq_id: The unique suffix for the tables corresponding to this job in the database.
+    @type uniq_id: C{basestring}
     @param job_num: The index for this job's content in the job and output tables.
     @type job_num: C{int}
 
     """
-    con = sqlite3.connect(pickle_db)
+    con = mysql.connect(db="pythongrid", host="loki.research.ets.org", user="dblanchard", passwd="Friday30")  # Yup, that's my MySQL password sitting right there.
 
     print("Loading job...", end="", file=sys.stderr)
     sys.stderr.flush()
-    job = _zload_db(con, 'job', job_num)
+    job = _zload_db(con, 'job{}'.format(uniq_id), job_num)
     print("done", file=sys.stderr)
 
     print("Running job...", end="", file=sys.stderr)
@@ -467,7 +485,7 @@ def _run_job(pickle_db, job_num):
 
     print("Writing output to database for job {}...".format(job_num), end="", file=sys.stderr)
     sys.stderr.flush()
-    _zsave_db(job.ret, con, 'output', job_num)
+    _zsave_db(job.ret, con, 'output{}'.format(uniq_id), job_num)
     print("done", file=sys.stderr)
 
     con.close()
@@ -483,7 +501,7 @@ def main():
                                                  "and write the results back to the database. You almost never want to run this yourself.",
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                      conflict_handler='resolve')
-    parser.add_argument('pickle_db', help='SQLite3 database containing the pickled job, the input data, and a table for output data.')
+    parser.add_argument('uniq_id', help='The unique suffix for the tables corresponding to this job in the database.')
     parser.add_argument('job_number', help='Which job number should be run. Dictates which input data is read from database and where output data is stored.', type=int)
     parser.add_argument('module_dir', help='Directory that contains module containing pickled function. This will get added to PYTHONPATH temporarily.')
     args = parser.parse_args()
@@ -492,7 +510,7 @@ def main():
     sys.path.append(_clean_path(args.module_dir))
 
     # Process the database and get job started
-    _run_job(args.pickle_db, args.job_number)
+    _run_job(args.uniq_id, args.job_number)
 
 
 if __name__ == "__main__":
