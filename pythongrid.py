@@ -65,8 +65,6 @@ class Job(object):
         @type name: C{basestring}
         @param num_slots: Number of slots this job should use.
         @type num_slots: C{int}
-        @param uniq_id: The unique suffix for the tables corresponding to this job in the database.
-        @type uniq_id: C{basestring}
         @param queue: SGE queue to schedule job on.
         @type queue: C{basestring}
         """
@@ -375,16 +373,17 @@ def process_jobs(jobs, temp_dir='/scratch/', wait=True, white_list=None, quiet=T
 #####################################################################
 def pg_map(f, args_list, cleanup=True, mem_free="1G", name='pythongrid_job', num_slots=1, temp_dir='/scratch/', white_list=None, queue='nlp.q', quiet=True):
     """
-    provides a generic map function
+    Maps a function onto the cluster.
+
     @param f: The function to map on args_list
     @type f: C{function}
     @param args_list: List of arguments to pass to f
     @type args_list: C{args_list}
-    @param cleanup: flag that determines the cleanup of input and log file
-    @type cleanup: boolean
-    @param mem_free: Estimate of how much memory each job will need (for scheduling)
+    @param cleanup: Should we remove the stdout and stderr temporary files for each job when we're done? (They are left in place if there's an error.)
+    @type cleanup: C{bool}
+    @param mem_free: Estimate of how much memory each job will need (for scheduling). (Not currently used, because our cluster does not have that setting enabled.)
     @type mem_free: C{basestring}
-    @param name: Base name to give each job (will have number add to end)
+    @param name: Base name to give each job (will have a number add to end)
     @type name: C{basestring}
     @param num_slots: Number of slots each job should use.
     @type num_slots: C{int}
@@ -491,7 +490,7 @@ def _run_job(uniq_id, job_num):
     con.close()
 
 
-def main():
+def _main():
     """
     Parse the command line inputs and call _run_job
     """
@@ -514,4 +513,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    _main()
