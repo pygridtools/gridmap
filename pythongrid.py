@@ -24,7 +24,10 @@ from __future__ import print_function, unicode_literals
 
 import argparse
 import bz2
-import cPickle as pickle
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
 import inspect
 import os
 import os.path
@@ -34,6 +37,12 @@ import uuid
 
 import drmaa
 import MySQLdb as mysql
+
+# Make this work in Python 2 or 3
+try:
+    xrange(5)
+except NameError:
+    xrange = range
 
 
 class Job(object):
@@ -455,7 +464,7 @@ def _zload_db(con, table, job_num):
     cur = con.cursor()
     cur.execute('SELECT data FROM `{}` WHERE id={}'.format(table, job_num))
     pickled_data = cur.fetchone()[0]
-    return pickle.loads(bz2.decompress(str(pickled_data)))
+    return pickle.loads(bz2.decompress(bytes(pickled_data)))
 
 
 ################################################################
