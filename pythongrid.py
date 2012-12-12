@@ -78,7 +78,6 @@ class Job(object):
         self.kwlist = kwlist if kwlist is not None else {}
         self.cleanup = cleanup
         self.ret = None
-        self.exception = None
         self.environment = None
         self.replace_env = False
         self.working_dir = os.getcwd()
@@ -131,14 +130,16 @@ class Job(object):
         Executes function f with given arguments
         and writes return value to field ret.
         If an exception is encountered during execution, ret will
-        remain empty and the exception will be written
-        to the exception field of the Job object.
+        contain a pickled version of it.
         Input data is removed after execution to save space.
         """
         try:
             self.ret = self.function(*self.args, **self.kwlist)
+            del self.args
+            del self.kwlist
         except Exception as e:
             self.ret = e
+            traceback.print_exc(e)
 
     @property
     def native_specification(self):
