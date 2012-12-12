@@ -40,7 +40,7 @@ import MySQLdb as mysql
 
 
 # Limit on the number of connection attempts to the MySQL server
-MAX_SQL_ATTEMPTS = 100
+MAX_SQL_ATTEMPTS = 10
 
 
 class Job(object):
@@ -310,7 +310,7 @@ def _collect_jobs(sid, jobids, joblist, con, uniq_id, temp_dir='/scratch/', wait
         except Exception as detail:
             print("Error while unpickling output for pythongrid job {1} from table pythongrid.output{0}".format(uniq_id, ix), file=sys.stderr)
             print("This could caused by a problem with the cluster environment, imports or environment variables.", file=sys.stderr)
-            print("Try running `./pythongrid.py {} {} {} {}` to see if your job crashed before writing its output.".format(uniq_id, ix, job.path, temp_dir), file=sys.stderr)
+            print("Try running `pythongrid.py {} {} {} {}` to see if your job crashed before writing its output.".format(uniq_id, ix, job.path, temp_dir), file=sys.stderr)
             print("Check log files for more information: ", file=sys.stderr)
             print("stdout:", log_stdout_fn, file=sys.stderr)
             print("stderr:", log_stderr_fn, file=sys.stderr)
@@ -337,6 +337,9 @@ def get_mysql_connection():
             else:
                 # Randomly sleep up to two seconds
                 sleep(random() * 2.0)
+        # It worked!
+        else:
+            break
     return con
 
 
