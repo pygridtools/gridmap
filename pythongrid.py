@@ -32,9 +32,15 @@ import re
 import sys
 import traceback
 import uuid
+from random import random
+from time import sleep
 
 import drmaa
 import MySQLdb as mysql
+
+
+# Limit on the number of connection attempts to the MySQL server
+MAX_SQL_ATTEMPTS = 100
 
 
 class Job(object):
@@ -316,6 +322,24 @@ def _collect_jobs(sid, jobids, joblist, con, uniq_id, temp_dir='/scratch/', wait
     return job_output_list
 
 
+def get_mysql_connection():
+    ''' Repeatedly attempt to connect to the MySQL database (with random sleeping in between attempts) '''
+    attempts = 0
+    con = None
+    while attempts <= MAX_SQL_ATTEMPTS:
+        try:
+            con = mysql.connect(db="pythongrid", host="loki.research.ets.org", user="dblanchard", passwd="Friday30")  # Yup, that's my MySQL password sitting right there.
+        except mysql.Error as e:
+            con = None
+            attempts += 1
+            if attempts > MAX_SQL_ATTEMPTS:
+                raise e
+            else:
+                # Randomly sleep up to two seconds
+                sleep(random() * 2.0)
+    return con
+
+
 def process_jobs(jobs, temp_dir='/scratch/', wait=True, white_list=None, quiet=True):
     """
     Take a list of jobs and process them on the cluster.
@@ -331,7 +355,7 @@ def process_jobs(jobs, temp_dir='/scratch/', wait=True, white_list=None, quiet=T
     """
 
     # Create new sqlite database with pickled jobs
-    con = mysql.connect(db="pythongrid", host="loki.research.ets.org", user="dblanchard", passwd="Friday30")
+    con = get_mysql_connection()
 
     # Generate random name for tables
     uniq_id = uuid.uuid4()
@@ -468,7 +492,7 @@ def _run_job(uniq_id, job_num, temp_dir):
     @param temp_dir: Local temporary directory for storing output for an individual job.
     @type temp_dir: C{basestring}
     """
-    con = mysql.connect(db="pythongrid", host="loki.research.ets.org", user="dblanchard", passwd="Friday30")  # Yup, that's my MySQL password sitting right there.
+    con = get_mysql_connection()
 
     print("Loading job...", end="", file=sys.stderr)
     sys.stderr.flush()
