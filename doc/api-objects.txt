@@ -1,7 +1,9 @@
 pythongrid	pythongrid-module.html
+pythongrid.MAX_SQL_ATTEMPTS	pythongrid-module.html#MAX_SQL_ATTEMPTS
 pythongrid._main	pythongrid-module.html#_main
 pythongrid._zload_db	pythongrid-module.html#_zload_db
 pythongrid.__package__	pythongrid-module.html#__package__
+pythongrid._get_mysql_connection	pythongrid-module.html#_get_mysql_connection
 pythongrid._append_job_to_session	pythongrid-module.html#_append_job_to_session
 pythongrid.pg_map	pythongrid-module.html#pg_map
 pythongrid._submit_jobs	pythongrid-module.html#_submit_jobs
