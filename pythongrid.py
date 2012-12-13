@@ -40,7 +40,7 @@ import MySQLdb as mysql
 
 
 # Limit on the number of connection attempts to the MySQL server
-MAX_SQL_ATTEMPTS = 10
+MAX_SQL_ATTEMPTS = 50
 
 
 class Job(object):
@@ -322,23 +322,36 @@ def _collect_jobs(sid, jobids, joblist, con, uniq_id, temp_dir='/scratch/', wait
     return job_output_list
 
 
-def get_mysql_connection():
-    ''' Repeatedly attempt to connect to the MySQL database (with random sleeping in between attempts) '''
+def _get_mysql_connection(verbose=False):
+    '''
+    Repeatedly attempt to connect to the MySQL database (with random sleeping in between attempts)
+    @param verbose: Should we print status info?
+    @type verbose: C{bool}
+    '''
     attempts = 0
     con = None
     while attempts <= MAX_SQL_ATTEMPTS:
         try:
+            if verbose:
+                print("Attempting to connect to mysql database...", end=" ", file=sys.stderr)
             con = mysql.connect(db="pythongrid", host="loki.research.ets.org", user="dblanchard", passwd="Friday30")  # Yup, that's my MySQL password sitting right there.
         except mysql.Error as e:
+            if verbose:
+                print("FAILED", file=sys.stderr)
             con = None
             attempts += 1
             if attempts > MAX_SQL_ATTEMPTS:
                 raise e
             else:
                 # Randomly sleep up to two seconds
-                sleep(random() * 2.0)
+                sleep_time = random() * 2.0
+                if verbose:
+                    print("Sleeping for {} seconds before retrying...".format(sleep_time), file=sys.stderr)
+                sleep(sleep_time)
         # It worked!
         else:
+            if verbose:
+                print("done", file=sys.stderr)
             break
     return con
 
@@ -358,7 +371,7 @@ def process_jobs(jobs, temp_dir='/scratch/', wait=True, white_list=None, quiet=T
     """
 
     # Create new sqlite database with pickled jobs
-    con = get_mysql_connection()
+    con = _get_mysql_connection()
 
     # Generate random name for tables
     uniq_id = uuid.uuid4()
@@ -372,10 +385,15 @@ def process_jobs(jobs, temp_dir='/scratch/', wait=True, white_list=None, quiet=T
     for job_id, job in enumerate(jobs):
         _zsave_db(job, con, 'job{}'.format(uniq_id), job_id)
 
+    # Disconnect until jobs are done because it could be a while
+    con.close()
+
     # Submit jobs to cluster
     sids, jobids = _submit_jobs(jobs, uniq_id, white_list=white_list, temp_dir=temp_dir, quiet=quiet)
 
-    # Retrieve outputs
+    # Reconnect and retrieve outputs
+    con = _get_mysql_connection()
+    cur = con.cursor()
     job_outputs = _collect_jobs(sids, jobids, jobs, con, uniq_id, temp_dir=temp_dir, wait=wait)
 
     # Make sure we have enough output
@@ -495,17 +513,24 @@ def _run_job(uniq_id, job_num, temp_dir):
     @param temp_dir: Local temporary directory for storing output for an individual job.
     @type temp_dir: C{basestring}
     """
-    con = get_mysql_connection()
+    # Connect to database
+    con = _get_mysql_connection(verbose=True)
 
     print("Loading job...", end="", file=sys.stderr)
     sys.stderr.flush()
     job = _zload_db(con, 'job{}'.format(uniq_id), job_num)
     print("done", file=sys.stderr)
 
+    # Disconnect while job is running, in case it takes a really long time.
+    con.close()
+
     print("Running job...", end="", file=sys.stderr)
     sys.stderr.flush()
     job.execute()
     print("done", file=sys.stderr)
+
+    # Reconnect to database
+    con = _get_mysql_connection(verbose=True)
 
     print("Writing output to database for job {}...".format(job_num), end="", file=sys.stderr)
     sys.stderr.flush()
