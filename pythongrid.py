@@ -145,7 +145,7 @@ class Job(object):
             del self.kwlist
         except Exception as e:
             self.ret = e
-            traceback.print_exc(e)
+            traceback.print_exc()
 
     @property
     def native_specification(self):
@@ -314,7 +314,7 @@ def _collect_jobs(sid, jobids, joblist, con, uniq_id, temp_dir='/scratch/', wait
             print("Check log files for more information: ", file=sys.stderr)
             print("stdout:", log_stdout_fn, file=sys.stderr)
             print("stderr:", log_stderr_fn, file=sys.stderr)
-            traceback.print_exc(detail)
+            print("Exception: {}".format(detail))
             sys.exit(2)
 
         job_output_list.append(job_output)
