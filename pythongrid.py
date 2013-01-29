@@ -19,7 +19,7 @@ This module provides wrappers that simplify submission and collection of jobs, i
 
 @author: Christian Widmer
 @author: Cheng Soon Ong
-@author: Dan Blanchard, dblanchard@ets.org
+@author: Dan Blanchard (dblanchard@ets.org)
 """
 
 from __future__ import print_function, unicode_literals
@@ -347,7 +347,7 @@ def _get_mysql_connection(verbose=False):
         try:
             if verbose:
                 print("Attempting to connect to mysql database...", end=" ", file=sys.stderr)
-            con = mysql.connect(db=_MYSQL_DB, host=_MYSQL_DB, user=_MYSQL_USER, passwd=_MYSQL_PASSWORD)
+            con = mysql.connect(db=_MYSQL_DB, host=_MYSQL_SERVER, user=_MYSQL_USER, passwd=_MYSQL_PASSWORD)
         except mysql.Error as e:
             if verbose:
                 print("FAILED", file=sys.stderr)
@@ -509,7 +509,7 @@ def _zload_db(con, table, job_num):
     cur = con.cursor()
     cur.execute('SELECT data FROM `{}` WHERE id={}'.format(table, job_num))
     pickled_data = cur.fetchone()[0]
-    return pickle.loads(bz2.decompress(str(pickled_data)))
+    return pickle.loads(bz2.decompress(bytes(pickled_data)))
 
 
 ################################################################
