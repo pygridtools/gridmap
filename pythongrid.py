@@ -10,14 +10,16 @@
 # Written (W) 2008-2010 Cheng Soon Ong
 # Copyright (C) 2008-2012 Max-Planck-Society
 #
-# Mostly rewritten by Dan Blanchard, November 2012
+# Forked and substantially rewritten by Dan Blanchard, dblanchard@ets.org, November 2012
 
 """
 pythongrid provides a high level front-end to DRMAA-python.
 
-This module provides wrappers that simplify submission and collection of jobs,
-in a more 'pythonic' fashion.
+This module provides wrappers that simplify submission and collection of jobs, in a more 'pythonic' fashion.
 
+@author: Christian Widmer
+@author: Cheng Soon Ong
+@author: Dan Blanchard, dblanchard@ets.org
 """
 
 from __future__ import print_function, unicode_literals
@@ -39,8 +41,21 @@ import drmaa
 import MySQLdb as mysql
 
 
+#### Global settings ####
 # Limit on the number of connection attempts to the MySQL server
 MAX_SQL_ATTEMPTS = 50
+
+# MySQL login info
+_MYSQL_USER = 'dblanchard'
+_MYSQL_PASSWORD = "Friday30"  # Not a huge deal that my password is here since I don't use it for anything else, and this server can't be accessed off-campus
+_MYSQL_DB = 'pythongrid'
+_MYSQL_SERVER = 'loki.research.ets.org'
+
+# Is mem_free configured properly on the cluster?
+USE_MEM_FREE = False
+
+# Which queue should we use by default
+DEFAULT_QUEUE = 'nlp.q'
 
 
 class Job(object):
@@ -54,7 +69,7 @@ class Job(object):
     __slots__ = ('_f', 'args', 'jobid', 'kwlist', 'cleanup', 'ret', 'exception', 'environment', 'replace_env', 'working_dir', 'num_slots', 'mem_free', 'white_list', 'path',
                  'uniq_id', 'name', 'queue')
 
-    def __init__(self, f, args, kwlist=None, cleanup=True, mem_free="1G", name='pythongrid_job', num_slots=1, queue='nlp.q'):
+    def __init__(self, f, args, kwlist=None, cleanup=True, mem_free="1G", name='pythongrid_job', num_slots=1, queue=DEFAULT_QUEUE):
         """
         Initializes a new Job.
 
@@ -128,7 +143,6 @@ class Job(object):
             mod = sys.modules[mn]
 
             # set function from module
-            # self._f = mod.__getattribute__(f.__name__)
             self._f = getattr(mod, f.__name__)
 
     def execute(self):
@@ -157,9 +171,8 @@ class Job(object):
 
         if self.name:
             ret += " -N {}".format(self.name)
-        # Currently commented out until we enable mem_free on the cluster
-        # if self.mem_free:
-        #     ret += " -l mem_free={}".format(self.mem_free)
+        if self.mem_free and USE_MEM_FREE:
+            ret += " -l mem_free={}".format(self.mem_free)
         if self.num_slots and self.num_slots > 1:
             ret += " -pe smp {}".format(self.num_slots)
         if self.white_list:
@@ -334,7 +347,7 @@ def _get_mysql_connection(verbose=False):
         try:
             if verbose:
                 print("Attempting to connect to mysql database...", end=" ", file=sys.stderr)
-            con = mysql.connect(db="pythongrid", host="loki.research.ets.org", user="dblanchard", passwd="Friday30")  # Yup, that's my MySQL password sitting right there.
+            con = mysql.connect(db=_MYSQL_DB, host=_MYSQL_DB, user=_MYSQL_USER, passwd=_MYSQL_PASSWORD)
         except mysql.Error as e:
             if verbose:
                 print("FAILED", file=sys.stderr)
@@ -370,7 +383,7 @@ def process_jobs(jobs, temp_dir='/scratch/', wait=True, white_list=None, quiet=T
     @type quiet: C{bool}
     """
 
-    # Create new sqlite database with pickled jobs
+    # Create new connection to MySQL database with pickled jobs
     con = _get_mysql_connection()
 
     # Generate random name for tables
@@ -412,7 +425,7 @@ def process_jobs(jobs, temp_dir='/scratch/', wait=True, white_list=None, quiet=T
 #####################################################################
 # MapReduce Interface
 #####################################################################
-def pg_map(f, args_list, cleanup=True, mem_free="1G", name='pythongrid_job', num_slots=1, temp_dir='/scratch/', white_list=None, queue='nlp.q', quiet=True):
+def pg_map(f, args_list, cleanup=True, mem_free="1G", name='pythongrid_job', num_slots=1, temp_dir='/scratch/', white_list=None, queue=DEFAULT_QUEUE, quiet=True):
     """
     Maps a function onto the cluster.
     @note: This can only be used with picklable functions (i.e., those that are defined at the module or class level).
@@ -461,7 +474,7 @@ def _clean_path(path):
 
 def _zsave_db(obj, con, table, job_num):
     """
-    Saves an object/function as bz2-compressed pickled data in an sqlite database table
+    Saves an object/function as bz2-compressed pickled data in a MySQL database table
 
     @param obj: The object/function to store.
     @type obj: C{object} or C{function}
@@ -484,7 +497,7 @@ def _zsave_db(obj, con, table, job_num):
 
 def _zload_db(con, table, job_num):
     """
-    Loads bz2-compressed pickled object from sqlite database table
+    Loads bz2-compressed pickled object from a MySQL database table
 
     @param con: An open connection to the database
     @type con: C{MySQLdb.Connection}
@@ -557,7 +570,7 @@ def _main():
     """
 
     # Get command line arguments
-    parser = argparse.ArgumentParser(description="This wrapper script will run a pickled Python function on some pickled data in a sqlite3 database, " +
+    parser = argparse.ArgumentParser(description="This wrapper script will run a pickled Python function on some pickled data in a MySQL database, " +
                                                  "and write the results back to the database. You almost never want to run this yourself.",
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                      conflict_handler='resolve')
