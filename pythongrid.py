@@ -425,38 +425,52 @@ def process_jobs(jobs, temp_dir='/scratch/', wait=True, white_list=None, quiet=T
 #####################################################################
 # MapReduce Interface
 #####################################################################
-def pg_map(f, args_list, cleanup=True, mem_free="1G", name='pythongrid_job', num_slots=1, temp_dir='/scratch/', white_list=None, queue=DEFAULT_QUEUE, quiet=True):
+def pg_map(f, args_list, cleanup=True, mem_free="1G", name='pythongrid_job',
+           num_slots=1, temp_dir='/scratch/', white_list=None,
+           queue=DEFAULT_QUEUE, quiet=True):
     """
     Maps a function onto the cluster.
-    @note: This can only be used with picklable functions (i.e., those that are defined at the module or class level).
+    @note: This can only be used with picklable functions (i.e., those that are
+           defined at the module or class level).
 
     @param f: The function to map on args_list
     @type f: C{function}
     @param args_list: List of arguments to pass to f
     @type args_list: C{list}
-    @param cleanup: Should we remove the stdout and stderr temporary files for each job when we're done? (They are left in place if there's an error.)
+    @param cleanup: Should we remove the stdout and stderr temporary files for
+                    each job when we're done? (They are left in place if there's
+                    an error.)
     @type cleanup: C{bool}
-    @param mem_free: Estimate of how much memory each job will need (for scheduling). (Not currently used, because our cluster does not have that setting enabled.)
+    @param mem_free: Estimate of how much memory each job will need (for
+                     scheduling). (Not currently used, because our cluster does
+                     not have that setting enabled.)
     @type mem_free: C{basestring}
     @param name: Base name to give each job (will have a number add to end)
     @type name: C{basestring}
     @param num_slots: Number of slots each job should use.
     @type num_slots: C{int}
-    @param temp_dir: Local temporary directory for storing output for an individual job.
+    @param temp_dir: Local temporary directory for storing output for an
+                     individual job.
     @type temp_dir: C{basestring}
     @param white_list: If specified, limit nodes used to only those in list.
     @type white_list: C{list} of C{basestring}
     @param queue: The SGE queue to use for scheduling.
     @type queue: C{basestring}
-    @param quiet: When true, do not output information about the jobs that have been submitted.
+    @param quiet: When true, do not output information about the jobs that have
+                  been submitted.
     @type quiet: C{bool}
     """
 
     # construct jobs
-    jobs = [Job(f, [args], cleanup=cleanup, mem_free=mem_free, name='{}{}'.format(name, job_num), num_slots=num_slots, queue=queue) for job_num, args in enumerate(args_list)]
+    jobs = [Job(f, [args] if not isinstance(args, list) else args,
+                cleanup=cleanup, mem_free=mem_free,
+                name='{}{}'.format(name, job_num), num_slots=num_slots,
+                queue=queue)
+            for job_num, args in enumerate(args_list)]
 
     # process jobs
-    job_results = process_jobs(jobs, temp_dir=temp_dir, white_list=white_list, quiet=quiet)
+    job_results = process_jobs(jobs, temp_dir=temp_dir, white_list=white_list,
+                               quiet=quiet)
 
     return job_results
 
