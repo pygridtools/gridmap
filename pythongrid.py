@@ -10,12 +10,14 @@
 # Written (W) 2008-2010 Cheng Soon Ong
 # Copyright (C) 2008-2012 Max-Planck-Society
 #
-# Forked and substantially rewritten by Dan Blanchard, dblanchard@ets.org, November 2012
+# Forked and substantially rewritten by Dan Blanchard, dblanchard@ets.org,
+# November 2012
 
 """
 pythongrid provides a high level front-end to DRMAA-python.
 
-This module provides wrappers that simplify submission and collection of jobs, in a more 'pythonic' fashion.
+This module provides wrappers that simplify submission and collection of jobs,
+in a more 'pythonic' fashion.
 
 @author: Christian Widmer
 @author: Cheng Soon Ong
@@ -34,22 +36,16 @@ import re
 import sys
 import traceback
 import uuid
-from random import random
-from time import sleep
 
 import drmaa
-import MySQLdb as mysql
+from redis import StrictRedis
+from six.moves import xrange as range
 
 
 #### Global settings ####
-# Limit on the number of connection attempts to the MySQL server
-MAX_SQL_ATTEMPTS = 50
-
-# MySQL login info
-_MYSQL_USER = 'dblanchard'
-_MYSQL_PASSWORD = "Friday30"  # Not a huge deal that my password is here since I don't use it for anything else, and this server can't be accessed off-campus
-_MYSQL_DB = 'pythongrid'
-_MYSQL_SERVER = 'loki.research.ets.org'
+# Redis settings
+REDIS_HOST = 'nlp.research.ets.org'
+REDIS_DB = 'python_grid'
 
 # Is mem_free configured properly on the cluster?
 USE_MEM_FREE = False
@@ -60,16 +56,20 @@ DEFAULT_QUEUE = 'nlp.q'
 
 class Job(object):
     """
-    Central entity that wraps a function and its data. Basically, a job consists of a function, its argument list, its keyword list and a field "ret" which is filled, when
-    the execute method gets called.
+    Central entity that wraps a function and its data. Basically, a job consists
+    of a function, its argument list, its keyword list and a field "ret" which
+    is filled, when the execute method gets called.
 
-    @note: This can only be used to wrap picklable functions (i.e., those that are defined at the module or class level).
+    @note: This can only be used to wrap picklable functions (i.e., those that
+    are defined at the module or class level).
     """
 
-    __slots__ = ('_f', 'args', 'jobid', 'kwlist', 'cleanup', 'ret', 'exception', 'environment', 'replace_env', 'working_dir', 'num_slots', 'mem_free', 'white_list', 'path',
-                 'uniq_id', 'name', 'queue')
+    __slots__ = ('_f', 'args', 'jobid', 'kwlist', 'cleanup', 'ret', 'exception',
+                 'environment', 'replace_env', 'working_dir', 'num_slots',
+                 'mem_free', 'white_list', 'path', 'uniq_id', 'name', 'queue')
 
-    def __init__(self, f, args, kwlist=None, cleanup=True, mem_free="1G", name='pythongrid_job', num_slots=1, queue=DEFAULT_QUEUE):
+    def __init__(self, f, args, kwlist=None, cleanup=True, mem_free="1G",
+                 name='pythongrid_job', num_slots=1, queue=DEFAULT_QUEUE):
         """
         Initializes a new Job.
 
@@ -81,7 +81,8 @@ class Job(object):
         @type kwlist: dict
         @param cleanup: flag that determines the cleanup of input and log file
         @type cleanup: boolean
-        @param mem_free: Estimate of how much memory this job will need (for scheduling)
+        @param mem_free: Estimate of how much memory this job will need (for
+                         scheduling)
         @type mem_free: C{basestring}
         @param name: Name to give this job
         @type name: C{basestring}
@@ -123,7 +124,8 @@ class Job(object):
 
         m = inspect.getmodule(f)
         try:
-            self.path = _clean_path(os.path.dirname(os.path.abspath(inspect.getsourcefile(f))))
+            self.path = _clean_path(os.path.dirname(os.path.abspath(
+                inspect.getsourcefile(f))))
         except TypeError:
             self.path = ''
 
@@ -157,8 +159,8 @@ class Job(object):
             self.ret = self.function(*self.args, **self.kwlist)
             del self.args
             del self.kwlist
-        except Exception as e:
-            self.ret = e
+        except Exception as exception:
+            self.ret = exception
             traceback.print_exc()
 
     @property
@@ -170,31 +172,36 @@ class Job(object):
         ret = ""
 
         if self.name:
-            ret += " -N {}".format(self.name)
+            ret += " -N {0}".format(self.name)
         if self.mem_free and USE_MEM_FREE:
-            ret += " -l mem_free={}".format(self.mem_free)
+            ret += " -l mem_free={0}".format(self.mem_free)
         if self.num_slots and self.num_slots > 1:
-            ret += " -pe smp {}".format(self.num_slots)
+            ret += " -pe smp {0}".format(self.num_slots)
         if self.white_list:
-            ret += " -l h={}".format('|'.join(self.white_list))
+            ret += " -l h={0}".format('|'.join(self.white_list))
         if self.queue:
-            ret += " -q {}".format(self.queue)
+            ret += " -q {0}".format(self.queue)
 
         return ret
 
 
-def _submit_jobs(jobs, uniq_id, temp_dir='/scratch', white_list=None, quiet=True):
+def _submit_jobs(jobs, uniq_id, temp_dir='/scratch', white_list=None,
+                 quiet=True):
     """
     Method used to send a list of jobs onto the cluster.
     @param jobs: list of jobs to be executed
     @type jobs: c{list} of L{Job}
-    @param uniq_id: The unique suffix for the tables corresponding to this job in the database.
+    @param uniq_id: The unique suffix for the tables corresponding to this job
+                    in the database.
     @type uniq_id: C{basestring}
-    @param temp_dir: Local temporary directory for storing output for an individual job.
+    @param temp_dir: Local temporary directory for storing output for an
+                     individual job.
     @type temp_dir: C{basestring}
-    @param white_list: List of acceptable nodes to use for scheduling job. If None, all are used.
+    @param white_list: List of acceptable nodes to use for scheduling job. If
+                       None, all are used.
     @type white_list: C{list} of C{basestring}
-    @param quiet: When true, do not output information about the jobs that have been submitted.
+    @param quiet: When true, do not output information about the jobs that have
+                  been submitted.
     @type quiet: C{bool}
     """
 
@@ -207,7 +214,8 @@ def _submit_jobs(jobs, uniq_id, temp_dir='/scratch', white_list=None, quiet=True
         job.white_list = white_list
 
         # append jobs
-        jobid = _append_job_to_session(session, job, uniq_id, job_num, temp_dir=temp_dir, quiet=quiet)
+        jobid = _append_job_to_session(session, job, uniq_id, job_num,
+                                       temp_dir=temp_dir, quiet=quiet)
         jobids.append(jobid)
 
     sid = session.contact
@@ -216,21 +224,27 @@ def _submit_jobs(jobs, uniq_id, temp_dir='/scratch', white_list=None, quiet=True
     return (sid, jobids)
 
 
-def _append_job_to_session(session, job, uniq_id, job_num, temp_dir='/scratch/', quiet=True):
+def _append_job_to_session(session, job, uniq_id, job_num, temp_dir='/scratch/',
+                           quiet=True):
     """
-    For an active session, append new job based on information stored in job object. Also sets job.job_id to the ID of the job on the grid.
+    For an active session, append new job based on information stored in job
+    object. Also sets job.job_id to the ID of the job on the grid.
 
     @param session: The current DRMAA session with the grid engine.
     @type session: C{drmaa.Session}
     @param job: The Job to add to the queue.
     @type job: L{Job}
-    @param uniq_id: The unique suffix for the tables corresponding to this job in the database.
+    @param uniq_id: The unique suffix for the tables corresponding to this job
+                    in the database.
     @type uniq_id: C{basestring}
-    @param job_num: The row in the table to store/retrieve data on. This is only non-zero for jobs created via pg_map.
+    @param job_num: The row in the table to store/retrieve data on. This is only
+                    non-zero for jobs created via pg_map.
     @type job_num: C{int}
-    @param temp_dir: Local temporary directory for storing output for an individual job.
+    @param temp_dir: Local temporary directory for storing output for an
+                    individual job.
     @type temp_dir: C{basestring}
-    @param quiet: When true, do not output information about the jobs that have been submitted.
+    @param quiet: When true, do not output information about the jobs that have
+                  been submitted.
     @type quiet: C{bool}
     """
 
@@ -253,8 +267,10 @@ def _append_job_to_session(session, job, uniq_id, job_num, temp_dir='/scratch/',
         # only consider env vars from shell
         jt.jobEnvironment = shell_env
 
-    jt.remoteCommand = re.sub(r'\.pyc$', '.py', _clean_path(os.path.abspath(__file__)))  # Make sure to use the .py and not the .pyc version of the module.
-    jt.args = ['{}'.format(uniq_id), '{}'.format(job_num), job.path, temp_dir]
+    # Make sure to use the .py and not the .pyc version of the module.
+    jt.remoteCommand = re.sub(r'\.pyc$', '.py',
+                              _clean_path(os.path.abspath(__file__)))
+    jt.args = ['{0}'.format(uniq_id), '{0}'.format(job_num), job.path, temp_dir]
     jt.nativeSpecification = job.native_specification
     jt.outputPath = ":" + temp_dir
     jt.errorPath = ":" + temp_dir
@@ -265,14 +281,17 @@ def _append_job_to_session(session, job, uniq_id, job_num, temp_dir='/scratch/',
     job.jobid = jobid
 
     if not quiet:
-        print('Your job {} has been submitted with id {}'.format(job.name, jobid), file=sys.stderr)
+        print('Your job {0} has been submitted with id {1}'.format(job.name,
+                                                                   jobid),
+              file=sys.stderr)
 
     session.deleteJobTemplate(jt)
 
     return jobid
 
 
-def _collect_jobs(sid, jobids, joblist, con, uniq_id, temp_dir='/scratch/', wait=True):
+def _collect_jobs(sid, jobids, joblist, redis_server, uniq_id,
+                  temp_dir='/scratch/', wait=True):
     """
     Collect the results from the jobids, returns a list of Jobs
 
@@ -280,15 +299,17 @@ def _collect_jobs(sid, jobids, joblist, con, uniq_id, temp_dir='/scratch/', wait
     @type sid: string returned by cluster
     @param jobids: list of job identifiers returned by the cluster
     @type jobids: list of strings
-    @param con: Open connection to the database where the results will be stored.
-    @type con: C{MySQLdb.Connection}
+    @param redis_server: Open connection to the database where the results will
+                         be stored.
+    @type redis_server: L{StrictRedis}
     @param wait: Wait for jobs to finish?
     @type wait: Boolean, defaults to False
-    @param temp_dir: Local temporary directory for storing output for an individual job.
+    @param temp_dir: Local temporary directory for storing output for an
+                     individual job.
     @type temp_dir: C{basestring}
     """
 
-    for ix in xrange(len(jobids)):
+    for ix in range(len(jobids)):
         assert(jobids[ix] == joblist[ix].jobid)
 
     s = drmaa.Session()
@@ -311,23 +332,34 @@ def _collect_jobs(sid, jobids, joblist, con, uniq_id, temp_dir='/scratch/', wait
         log_stderr_fn = os.path.join(temp_dir, job.name + '.e' + jobids[ix])
 
         try:
-            job_output = _zload_db(con, 'output{}'.format(uniq_id), ix)
+            job_output = _zload_db(redis_server, 'output{0}'.format(uniq_id),
+                                   ix)
 
             #print exceptions
             if isinstance(job_output, Exception):
-                print("Exception encountered in job with log file:", file=sys.stderr)
+                print("Exception encountered in job with log file:",
+                      file=sys.stderr)
                 print(log_stdout_fn, file=sys.stderr)
                 print(job_output, file=sys.stderr)
                 print(file=sys.stderr)
 
         except Exception as detail:
-            print("Error while unpickling output for pythongrid job {1} from table pythongrid.output{0}".format(uniq_id, ix), file=sys.stderr)
-            print("This could caused by a problem with the cluster environment, imports or environment variables.", file=sys.stderr)
-            print("Try running `pythongrid.py {} {} {} {}` to see if your job crashed before writing its output.".format(uniq_id, ix, job.path, temp_dir), file=sys.stderr)
+            print("Error while unpickling output for pythongrid job {1} from " +
+                  "stored with key output_{0}_{1}".format(uniq_id, ix),
+                  file=sys.stderr)
+            print("This could caused by a problem with the cluster " +
+                  "environment, imports or environment variables.",
+                  file=sys.stderr)
+            print("Try running `pythongrid.py {0} {1} {2} {3}` to see if your" +
+                  " job crashed before writing its output.".format(uniq_id,
+                                                                   ix,
+                                                                   job.path,
+                                                                   temp_dir),
+                  file=sys.stderr)
             print("Check log files for more information: ", file=sys.stderr)
             print("stdout:", log_stdout_fn, file=sys.stderr)
             print("stderr:", log_stderr_fn, file=sys.stderr)
-            print("Exception: {}".format(detail))
+            print("Exception: {0}".format(detail))
             sys.exit(2)
 
         job_output_list.append(job_output)
@@ -335,90 +367,47 @@ def _collect_jobs(sid, jobids, joblist, con, uniq_id, temp_dir='/scratch/', wait
     return job_output_list
 
 
-def _get_mysql_connection(verbose=False):
-    '''
-    Repeatedly attempt to connect to the MySQL database (with random sleeping in between attempts)
-    @param verbose: Should we print status info?
-    @type verbose: C{bool}
-    '''
-    attempts = 0
-    con = None
-    while attempts <= MAX_SQL_ATTEMPTS:
-        try:
-            if verbose:
-                print("Attempting to connect to mysql database...", end=" ", file=sys.stderr)
-            con = mysql.connect(db=_MYSQL_DB, host=_MYSQL_SERVER, user=_MYSQL_USER, passwd=_MYSQL_PASSWORD)
-        except mysql.Error as e:
-            if verbose:
-                print("FAILED", file=sys.stderr)
-            con = None
-            attempts += 1
-            if attempts > MAX_SQL_ATTEMPTS:
-                raise e
-            else:
-                # Randomly sleep up to two seconds
-                sleep_time = random() * 2.0
-                if verbose:
-                    print("Sleeping for {} seconds before retrying...".format(sleep_time), file=sys.stderr)
-                sleep(sleep_time)
-        # It worked!
-        else:
-            if verbose:
-                print("done", file=sys.stderr)
-            break
-    return con
-
-
-def process_jobs(jobs, temp_dir='/scratch/', wait=True, white_list=None, quiet=True):
+def process_jobs(jobs, temp_dir='/scratch/', wait=True, white_list=None,
+                 quiet=True):
     """
     Take a list of jobs and process them on the cluster.
 
-    @param temp_dir: Local temporary directory for storing output for an individual job.
+    @param temp_dir: Local temporary directory for storing output for an
+                     individual job.
     @type temp_dir: C{basestring}
-    @param wait: Should we wait for jobs to finish? (Should only be false if the function you're running doesn't return anything)
+    @param wait: Should we wait for jobs to finish? (Should only be false if the
+                 function you're running doesn't return anything)
     @type wait: C{bool}
     @param white_list: If specified, limit nodes used to only those in list.
     @type white_list: C{list} of C{basestring}
-    @param quiet: When true, do not output information about the jobs that have been submitted.
+    @param quiet: When true, do not output information about the jobs that have
+                  been submitted.
     @type quiet: C{bool}
     """
+    # Create new connection to Redis database with pickled jobs
+    redis_server = StrictRedis(host=REDIS_HOST, db=REDIS_DB)
 
-    # Create new connection to MySQL database with pickled jobs
-    con = _get_mysql_connection()
-
-    # Generate random name for tables
+    # Generate random name for keys
     uniq_id = uuid.uuid4()
-
-    # Create tables
-    cur = con.cursor()
-    cur.execute("CREATE TABLE `job{}` (`id` INT NOT NULL, `data` LONGBLOB NOT NULL)".format(uniq_id))
-    cur.execute("CREATE TABLE `output{}` (`id` INT NOT NULL, `data` LONGBLOB NOT NULL)".format(uniq_id))
 
     # Save jobs to database
     for job_id, job in enumerate(jobs):
-        _zsave_db(job, con, 'job{}'.format(uniq_id), job_id)
-
-    # Disconnect until jobs are done because it could be a while
-    con.close()
+        _zsave_db(job, redis_server, 'job{0}'.format(uniq_id), job_id)
 
     # Submit jobs to cluster
-    sids, jobids = _submit_jobs(jobs, uniq_id, white_list=white_list, temp_dir=temp_dir, quiet=quiet)
+    sids, jobids = _submit_jobs(jobs, uniq_id, white_list=white_list,
+                                temp_dir=temp_dir, quiet=quiet)
 
     # Reconnect and retrieve outputs
-    con = _get_mysql_connection()
-    cur = con.cursor()
-    job_outputs = _collect_jobs(sids, jobids, jobs, con, uniq_id, temp_dir=temp_dir, wait=wait)
+    job_outputs = _collect_jobs(sids, jobids, jobs, redis_server, uniq_id,
+                                temp_dir=temp_dir, wait=wait)
 
     # Make sure we have enough output
     assert(len(jobs) == len(job_outputs))
 
-    # Drop tables
-    cur.execute("DROP TABLE `job{}`".format(uniq_id))
-    cur.execute("DROP TABLE `output{}`".format(uniq_id))
-
-    # Close database connection
-    con.close()
-
+    # Delete keys
+    redis_server.delete(*redis_server.keys('job{0}_*'.format(uniq_id)))
+    redis_server.delete(*redis_server.keys('output{0}_*'.format(uniq_id)))
     return job_outputs
 
 
@@ -464,7 +453,7 @@ def pg_map(f, args_list, cleanup=True, mem_free="1G", name='pythongrid_job',
     # construct jobs
     jobs = [Job(f, [args] if not isinstance(args, list) else args,
                 cleanup=cleanup, mem_free=mem_free,
-                name='{}{}'.format(name, job_num), num_slots=num_slots,
+                name='{0}{1}'.format(name, job_num), num_slots=num_slots,
                 queue=queue)
             for job_num, args in enumerate(args_list)]
 
@@ -481,21 +470,23 @@ def pg_map(f, args_list, cleanup=True, mem_free="1G", name='pythongrid_job',
 def _clean_path(path):
     ''' Replace all weird SAN paths with normal paths '''
 
-    path = re.sub(r'/\.automount/\w+/SAN/NLP/(\w+)-(dynamic|static)', r'/home/nlp-\1/\2', path)
-    path = re.sub(r'/\.automount/[^/]+/SAN/Research/HomeResearch', '/home/research', path)
+    path = re.sub(r'/\.automount/\w+/SAN/NLP/(\w+)-(dynamic|static)',
+                  r'/home/nlp-\1/\2', path)
+    path = re.sub(r'/\.automount/[^/]+/SAN/Research/HomeResearch',
+                  '/home/research', path)
     return path
 
 
-def _zsave_db(obj, con, table, job_num):
+def _zsave_db(obj, redis_server, prefix, job_num):
     """
-    Saves an object/function as bz2-compressed pickled data in a MySQL database table
+    Saves an object/function as bz2-compressed pickled data in a Redis database
 
     @param obj: The object/function to store.
     @type obj: C{object} or C{function}
-    @param con: An open connection to the database
-    @type con: C{MySQLdb.Connection}
-    @param table: The name of the table to retrieve data from.
-    @type table: C{basestring}
+    @param redis_server: An open connection to the database
+    @type redis_server: L{StrictRedis}
+    @param prefix: The prefix to use for the key for this data.
+    @type prefix: C{basestring}
     @param job_num: The ID of the job this data is for.
     @type job_num: C{int}
     """
@@ -504,26 +495,22 @@ def _zsave_db(obj, con, table, job_num):
     pickled_data = bz2.compress(pickle.dumps(obj, pickle.HIGHEST_PROTOCOL), 9)
 
     # Insert the pickled data into the database
-    cur = con.cursor()
-    # print("Job num type: {}\tJob num value: {}".format(type(job_num), job_num))
-    cur.execute("INSERT INTO `" + table + "`(id, data) VALUES (%s, %s)", (job_num, mysql.Binary(pickled_data)))
+    redis_server.set('{0}_{1}'.format(prefix, job_num), pickled_data)
 
 
-def _zload_db(con, table, job_num):
+def _zload_db(redis_server, prefix, job_num):
     """
-    Loads bz2-compressed pickled object from a MySQL database table
+    Loads bz2-compressed pickled object from a Redis database
 
-    @param con: An open connection to the database
-    @type con: C{MySQLdb.Connection}
-    @param table: The name of the table to retrieve data from.
-    @type table: C{basestring}
+    @param redis_server: An open connection to the database
+    @type redis_server: L{StrictRedis}
+    @param prefix: The prefix to use for the key for this data.
+    @type prefix: C{basestring}
     @param job_num: The ID of the job this data is for.
     @type job_num: C{int}
     """
-    cur = con.cursor()
-    cur.execute('SELECT data FROM `{}` WHERE id={}'.format(table, job_num))
-    pickled_data = cur.fetchone()[0]
-    return pickle.loads(bz2.decompress(bytes(pickled_data)))
+    pickled_data = redis_server.get('{0}_{1}'.format(prefix, job_num))
+    return pickle.loads(bz2.decompress(pickled_data))
 
 
 ################################################################
@@ -531,51 +518,49 @@ def _zload_db(con, table, job_num):
 ################################################################
 def _run_job(uniq_id, job_num, temp_dir):
     """
-    Execute the pickled job and produce pickled output (all in the SQLite3 database).
+    Execute the pickled job and produce pickled output.
 
-    @param uniq_id: The unique suffix for the tables corresponding to this job in the database.
+    @param uniq_id: The unique suffix for the tables corresponding to this job
+                    in the database.
     @type uniq_id: C{basestring}
-    @param job_num: The index for this job's content in the job and output tables.
+    @param job_num: The index for this job's content in the job and output
+                    tables.
     @type job_num: C{int}
-    @param temp_dir: Local temporary directory for storing output for an individual job.
+    @param temp_dir: Local temporary directory for storing output for an
+                     individual job.
     @type temp_dir: C{basestring}
     """
     # Connect to database
-    con = _get_mysql_connection(verbose=True)
+    redis_server = redis_server = StrictRedis(host=REDIS_HOST, db=REDIS_DB)
 
     print("Loading job...", end="", file=sys.stderr)
     sys.stderr.flush()
-    job = _zload_db(con, 'job{}'.format(uniq_id), job_num)
+    job = _zload_db(redis_server, 'job{0}'.format(uniq_id), job_num)
     print("done", file=sys.stderr)
-
-    # Disconnect while job is running, in case it takes a really long time.
-    con.close()
 
     print("Running job...", end="", file=sys.stderr)
     sys.stderr.flush()
     job.execute()
     print("done", file=sys.stderr)
 
-    # Reconnect to database
-    con = _get_mysql_connection(verbose=True)
-
-    print("Writing output to database for job {}...".format(job_num), end="", file=sys.stderr)
+    print("Writing output to database for job {0}...".format(job_num), end="",
+          file=sys.stderr)
     sys.stderr.flush()
-    _zsave_db(job.ret, con, 'output{}'.format(uniq_id), job_num)
+    _zsave_db(job.ret, redis_server, 'output{0}'.format(uniq_id), job_num)
     print("done", file=sys.stderr)
 
     #remove files
     if job.cleanup:
-        log_stdout_fn = os.path.join(temp_dir, '{}.o{}'.format(job.name, job.jobid))
-        log_stderr_fn = os.path.join(temp_dir, '{}.e{}'.format(job.name, job.jobid))
+        log_stdout_fn = os.path.join(temp_dir, '{0}.o{1}'.format(job.name,
+                                                                 job.jobid))
+        log_stderr_fn = os.path.join(temp_dir, '{0}.e{1}'.format(job.name,
+                                                                 job.jobid))
 
         try:
             os.remove(log_stdout_fn)
             os.remove(log_stderr_fn)
         except OSError:
             pass
-
-    con.close()
 
 
 def _main():
@@ -584,17 +569,33 @@ def _main():
     """
 
     # Get command line arguments
-    parser = argparse.ArgumentParser(description="This wrapper script will run a pickled Python function on some pickled data in a MySQL database, " +
-                                                 "and write the results back to the database. You almost never want to run this yourself.",
+    parser = argparse.ArgumentParser(description="This wrapper script will run \
+                                                 a pickled Python function on \
+                                                 some pickled data in a Redis\
+                                                 database, " + "and write the\
+                                                 results back to the database.\
+                                                 You almost never want to run\
+                                                 this yourself.",
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                      conflict_handler='resolve')
-    parser.add_argument('uniq_id', help='The unique suffix for the tables corresponding to this job in the database.')
-    parser.add_argument('job_number', help='Which job number should be run. Dictates which input data is read from database and where output data is stored.', type=int)
-    parser.add_argument('module_dir', help='Directory that contains module containing pickled function. This will get added to PYTHONPATH temporarily.')
-    parser.add_argument('temp_dir', help='Directory that temporary output will be stored in.')
+    parser.add_argument('uniq_id',
+                        help='The unique suffix for the tables corresponding to\
+                              this job in the database.')
+    parser.add_argument('job_number',
+                        help='Which job number should be run. Dictates which \
+                              input data is read from database and where output\
+                              data is stored.',
+                        type=int)
+    parser.add_argument('module_dir',
+                        help='Directory that contains module containing pickled\
+                              function. This will get added to PYTHONPATH \
+                              temporarily.')
+    parser.add_argument('temp_dir',
+                        help='Directory that temporary output will be stored\
+                              in.')
     args = parser.parse_args()
 
-    print("Appended {} to PYTHONPATH".format(args.module_dir), file=sys.stderr)
+    print("Appended {0} to PYTHONPATH".format(args.module_dir), file=sys.stderr)
     sys.path.append(_clean_path(args.module_dir))
 
     # Process the database and get job started
