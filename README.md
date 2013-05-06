@@ -14,6 +14,8 @@ For complete documentation go [here](http://htmlpreview.github.com/?http://githu
 
 * [redis-py](https://github.com/andymccurdy/redis-py)
 * [drmaa-python](http://drmaa-python.github.io/)
+* [six](http://pythonhosted.org/six/)
+* Python 2.6+
 
 ### Recommended ###
 * [hiredis](https://pypi.python.org/pypi/hiredis)
