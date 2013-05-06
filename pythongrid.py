@@ -31,21 +31,24 @@ import bz2
 import cPickle as pickle
 import inspect
 import os
-import os.path
 import re
+import subprocess
 import sys
 import traceback
 import uuid
+from socket import gethostname
+from time import sleep
 
 import drmaa
 from redis import StrictRedis
+from redis.exceptions import ConnectionError
 from six.moves import xrange as range
 
 
 #### Global settings ####
 # Redis settings
-REDIS_HOST = 'nlp.research.ets.org'
-REDIS_DB = 'python_grid'
+REDIS_DB = 2
+REDIS_PORT = 7272
 
 # Is mem_free configured properly on the cluster?
 USE_MEM_FREE = False
@@ -157,11 +160,11 @@ class Job(object):
         """
         try:
             self.ret = self.function(*self.args, **self.kwlist)
-            del self.args
-            del self.kwlist
         except Exception as exception:
             self.ret = exception
             traceback.print_exc()
+        del self.args
+        del self.kwlist
 
     @property
     def native_specification(self):
@@ -270,7 +273,8 @@ def _append_job_to_session(session, job, uniq_id, job_num, temp_dir='/scratch/',
     # Make sure to use the .py and not the .pyc version of the module.
     jt.remoteCommand = re.sub(r'\.pyc$', '.py',
                               _clean_path(os.path.abspath(__file__)))
-    jt.args = ['{0}'.format(uniq_id), '{0}'.format(job_num), job.path, temp_dir]
+    jt.args = ['{0}'.format(uniq_id), '{0}'.format(job_num), job.path, temp_dir,
+               gethostname()]
     jt.nativeSpecification = job.native_specification
     jt.outputPath = ":" + temp_dir
     jt.errorPath = ":" + temp_dir
@@ -334,33 +338,34 @@ def _collect_jobs(sid, jobids, joblist, redis_server, uniq_id,
         try:
             job_output = _zload_db(redis_server, 'output{0}'.format(uniq_id),
                                    ix)
-
-            #print exceptions
-            if isinstance(job_output, Exception):
-                print("Exception encountered in job with log file:",
-                      file=sys.stderr)
-                print(log_stdout_fn, file=sys.stderr)
-                print(job_output, file=sys.stderr)
-                print(file=sys.stderr)
-
         except Exception as detail:
-            print("Error while unpickling output for pythongrid job {1} from " +
-                  "stored with key output_{0}_{1}".format(uniq_id, ix),
+            print(("Error while unpickling output for pythongrid job {1} from" +
+                   " stored with key output_{0}_{1}").format(uniq_id, ix),
                   file=sys.stderr)
             print("This could caused by a problem with the cluster " +
                   "environment, imports or environment variables.",
                   file=sys.stderr)
-            print("Try running `pythongrid.py {0} {1} {2} {3}` to see if your" +
-                  " job crashed before writing its output.".format(uniq_id,
-                                                                   ix,
-                                                                   job.path,
-                                                                   temp_dir),
+            print(("Try running `pythongrid.py {0} {1} {2} {3} {4}` to see " +
+                   "if your job crashed before writing its " +
+                   "output.").format(uniq_id,
+                                     ix,
+                                     job.path,
+                                     temp_dir,
+                                     gethostname()),
                   file=sys.stderr)
             print("Check log files for more information: ", file=sys.stderr)
             print("stdout:", log_stdout_fn, file=sys.stderr)
             print("stderr:", log_stderr_fn, file=sys.stderr)
             print("Exception: {0}".format(detail))
             sys.exit(2)
+
+        #print exceptions
+        if isinstance(job_output, Exception):
+            print("Exception encountered in job with log file:",
+                  file=sys.stderr)
+            print(log_stdout_fn, file=sys.stderr)
+            print(job_output, file=sys.stderr)
+            print(file=sys.stderr)
 
         job_output_list.append(job_output)
 
@@ -385,7 +390,26 @@ def process_jobs(jobs, temp_dir='/scratch/', wait=True, white_list=None,
     @type quiet: C{bool}
     """
     # Create new connection to Redis database with pickled jobs
-    redis_server = StrictRedis(host=REDIS_HOST, db=REDIS_DB)
+    redis_server = StrictRedis(host=gethostname(), db=REDIS_DB, port=7272)
+
+    # Check if Redis server is launched, and spawn it if not.
+    try:
+        redis_server.set('connection_test', True)
+    except ConnectionError:
+        with open('/dev/null') as null_file:
+            redis_process = subprocess.Popen(['redis-server', '-'],
+                                             stdout=null_file,
+                                             stdin=subprocess.PIPE,
+                                             stderr=null_file)
+            redis_process.stdin.write('''daemonize yes
+                                         pidfile {0}
+                                         port {1}
+                                      '''.format(os.path.join(temp_dir,
+                                                              'redis7272.pid'),
+                                                 REDIS_PORT))
+            redis_process.stdin.close()
+            # Wait for things to get started
+            sleep(5)
 
     # Generate random name for keys
     uniq_id = uuid.uuid4()
@@ -405,7 +429,7 @@ def process_jobs(jobs, temp_dir='/scratch/', wait=True, white_list=None,
     # Make sure we have enough output
     assert(len(jobs) == len(job_outputs))
 
-    # Delete keys
+    # Delete keys from existing server or just
     redis_server.delete(*redis_server.keys('job{0}_*'.format(uniq_id)))
     redis_server.delete(*redis_server.keys('output{0}_*'.format(uniq_id)))
     return job_outputs
@@ -516,7 +540,7 @@ def _zload_db(redis_server, prefix, job_num):
 ################################################################
 #      The following code will be executed on the cluster      #
 ################################################################
-def _run_job(uniq_id, job_num, temp_dir):
+def _run_job(uniq_id, job_num, temp_dir, redis_host):
     """
     Execute the pickled job and produce pickled output.
 
@@ -529,9 +553,11 @@ def _run_job(uniq_id, job_num, temp_dir):
     @param temp_dir: Local temporary directory for storing output for an
                      individual job.
     @type temp_dir: C{basestring}
+    @param redis_host: Hostname of the database to connect to get the job data.
+    @type redis_host: C{basestring}
     """
     # Connect to database
-    redis_server = redis_server = StrictRedis(host=REDIS_HOST, db=REDIS_DB)
+    redis_server = StrictRedis(host=redis_host, port=REDIS_PORT, db=REDIS_DB)
 
     print("Loading job...", end="", file=sys.stderr)
     sys.stderr.flush()
@@ -593,13 +619,17 @@ def _main():
     parser.add_argument('temp_dir',
                         help='Directory that temporary output will be stored\
                               in.')
+    parser.add_argument('redis_host',
+                        help='The hostname of the server that where the Redis\
+                              database is.')
     args = parser.parse_args()
 
     print("Appended {0} to PYTHONPATH".format(args.module_dir), file=sys.stderr)
     sys.path.append(_clean_path(args.module_dir))
 
     # Process the database and get job started
-    _run_job(args.uniq_id, args.job_number, _clean_path(args.temp_dir))
+    _run_job(args.uniq_id, args.job_number, _clean_path(args.temp_dir),
+             args.redis_host)
 
 
 if __name__ == "__main__":
