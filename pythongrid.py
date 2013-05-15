@@ -49,6 +49,8 @@ from six.moves import xrange as range
 # Redis settings
 REDIS_DB = 2
 REDIS_PORT = 7272
+MAX_TRIES = 50
+SLEEP_TIME = 3
 
 # Is mem_free configured properly on the cluster?
 USE_MEM_FREE = False
@@ -533,7 +535,12 @@ def _zload_db(redis_server, prefix, job_num):
     @param job_num: The ID of the job this data is for.
     @type job_num: C{int}
     """
-    pickled_data = redis_server.get('{0}_{1}'.format(prefix, job_num))
+    attempt = 0
+    pickled_data = None
+    while pickled_data is None and attempt < MAX_TRIES:
+        pickled_data = redis_server.get('{0}_{1}'.format(prefix, job_num))
+        attempt += 1
+        sleep(SLEEP_TIME)
     return pickle.loads(bz2.decompress(pickled_data))
 
 
