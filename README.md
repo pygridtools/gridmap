@@ -9,6 +9,7 @@ For some examples of how to use it, check out example_map_reduce.py (for a simpl
 
 For complete documentation go [here](http://htmlpreview.github.com/?http://github.com/dan-blanchard/pythongrid/blob/master/doc/index.html).
 
+*NOTE*: You cannot use Python Grid on a machine that is not allowed to submit jobs (e.g., slave nodes).
 
 ### Requirements ###
 
@@ -19,5 +20,3 @@ For complete documentation go [here](http://htmlpreview.github.com/?http://githu
 
 ### Recommended ###
 * [hiredis](https://pypi.python.org/pypi/hiredis)
-
-
