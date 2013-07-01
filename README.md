@@ -20,3 +20,6 @@ For complete documentation go [here](http://htmlpreview.github.com/?http://githu
 
 ### Recommended ###
 * [hiredis](https://pypi.python.org/pypi/hiredis)
+
+### License ###
+GPLv3
