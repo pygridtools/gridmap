@@ -7,7 +7,7 @@ This is the ETS fork of an open source project originally hosted on Google Code.
 
 For some examples of how to use it, check out example_map_reduce.py (for a simple example of how you can map a function onto the cluster) and example_manual.py (for an example of how you can create list of jobs yourself).
 
-For complete documentation go [here](http://htmlpreview.github.com/?http://github.com/dan-blanchard/pythongrid/blob/master/doc/index.html).
+For complete documentation go [here](http://htmlpreview.github.io/?http://github.com/EducationalTestingService/pythongrid/blob/master/doc/index.html).
 
 *NOTE*: You cannot use Python Grid on a machine that is not allowed to submit jobs (e.g., slave nodes).
 
