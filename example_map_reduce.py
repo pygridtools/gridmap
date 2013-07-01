@@ -1,14 +1,24 @@
 #!/usr/bin/env python
 
-# This program is free software; you can redistribute it and/or modify
+# Written (W) 2008-2012 Christian Widmer
+# Written (W) 2008-2010 Cheng Soon Ong
+# Written (W) 2012-2013 Daniel Blanchard, dblanchard@ets.org
+# Copyright (C) 2008-2012 Max-Planck-Society, 2012-2013 Educational Testing Service
+
+# This file is part of Python Grid.
+
+# Python Grid is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 2 of the License, or
+# the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-#
-# Written (W) 2010-2012 Christian Widmer
-# Copyright (C) 2010-2012 Max-Planck-Society
-#
-# Modified to use new API by Daniel Blanchard, November 2012
+
+# Python Grid is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with Python Grid.  If not, see <http://www.gnu.org/licenses/>.
 
 
 """
