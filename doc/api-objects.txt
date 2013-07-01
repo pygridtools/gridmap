@@ -10,7 +10,9 @@ pythongrid.REDIS_DB	pythongrid-module.html#REDIS_DB
 pythongrid._submit_jobs	pythongrid-module.html#_submit_jobs
 pythongrid.REDIS_PORT	pythongrid-module.html#REDIS_PORT
 pythongrid._zsave_db	pythongrid-module.html#_zsave_db
+pythongrid.MAX_TRIES	pythongrid-module.html#MAX_TRIES
 pythongrid._collect_jobs	pythongrid-module.html#_collect_jobs
+pythongrid.SLEEP_TIME	pythongrid-module.html#SLEEP_TIME
 pythongrid.process_jobs	pythongrid-module.html#process_jobs
 pythongrid._run_job	pythongrid-module.html#_run_job
 pythongrid._clean_path	pythongrid-module.html#_clean_path
