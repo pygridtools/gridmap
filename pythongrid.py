@@ -400,7 +400,7 @@ def process_jobs(jobs, temp_dir='/scratch/', wait=True, white_list=None,
     @type quiet: C{bool}
     """
     # Create new connection to Redis database with pickled jobs
-    redis_server = StrictRedis(host=gethostname(), db=REDIS_DB, port=7272)
+    redis_server = StrictRedis(host=gethostname(), db=REDIS_DB, port=REDIS_PORT)
 
     # Check if Redis server is launched, and spawn it if not.
     try:
@@ -415,7 +415,7 @@ def process_jobs(jobs, temp_dir='/scratch/', wait=True, white_list=None,
                                          pidfile {0}
                                          port {1}
                                       '''.format(os.path.join(temp_dir,
-                                                              'redis7272.pid'),
+                                                              'redis{0}.pid'.format(REDIS_PORT)),
                                                  REDIS_PORT))
             redis_process.stdin.close()
             # Wait for things to get started
