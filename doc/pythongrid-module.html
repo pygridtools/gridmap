@@ -92,14 +92,19 @@
     </td><td class="summary">
       <table width="100%" cellpadding="0" cellspacing="0" border="0">
         <tr>
-          <td><span class="summary-sig"><a href="pythongrid-module.html#process_jobs" class="summary-sig-name">process_jobs</a>(<span class="summary-sig-arg">jobs</span>,
+          <td><span class="summary-sig"><a href="pythongrid-module.html#pg_map" class="summary-sig-name">pg_map</a>(<span class="summary-sig-arg">f</span>,
+        <span class="summary-sig-arg">args_list</span>,
+        <span class="summary-sig-arg">cleanup</span>=<span class="summary-sig-default">True</span>,
+        <span class="summary-sig-arg">mem_free</span>=<span class="summary-sig-default"><code class="variable-quote">u'</code><code class="variable-string">1G</code><code class="variable-quote">'</code></span>,
+        <span class="summary-sig-arg">name</span>=<span class="summary-sig-default"><code class="variable-quote">u'</code><code class="variable-string">pythongrid_job</code><code class="variable-quote">'</code></span>,
+        <span class="summary-sig-arg">num_slots</span>=<span class="summary-sig-default">1</span>,
         <span class="summary-sig-arg">temp_dir</span>=<span class="summary-sig-default"><code class="variable-quote">u'</code><code class="variable-string">/scratch/</code><code class="variable-quote">'</code></span>,
-        <span class="summary-sig-arg">wait</span>=<span class="summary-sig-default">True</span>,
         <span class="summary-sig-arg">white_list</span>=<span class="summary-sig-default">None</span>,
+        <span class="summary-sig-arg">queue</span>=<span class="summary-sig-default"><code class="variable-quote">u'</code><code class="variable-string">all.q</code><code class="variable-quote">'</code></span>,
         <span class="summary-sig-arg">quiet</span>=<span class="summary-sig-default">True</span>)</span><br />
-      Take a list of jobs and process them on the cluster.</td>
+      Maps a function onto the cluster.</td>
           <td align="right" valign="top">
-            <span class="codelink"><a href="pythongrid-pysrc.html#process_jobs">source&nbsp;code</a></span>
+            <span class="codelink"><a href="pythongrid-pysrc.html#pg_map">source&nbsp;code</a></span>
             
           </td>
         </tr>
@@ -113,19 +118,14 @@
     </td><td class="summary">
       <table width="100%" cellpadding="0" cellspacing="0" border="0">
         <tr>
-          <td><span class="summary-sig"><a href="pythongrid-module.html#pg_map" class="summary-sig-name">pg_map</a>(<span class="summary-sig-arg">f</span>,
-        <span class="summary-sig-arg">args_list</span>,
-        <span class="summary-sig-arg">cleanup</span>=<span class="summary-sig-default">True</span>,
-        <span class="summary-sig-arg">mem_free</span>=<span class="summary-sig-default"><code class="variable-quote">u'</code><code class="variable-string">1G</code><code class="variable-quote">'</code></span>,
-        <span class="summary-sig-arg">name</span>=<span class="summary-sig-default"><code class="variable-quote">u'</code><code class="variable-string">pythongrid_job</code><code class="variable-quote">'</code></span>,
-        <span class="summary-sig-arg">num_slots</span>=<span class="summary-sig-default">1</span>,
+          <td><span class="summary-sig"><a href="pythongrid-module.html#process_jobs" class="summary-sig-name">process_jobs</a>(<span class="summary-sig-arg">jobs</span>,
         <span class="summary-sig-arg">temp_dir</span>=<span class="summary-sig-default"><code class="variable-quote">u'</code><code class="variable-string">/scratch/</code><code class="variable-quote">'</code></span>,
+        <span class="summary-sig-arg">wait</span>=<span class="summary-sig-default">True</span>,
         <span class="summary-sig-arg">white_list</span>=<span class="summary-sig-default">None</span>,
-        <span class="summary-sig-arg">queue</span>=<span class="summary-sig-default"><code class="variable-quote">u'</code><code class="variable-string">nlp.q</code><code class="variable-quote">'</code></span>,
         <span class="summary-sig-arg">quiet</span>=<span class="summary-sig-default">True</span>)</span><br />
-      Maps a function onto the cluster.</td>
+      Take a list of jobs and process them on the cluster.</td>
           <td align="right" valign="top">
-            <span class="codelink"><a href="pythongrid-pysrc.html#pg_map">source&nbsp;code</a></span>
+            <span class="codelink"><a href="pythongrid-pysrc.html#process_jobs">source&nbsp;code</a></span>
             
           </td>
         </tr>
@@ -146,6 +146,20 @@
     <td width="15%" align="right" valign="top" class="summary">
       <span class="summary-type">&nbsp;</span>
     </td><td class="summary">
+        <a name="DEFAULT_QUEUE"></a><span class="summary-name">DEFAULT_QUEUE</span> = <code title="u'all.q'"><code class="variable-quote">u'</code><code class="variable-string">all.q</code><code class="variable-quote">'</code></code>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a name="MAX_TRIES"></a><span class="summary-name">MAX_TRIES</span> = <code title="50">50</code>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
         <a name="REDIS_DB"></a><span class="summary-name">REDIS_DB</span> = <code title="2">2</code>
     </td>
   </tr>
@@ -154,13 +168,6 @@
       <span class="summary-type">&nbsp;</span>
     </td><td class="summary">
         <a name="REDIS_PORT"></a><span class="summary-name">REDIS_PORT</span> = <code title="7272">7272</code>
-    </td>
-  </tr>
-<tr>
-    <td width="15%" align="right" valign="top" class="summary">
-      <span class="summary-type">&nbsp;</span>
-    </td><td class="summary">
-        <a name="MAX_TRIES"></a><span class="summary-name">MAX_TRIES</span> = <code title="50">50</code>
     </td>
   </tr>
 <tr>
@@ -181,13 +188,6 @@
     <td width="15%" align="right" valign="top" class="summary">
       <span class="summary-type">&nbsp;</span>
     </td><td class="summary">
-        <a name="DEFAULT_QUEUE"></a><span class="summary-name">DEFAULT_QUEUE</span> = <code title="u'nlp.q'"><code class="variable-quote">u'</code><code class="variable-string">nlp.q</code><code class="variable-quote">'</code></code>
-    </td>
-  </tr>
-<tr>
-    <td width="15%" align="right" valign="top" class="summary">
-      <span class="summary-type">&nbsp;</span>
-    </td><td class="summary">
         <a name="__package__"></a><span class="summary-name">__package__</span> = <code title="None">None</code>
     </td>
   </tr>
@@ -201,39 +201,6 @@
     <span class="table-header">Function Details</span></td>
 </tr>
 </table>
-<a name="process_jobs"></a>
-<div>
-<table class="details" border="1" cellpadding="3"
-       cellspacing="0" width="100%" bgcolor="white">
-<tr><td>
-  <table width="100%" cellpadding="0" cellspacing="0" border="0">
-  <tr valign="top"><td>
-  <h3 class="epydoc"><span class="sig"><span class="sig-name">process_jobs</span>(<span class="sig-arg">jobs</span>,
-        <span class="sig-arg">temp_dir</span>=<span class="sig-default"><code class="variable-quote">u'</code><code class="variable-string">/scratch/</code><code class="variable-quote">'</code></span>,
-        <span class="sig-arg">wait</span>=<span class="sig-default">True</span>,
-        <span class="sig-arg">white_list</span>=<span class="sig-default">None</span>,
-        <span class="sig-arg">quiet</span>=<span class="sig-default">True</span>)</span>
-  </h3>
-  </td><td align="right" valign="top"
-    ><span class="codelink"><a href="pythongrid-pysrc.html#process_jobs">source&nbsp;code</a></span>&nbsp;
-    </td>
-  </tr></table>
-  
-  <p>Take a list of jobs and process them on the cluster.</p>
-  <dl class="fields">
-    <dt>Parameters:</dt>
-    <dd><ul class="nomargin-top">
-        <li><strong class="pname"><code>temp_dir</code></strong> (<code>basestring</code>) - Local temporary directory for storing output for an individual 
-          job.</li>
-        <li><strong class="pname"><code>wait</code></strong> (<code>bool</code>) - Should we wait for jobs to finish? (Should only be false if the 
-          function you're running doesn't return anything)</li>
-        <li><strong class="pname"><code>white_list</code></strong> (<code>list</code> of <code>basestring</code>) - If specified, limit nodes used to only those in list.</li>
-        <li><strong class="pname"><code>quiet</code></strong> (<code>bool</code>) - When true, do not output information about the jobs that have 
-          been submitted.</li>
-    </ul></dd>
-  </dl>
-</td></tr></table>
-</div>
 <a name="pg_map"></a>
 <div>
 <table class="details" border="1" cellpadding="3"
@@ -249,7 +216,7 @@
         <span class="sig-arg">num_slots</span>=<span class="sig-default">1</span>,
         <span class="sig-arg">temp_dir</span>=<span class="sig-default"><code class="variable-quote">u'</code><code class="variable-string">/scratch/</code><code class="variable-quote">'</code></span>,
         <span class="sig-arg">white_list</span>=<span class="sig-default">None</span>,
-        <span class="sig-arg">queue</span>=<span class="sig-default"><code class="variable-quote">u'</code><code class="variable-string">nlp.q</code><code class="variable-quote">'</code></span>,
+        <span class="sig-arg">queue</span>=<span class="sig-default"><code class="variable-quote">u'</code><code class="variable-string">all.q</code><code class="variable-quote">'</code></span>,
         <span class="sig-arg">quiet</span>=<span class="sig-default">True</span>)</span>
   </h3>
   </td><td align="right" valign="top"
@@ -285,6 +252,39 @@
       </p>
 </div></td></tr></table>
 </div>
+<a name="process_jobs"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">process_jobs</span>(<span class="sig-arg">jobs</span>,
+        <span class="sig-arg">temp_dir</span>=<span class="sig-default"><code class="variable-quote">u'</code><code class="variable-string">/scratch/</code><code class="variable-quote">'</code></span>,
+        <span class="sig-arg">wait</span>=<span class="sig-default">True</span>,
+        <span class="sig-arg">white_list</span>=<span class="sig-default">None</span>,
+        <span class="sig-arg">quiet</span>=<span class="sig-default">True</span>)</span>
+  </h3>
+  </td><td align="right" valign="top"
+    ><span class="codelink"><a href="pythongrid-pysrc.html#process_jobs">source&nbsp;code</a></span>&nbsp;
+    </td>
+  </tr></table>
+  
+  <p>Take a list of jobs and process them on the cluster.</p>
+  <dl class="fields">
+    <dt>Parameters:</dt>
+    <dd><ul class="nomargin-top">
+        <li><strong class="pname"><code>temp_dir</code></strong> (<code>basestring</code>) - Local temporary directory for storing output for an individual 
+          job.</li>
+        <li><strong class="pname"><code>wait</code></strong> (<code>bool</code>) - Should we wait for jobs to finish? (Should only be false if the 
+          function you're running doesn't return anything)</li>
+        <li><strong class="pname"><code>white_list</code></strong> (<code>list</code> of <code>basestring</code>) - If specified, limit nodes used to only those in list.</li>
+        <li><strong class="pname"><code>quiet</code></strong> (<code>bool</code>) - When true, do not output information about the jobs that have 
+          been submitted.</li>
+    </ul></dd>
+  </dl>
+</td></tr></table>
+</div>
 <br />
 <!-- ==================== NAVIGATION BAR ==================== -->
 <table class="navbar" border="0" width="100%" cellpadding="0"
@@ -312,7 +312,7 @@
 <table border="0" cellpadding="0" cellspacing="0" width="100%%">
   <tr>
     <td align="left" class="footer">
-    Generated by Epydoc 3.0.1 on Mon Jul  1 15:03:50 2013
+    Generated by Epydoc 3.0.1 on Mon Jul 15 12:03:23 2013
     </td>
     <td align="right" class="footer">
       <a target="mainFrame" href="http://epydoc.sourceforge.net"
