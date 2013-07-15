@@ -16,5 +16,5 @@ setup(name='gridmap',
       author_email='dblanchard@ets.org',
       license='GPL',
       packages=['gridmap'],
-      install_requires=['drmaa', 'pyzmq'],
+      install_requires=['drmaa', 'redis', 'hiredis'],
       zip_safe=False)
