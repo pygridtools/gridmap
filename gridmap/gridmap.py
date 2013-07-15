@@ -4,16 +4,16 @@
 # Written (W) 2008-2012 Christian Widmer
 # Written (W) 2008-2010 Cheng Soon Ong
 # Written (W) 2012-2013 Daniel Blanchard, dblanchard@ets.org
-# Copyright (C) 2008-2012 Max-Planck-Society, 2012-2013 Educational Testing Service
+# Copyright (C) 2008-2012 Max-Planck-Society, 2012-2013 ETS
 
-# This file is part of Python Grid.
+# This file is part of Grid Map.
 
-# Python Grid is free software: you can redistribute it and/or modify
+# Grid Map is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 
-# Python Grid is distributed in the hope that it will be useful,
+# Grid Map is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
@@ -22,7 +22,7 @@
 # along with Grid Map.  If not, see <http://www.gnu.org/licenses/>.
 
 """
-pythongrid provides a high level front-end to DRMAA-python.
+gridmap provides a high level front-end to DRMAA-python.
 
 This module provides wrappers that simplify submission and collection of jobs,
 in a more 'pythonic' fashion.
@@ -36,7 +36,10 @@ from __future__ import print_function, unicode_literals
 
 import argparse
 import bz2
-import cPickle as pickle
+try:
+    import cPickle as pickle  # For Python 2.x
+except ImportError:
+    import pickle
 import inspect
 import os
 import re
@@ -49,8 +52,11 @@ from time import sleep
 
 import drmaa
 from redis import StrictRedis
-from redis.exceptions import ConnectionError
-from six.moves import xrange as range
+from redis.exceptions import ConnectionError as RedisConnectionError
+
+# Python 2.x backward compatibility
+if sys.version_info < (3, 0):
+    range = xrange
 
 
 #### Global settings ####
@@ -64,7 +70,7 @@ SLEEP_TIME = 3
 USE_MEM_FREE = False
 
 # Which queue should we use by default
-DEFAULT_QUEUE = 'nlp.q'
+DEFAULT_QUEUE = 'all.q'
 
 
 class Job(object):
@@ -82,7 +88,7 @@ class Job(object):
                  'mem_free', 'white_list', 'path', 'uniq_id', 'name', 'queue')
 
     def __init__(self, f, args, kwlist=None, cleanup=True, mem_free="1G",
-                 name='pythongrid_job', num_slots=1, queue=DEFAULT_QUEUE):
+                 name='gridmap_job', num_slots=1, queue=DEFAULT_QUEUE):
         """
         Initializes a new Job.
 
@@ -251,7 +257,7 @@ def _append_job_to_session(session, job, uniq_id, job_num, temp_dir='/scratch/',
                     in the database.
     @type uniq_id: C{basestring}
     @param job_num: The row in the table to store/retrieve data on. This is only
-                    non-zero for jobs created via pg_map.
+                    non-zero for jobs created via grid_map.
     @type job_num: C{int}
     @param temp_dir: Local temporary directory for storing output for an
                     individual job.
@@ -349,13 +355,13 @@ def _collect_jobs(sid, jobids, joblist, redis_server, uniq_id,
             job_output = _zload_db(redis_server, 'output{0}'.format(uniq_id),
                                    ix)
         except Exception as detail:
-            print(("Error while unpickling output for pythongrid job {1} from" +
+            print(("Error while unpickling output for gridmap job {1} from" +
                    " stored with key output_{0}_{1}").format(uniq_id, ix),
                   file=sys.stderr)
             print("This could caused by a problem with the cluster " +
                   "environment, imports or environment variables.",
                   file=sys.stderr)
-            print(("Try running `pythongrid.py {0} {1} {2} {3} {4}` to see " +
+            print(("Try running `gridmap.py {0} {1} {2} {3} {4}` to see " +
                    "if your job crashed before writing its " +
                    "output.").format(uniq_id,
                                      ix,
@@ -405,7 +411,7 @@ def process_jobs(jobs, temp_dir='/scratch/', wait=True, white_list=None,
     # Check if Redis server is launched, and spawn it if not.
     try:
         redis_server.set('connection_test', True)
-    except ConnectionError:
+    except RedisConnectionError:
         with open('/dev/null') as null_file:
             redis_process = subprocess.Popen(['redis-server', '-'],
                                              stdout=null_file,
@@ -448,7 +454,7 @@ def process_jobs(jobs, temp_dir='/scratch/', wait=True, white_list=None,
 #####################################################################
 # MapReduce Interface
 #####################################################################
-def pg_map(f, args_list, cleanup=True, mem_free="1G", name='pythongrid_job',
+def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
            num_slots=1, temp_dir='/scratch/', white_list=None,
            queue=DEFAULT_QUEUE, quiet=True):
     """
@@ -496,6 +502,44 @@ def pg_map(f, args_list, cleanup=True, mem_free="1G", name='pythongrid_job',
                                quiet=quiet)
 
     return job_results
+
+
+def pg_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
+           num_slots=1, temp_dir='/scratch/', white_list=None,
+           queue=DEFAULT_QUEUE, quiet=True):
+    """
+    @deprecated: This function has been renamed grid_map.
+
+    @param f: The function to map on args_list
+    @type f: C{function}
+    @param args_list: List of arguments to pass to f
+    @type args_list: C{list}
+    @param cleanup: Should we remove the stdout and stderr temporary files for
+                    each job when we're done? (They are left in place if there's
+                    an error.)
+    @type cleanup: C{bool}
+    @param mem_free: Estimate of how much memory each job will need (for
+                     scheduling). (Not currently used, because our cluster does
+                     not have that setting enabled.)
+    @type mem_free: C{basestring}
+    @param name: Base name to give each job (will have a number add to end)
+    @type name: C{basestring}
+    @param num_slots: Number of slots each job should use.
+    @type num_slots: C{int}
+    @param temp_dir: Local temporary directory for storing output for an
+                     individual job.
+    @type temp_dir: C{basestring}
+    @param white_list: If specified, limit nodes used to only those in list.
+    @type white_list: C{list} of C{basestring}
+    @param queue: The SGE queue to use for scheduling.
+    @type queue: C{basestring}
+    @param quiet: When true, do not output information about the jobs that have
+                  been submitted.
+    @type quiet: C{bool}
+    """
+    return grid_map(f, args_list, cleanup=cleanup, mem_free=mem_free, name=name,
+                    num_slots=num_slots, temp_dir=temp_dir,
+                    white_list=white_list, queue=queue, quiet=quiet)
 
 
 #####################################################################
