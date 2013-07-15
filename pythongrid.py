@@ -64,7 +64,7 @@ SLEEP_TIME = 3
 USE_MEM_FREE = False
 
 # Which queue should we use by default
-DEFAULT_QUEUE = 'nlp.q'
+DEFAULT_QUEUE = 'all.q'
 
 
 class Job(object):
