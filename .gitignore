@@ -4,3 +4,4 @@
 *.egg
 gridmap.egg-info/
 dist/
+build/
