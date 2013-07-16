@@ -20,4 +20,9 @@
 # You should have received a copy of the GNU General Public License
 # along with Grid Map.  If not, see <http://www.gnu.org/licenses/>.
 
-from gridmap import Job, process_jobs, grid_map, pg_map
+from __future__ import absolute_import
+
+from .gridmap import Job, process_jobs, grid_map, pg_map
+
+__version__ = '0.9.2'
+VERSION = tuple(int(x) for x in __version__.split('.'))
