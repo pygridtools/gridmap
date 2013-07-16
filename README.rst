@@ -12,10 +12,10 @@ method they were using. The main benefit of this approach is you never
 run into issues with exceeding the message length when you're
 parallelizing a huge job.
 
-For some examples of how to use it, check out example\_map\_reduce.py
+For some examples of how to use it, check out map\_reduce.py
 (for a simple example of how you can map a function onto the cluster)
-and example\_manual.py (for an example of how you can create list of
-jobs yourself).
+and manual.py (for an example of how you can create list of
+jobs yourself) in the examples folder.
 
 For complete documentation go
 `here <http://htmlpreview.github.io/?http://github.com/EducationalTestingService/gridmap/blob/master/doc/index.html>`__.

@@ -18,6 +18,6 @@
 # GNU General Public License for more details.
 
 # You should have received a copy of the GNU General Public License
-# along with Python Grid.  If not, see <http://www.gnu.org/licenses/>.
+# along with Grid Map.  If not, see <http://www.gnu.org/licenses/>.
 
 from gridmap import Job, process_jobs, grid_map, pg_map

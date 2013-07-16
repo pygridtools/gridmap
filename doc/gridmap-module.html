@@ -37,7 +37,7 @@
   <tr valign="top">
     <td width="100%">
       <span class="breadcrumbs">
-        Package&nbsp;gridmap
+        Module&nbsp;gridmap
       </span>
     </td>
     <td>
@@ -47,23 +47,118 @@
     </td>
   </tr>
 </table>
-<!-- ==================== PACKAGE DESCRIPTION ==================== -->
-<h1 class="epydoc">Package gridmap</h1><p class="nomargin-top"><span class="codelink"><a href="gridmap-pysrc.html">source&nbsp;code</a></span></p>
-<!-- ==================== SUBMODULES ==================== -->
-<a name="section-Submodules"></a>
+<!-- ==================== MODULE DESCRIPTION ==================== -->
+<h1 class="epydoc">Module gridmap</h1><p class="nomargin-top"><span class="codelink"><a href="gridmap-pysrc.html">source&nbsp;code</a></span></p>
+<p>gridmap provides a high level front-end to DRMAA-python.</p>
+  <p>This module provides wrappers that simplify submission and collection 
+  of jobs, in a more 'pythonic' fashion.</p>
+
+<hr />
+<div class="fields">      <dl><dt>Authors:</dt>
+        <dd>
+          Christian Widmer,
+          Cheng Soon Ong,
+          Dan Blanchard (dblanchard@ets.org)
+        </dd>
+      </dl>
+</div><!-- ==================== CLASSES ==================== -->
+<a name="section-Classes"></a>
 <table class="summary" border="1" cellpadding="3"
        cellspacing="0" width="100%" bgcolor="white">
 <tr bgcolor="#70b0f0" class="table-header">
   <td align="left" colspan="2" class="table-header">
-    <span class="table-header">Submodules</span></td>
+    <span class="table-header">Classes</span></td>
 </tr>
-  <tr><td class="summary">
-  <ul class="nomargin">
-    <li> <strong class="uidlink"><a href="gridmap.gridmap-module.html">gridmap.gridmap</a></strong>: <em class="summary">gridmap provides a high level front-end to DRMAA-python.</em>    </li>
-  </ul></td></tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="gridmap.Job-class.html" class="summary-name">Job</a><br />
+      Central entity that wraps a function and its data.
+    </td>
+  </tr>
 </table>
-
-<br />
+<!-- ==================== FUNCTIONS ==================== -->
+<a name="section-Functions"></a>
+<table class="summary" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr bgcolor="#70b0f0" class="table-header">
+  <td align="left" colspan="2" class="table-header">
+    <span class="table-header">Functions</span></td>
+</tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a href="gridmap-module.html#grid_map" class="summary-sig-name">grid_map</a>(<span class="summary-sig-arg">f</span>,
+        <span class="summary-sig-arg">args_list</span>,
+        <span class="summary-sig-arg">cleanup</span>=<span class="summary-sig-default">True</span>,
+        <span class="summary-sig-arg">mem_free</span>=<span class="summary-sig-default"><code class="variable-quote">u'</code><code class="variable-string">1G</code><code class="variable-quote">'</code></span>,
+        <span class="summary-sig-arg">name</span>=<span class="summary-sig-default"><code class="variable-quote">u'</code><code class="variable-string">gridmap_job</code><code class="variable-quote">'</code></span>,
+        <span class="summary-sig-arg">num_slots</span>=<span class="summary-sig-default">1</span>,
+        <span class="summary-sig-arg">temp_dir</span>=<span class="summary-sig-default"><code class="variable-quote">u'</code><code class="variable-string">/scratch/</code><code class="variable-quote">'</code></span>,
+        <span class="summary-sig-arg">white_list</span>=<span class="summary-sig-default">None</span>,
+        <span class="summary-sig-arg">queue</span>=<span class="summary-sig-default"><code class="variable-quote">u'</code><code class="variable-string">all.q</code><code class="variable-quote">'</code></span>,
+        <span class="summary-sig-arg">quiet</span>=<span class="summary-sig-default">True</span>)</span><br />
+      Maps a function onto the cluster.</td>
+          <td align="right" valign="top">
+            <span class="codelink"><a href="gridmap-pysrc.html#grid_map">source&nbsp;code</a></span>
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a href="gridmap-module.html#pg_map" class="summary-sig-name">pg_map</a>(<span class="summary-sig-arg">f</span>,
+        <span class="summary-sig-arg">args_list</span>,
+        <span class="summary-sig-arg">cleanup</span>=<span class="summary-sig-default">True</span>,
+        <span class="summary-sig-arg">mem_free</span>=<span class="summary-sig-default"><code class="variable-quote">u'</code><code class="variable-string">1G</code><code class="variable-quote">'</code></span>,
+        <span class="summary-sig-arg">name</span>=<span class="summary-sig-default"><code class="variable-quote">u'</code><code class="variable-string">gridmap_job</code><code class="variable-quote">'</code></span>,
+        <span class="summary-sig-arg">num_slots</span>=<span class="summary-sig-default">1</span>,
+        <span class="summary-sig-arg">temp_dir</span>=<span class="summary-sig-default"><code class="variable-quote">u'</code><code class="variable-string">/scratch/</code><code class="variable-quote">'</code></span>,
+        <span class="summary-sig-arg">white_list</span>=<span class="summary-sig-default">None</span>,
+        <span class="summary-sig-arg">queue</span>=<span class="summary-sig-default"><code class="variable-quote">u'</code><code class="variable-string">all.q</code><code class="variable-quote">'</code></span>,
+        <span class="summary-sig-arg">quiet</span>=<span class="summary-sig-default">True</span>)</span></td>
+          <td align="right" valign="top">
+            <span class="codelink"><a href="gridmap-pysrc.html#pg_map">source&nbsp;code</a></span>
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a href="gridmap-module.html#process_jobs" class="summary-sig-name">process_jobs</a>(<span class="summary-sig-arg">jobs</span>,
+        <span class="summary-sig-arg">temp_dir</span>=<span class="summary-sig-default"><code class="variable-quote">u'</code><code class="variable-string">/scratch/</code><code class="variable-quote">'</code></span>,
+        <span class="summary-sig-arg">wait</span>=<span class="summary-sig-default">True</span>,
+        <span class="summary-sig-arg">white_list</span>=<span class="summary-sig-default">None</span>,
+        <span class="summary-sig-arg">quiet</span>=<span class="summary-sig-default">True</span>)</span><br />
+      Take a list of jobs and process them on the cluster.</td>
+          <td align="right" valign="top">
+            <span class="codelink"><a href="gridmap-pysrc.html#process_jobs">source&nbsp;code</a></span>
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+</table>
 <!-- ==================== VARIABLES ==================== -->
 <a name="section-Variables"></a>
 <table class="summary" border="1" cellpadding="3"
@@ -76,10 +171,196 @@
     <td width="15%" align="right" valign="top" class="summary">
       <span class="summary-type">&nbsp;</span>
     </td><td class="summary">
-        <a name="__package__"></a><span class="summary-name">__package__</span> = <code title="'gridmap'"><code class="variable-quote">'</code><code class="variable-string">gridmap</code><code class="variable-quote">'</code></code>
+        <a name="DEFAULT_QUEUE"></a><span class="summary-name">DEFAULT_QUEUE</span> = <code title="u'all.q'"><code class="variable-quote">u'</code><code class="variable-string">all.q</code><code class="variable-quote">'</code></code>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a name="MAX_TRIES"></a><span class="summary-name">MAX_TRIES</span> = <code title="50">50</code>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a name="REDIS_DB"></a><span class="summary-name">REDIS_DB</span> = <code title="2">2</code>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a name="REDIS_PORT"></a><span class="summary-name">REDIS_PORT</span> = <code title="7272">7272</code>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a name="SLEEP_TIME"></a><span class="summary-name">SLEEP_TIME</span> = <code title="3">3</code>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a name="USE_MEM_FREE"></a><span class="summary-name">USE_MEM_FREE</span> = <code title="False">False</code>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a name="__package__"></a><span class="summary-name">__package__</span> = <code title="None">None</code>
     </td>
   </tr>
 </table>
+<!-- ==================== FUNCTION DETAILS ==================== -->
+<a name="section-FunctionDetails"></a>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr bgcolor="#70b0f0" class="table-header">
+  <td align="left" colspan="2" class="table-header">
+    <span class="table-header">Function Details</span></td>
+</tr>
+</table>
+<a name="grid_map"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">grid_map</span>(<span class="sig-arg">f</span>,
+        <span class="sig-arg">args_list</span>,
+        <span class="sig-arg">cleanup</span>=<span class="sig-default">True</span>,
+        <span class="sig-arg">mem_free</span>=<span class="sig-default"><code class="variable-quote">u'</code><code class="variable-string">1G</code><code class="variable-quote">'</code></span>,
+        <span class="sig-arg">name</span>=<span class="sig-default"><code class="variable-quote">u'</code><code class="variable-string">gridmap_job</code><code class="variable-quote">'</code></span>,
+        <span class="sig-arg">num_slots</span>=<span class="sig-default">1</span>,
+        <span class="sig-arg">temp_dir</span>=<span class="sig-default"><code class="variable-quote">u'</code><code class="variable-string">/scratch/</code><code class="variable-quote">'</code></span>,
+        <span class="sig-arg">white_list</span>=<span class="sig-default">None</span>,
+        <span class="sig-arg">queue</span>=<span class="sig-default"><code class="variable-quote">u'</code><code class="variable-string">all.q</code><code class="variable-quote">'</code></span>,
+        <span class="sig-arg">quiet</span>=<span class="sig-default">True</span>)</span>
+  </h3>
+  </td><td align="right" valign="top"
+    ><span class="codelink"><a href="gridmap-pysrc.html#grid_map">source&nbsp;code</a></span>&nbsp;
+    </td>
+  </tr></table>
+  
+  <p>Maps a function onto the cluster.</p>
+  <dl class="fields">
+    <dt>Parameters:</dt>
+    <dd><ul class="nomargin-top">
+        <li><strong class="pname"><code>f</code></strong> (<code>function</code>) - The function to map on args_list</li>
+        <li><strong class="pname"><code>args_list</code></strong> (<code>list</code>) - List of arguments to pass to f</li>
+        <li><strong class="pname"><code>cleanup</code></strong> (<code>bool</code>) - Should we remove the stdout and stderr temporary files for each 
+          job when we're done? (They are left in place if there's an 
+          error.)</li>
+        <li><strong class="pname"><code>mem_free</code></strong> (<code>basestring</code>) - Estimate of how much memory each job will need (for scheduling). 
+          (Not currently used, because our cluster does not have that 
+          setting enabled.)</li>
+        <li><strong class="pname"><code>name</code></strong> (<code>basestring</code>) - Base name to give each job (will have a number add to end)</li>
+        <li><strong class="pname"><code>num_slots</code></strong> (<code>int</code>) - Number of slots each job should use.</li>
+        <li><strong class="pname"><code>temp_dir</code></strong> (<code>basestring</code>) - Local temporary directory for storing output for an individual 
+          job.</li>
+        <li><strong class="pname"><code>white_list</code></strong> (<code>list</code> of <code>basestring</code>) - If specified, limit nodes used to only those in list.</li>
+        <li><strong class="pname"><code>queue</code></strong> (<code>basestring</code>) - The SGE queue to use for scheduling.</li>
+        <li><strong class="pname"><code>quiet</code></strong> (<code>bool</code>) - When true, do not output information about the jobs that have 
+          been submitted.</li>
+    </ul></dd>
+  </dl>
+<div class="fields">      <p><strong>Note:</strong>
+        This can only be used with picklable functions (i.e., those that 
+        are defined at the module or class level).
+      </p>
+</div></td></tr></table>
+</div>
+<a name="pg_map"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">pg_map</span>(<span class="sig-arg">f</span>,
+        <span class="sig-arg">args_list</span>,
+        <span class="sig-arg">cleanup</span>=<span class="sig-default">True</span>,
+        <span class="sig-arg">mem_free</span>=<span class="sig-default"><code class="variable-quote">u'</code><code class="variable-string">1G</code><code class="variable-quote">'</code></span>,
+        <span class="sig-arg">name</span>=<span class="sig-default"><code class="variable-quote">u'</code><code class="variable-string">gridmap_job</code><code class="variable-quote">'</code></span>,
+        <span class="sig-arg">num_slots</span>=<span class="sig-default">1</span>,
+        <span class="sig-arg">temp_dir</span>=<span class="sig-default"><code class="variable-quote">u'</code><code class="variable-string">/scratch/</code><code class="variable-quote">'</code></span>,
+        <span class="sig-arg">white_list</span>=<span class="sig-default">None</span>,
+        <span class="sig-arg">queue</span>=<span class="sig-default"><code class="variable-quote">u'</code><code class="variable-string">all.q</code><code class="variable-quote">'</code></span>,
+        <span class="sig-arg">quiet</span>=<span class="sig-default">True</span>)</span>
+  </h3>
+  </td><td align="right" valign="top"
+    ><span class="codelink"><a href="gridmap-pysrc.html#pg_map">source&nbsp;code</a></span>&nbsp;
+    </td>
+  </tr></table>
+  
+  
+  <dl class="fields">
+    <dt>Parameters:</dt>
+    <dd><ul class="nomargin-top">
+        <li><strong class="pname"><code>f</code></strong> (<code>function</code>) - The function to map on args_list</li>
+        <li><strong class="pname"><code>args_list</code></strong> (<code>list</code>) - List of arguments to pass to f</li>
+        <li><strong class="pname"><code>cleanup</code></strong> (<code>bool</code>) - Should we remove the stdout and stderr temporary files for each 
+          job when we're done? (They are left in place if there's an 
+          error.)</li>
+        <li><strong class="pname"><code>mem_free</code></strong> (<code>basestring</code>) - Estimate of how much memory each job will need (for scheduling). 
+          (Not currently used, because our cluster does not have that 
+          setting enabled.)</li>
+        <li><strong class="pname"><code>name</code></strong> (<code>basestring</code>) - Base name to give each job (will have a number add to end)</li>
+        <li><strong class="pname"><code>num_slots</code></strong> (<code>int</code>) - Number of slots each job should use.</li>
+        <li><strong class="pname"><code>temp_dir</code></strong> (<code>basestring</code>) - Local temporary directory for storing output for an individual 
+          job.</li>
+        <li><strong class="pname"><code>white_list</code></strong> (<code>list</code> of <code>basestring</code>) - If specified, limit nodes used to only those in list.</li>
+        <li><strong class="pname"><code>queue</code></strong> (<code>basestring</code>) - The SGE queue to use for scheduling.</li>
+        <li><strong class="pname"><code>quiet</code></strong> (<code>bool</code>) - When true, do not output information about the jobs that have 
+          been submitted.</li>
+    </ul></dd>
+  </dl>
+<div class="fields">      <p><strong>Deprecated:</strong>
+        This function has been renamed grid_map.
+      </p>
+</div></td></tr></table>
+</div>
+<a name="process_jobs"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">process_jobs</span>(<span class="sig-arg">jobs</span>,
+        <span class="sig-arg">temp_dir</span>=<span class="sig-default"><code class="variable-quote">u'</code><code class="variable-string">/scratch/</code><code class="variable-quote">'</code></span>,
+        <span class="sig-arg">wait</span>=<span class="sig-default">True</span>,
+        <span class="sig-arg">white_list</span>=<span class="sig-default">None</span>,
+        <span class="sig-arg">quiet</span>=<span class="sig-default">True</span>)</span>
+  </h3>
+  </td><td align="right" valign="top"
+    ><span class="codelink"><a href="gridmap-pysrc.html#process_jobs">source&nbsp;code</a></span>&nbsp;
+    </td>
+  </tr></table>
+  
+  <p>Take a list of jobs and process them on the cluster.</p>
+  <dl class="fields">
+    <dt>Parameters:</dt>
+    <dd><ul class="nomargin-top">
+        <li><strong class="pname"><code>temp_dir</code></strong> (<code>basestring</code>) - Local temporary directory for storing output for an individual 
+          job.</li>
+        <li><strong class="pname"><code>wait</code></strong> (<code>bool</code>) - Should we wait for jobs to finish? (Should only be false if the 
+          function you're running doesn't return anything)</li>
+        <li><strong class="pname"><code>white_list</code></strong> (<code>list</code> of <code>basestring</code>) - If specified, limit nodes used to only those in list.</li>
+        <li><strong class="pname"><code>quiet</code></strong> (<code>bool</code>) - When true, do not output information about the jobs that have 
+          been submitted.</li>
+    </ul></dd>
+  </dl>
+</td></tr></table>
+</div>
+<br />
 <!-- ==================== NAVIGATION BAR ==================== -->
 <table class="navbar" border="0" width="100%" cellpadding="0"
        bgcolor="#a0c0ff" cellspacing="0">
@@ -106,7 +387,7 @@
 <table border="0" cellpadding="0" cellspacing="0" width="100%%">
   <tr>
     <td align="left" class="footer">
-    Generated by Epydoc 3.0.1 on Mon Jul 15 16:41:22 2013
+    Generated by Epydoc 3.0.1 on Mon Jul 15 22:16:40 2013
     </td>
     <td align="right" class="footer">
       <a target="mainFrame" href="http://epydoc.sourceforge.net"
