@@ -126,7 +126,7 @@ class Job(object):
         self.mem_free = mem_free
         self.white_list = []
         self.uniq_id = None
-        self.name = name
+        self.name = name.replace(' ', '_')
         self.queue = queue
 
     @property
