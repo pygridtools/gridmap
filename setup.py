@@ -7,7 +7,7 @@ def readme():
 
 
 setup(name='gridmap',
-      version='0.9',
+      version='0.9.1',
       description='Easily map Python functions onto a cluster using a DRMAA-compatible grid engine like Sun Grid Engine (SGE).',
       long_description=readme(),
       keywords='drmaa sge cluster distributed parallel',
