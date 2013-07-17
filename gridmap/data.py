@@ -40,7 +40,7 @@ from time import sleep
 
 
 #### Global settings ####
-MAX_TRIES = 50
+MAX_TRIES = 10
 SLEEP_TIME = 3
 
 
