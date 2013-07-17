@@ -62,8 +62,6 @@ def _run_job(uniq_id, job_num, temp_dir, redis_host):
     print("Loading job...", end="", file=sys.stderr)
     sys.stderr.flush()
     try:
-        import pdb
-        pdb.set_trace()
         job = zload_db(redis_server, 'job{0}'.format(uniq_id), job_num)
     except Exception as detail:
         job = None
