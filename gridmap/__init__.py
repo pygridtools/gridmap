@@ -30,7 +30,7 @@ in a more 'pythonic' fashion.
 
 from __future__ import absolute_import, print_function, unicode_literals
 
-from .job import Job, process_jobs, grid_map, pg_map
+from gridmap.job import Job, process_jobs, grid_map, pg_map
 
 
 # Version info

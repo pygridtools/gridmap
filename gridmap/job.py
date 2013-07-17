@@ -350,13 +350,14 @@ def _collect_jobs(sid, jobids, joblist, redis_server, uniq_id,
             print("This could caused by a problem with the cluster " +
                   "environment, imports or environment variables.",
                   file=sys.stderr)
-            print(("Try running `python -m gridmap.runner {0} {1} {2} {3} " +
+            print(("Try running `{5} -m gridmap.runner {0} {1} {2} {3} " +
                    "{4}` to see if your job crashed before writing its " +
                    "output.").format(uniq_id,
                                      ix,
                                      job.path,
                                      temp_dir,
-                                     gethostname()),
+                                     gethostname(),
+                                     sys.executable),
                   file=sys.stderr)
             print("Check log files for more information: ", file=sys.stderr)
             print("stdout:", log_stdout_fn, file=sys.stderr)
