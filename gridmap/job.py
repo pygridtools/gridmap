@@ -277,7 +277,7 @@ def _append_job_to_session(session, job, uniq_id, job_num, temp_dir='/scratch/',
         jt.jobEnvironment = shell_env
 
     # Run module using python -m to avoid ImportErrors when unpickling jobs
-    jt.remoteCommand =  '/usr/bin/env/python'
+    jt.remoteCommand =  sys.executable
     jt.args = ['-m', 'gridmap.runner', '{0}'.format(uniq_id),
                '{0}'.format(job_num), job.path, temp_dir, gethostname()]
     jt.nativeSpecification = job.native_specification
