@@ -37,7 +37,7 @@
   <tr valign="top">
     <td width="100%">
       <span class="breadcrumbs">
-        Module&nbsp;gridmap
+        Package&nbsp;gridmap
       </span>
     </td>
     <td>
@@ -47,11 +47,10 @@
     </td>
   </tr>
 </table>
-<!-- ==================== MODULE DESCRIPTION ==================== -->
-<h1 class="epydoc">Module gridmap</h1><p class="nomargin-top"><span class="codelink"><a href="gridmap-pysrc.html">source&nbsp;code</a></span></p>
-<p>gridmap provides a high level front-end to DRMAA-python.</p>
-  <p>This module provides wrappers that simplify submission and collection 
-  of jobs, in a more 'pythonic' fashion.</p>
+<!-- ==================== PACKAGE DESCRIPTION ==================== -->
+<h1 class="epydoc">Package gridmap</h1><p class="nomargin-top"><span class="codelink"><a href="gridmap-pysrc.html">source&nbsp;code</a></span></p>
+<p>Grid Map provides wrappers that simplify submission and collection of 
+  jobs, in a more 'pythonic' fashion.</p>
 
 <hr />
 <div class="fields">      <dl><dt>Authors:</dt>
@@ -61,7 +60,28 @@
           Dan Blanchard (dblanchard@ets.org)
         </dd>
       </dl>
-</div><!-- ==================== CLASSES ==================== -->
+      <p><strong>Version:</strong>
+        0.9.3
+      </p>
+</div><!-- ==================== SUBMODULES ==================== -->
+<a name="section-Submodules"></a>
+<table class="summary" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr bgcolor="#70b0f0" class="table-header">
+  <td align="left" colspan="2" class="table-header">
+    <span class="table-header">Submodules</span></td>
+</tr>
+  <tr><td class="summary">
+  <ul class="nomargin">
+    <li class="private"> <strong class="uidlink"><a href="gridmap.data-module.html" onclick="show_private();">gridmap.data</a></strong>: <em class="summary">This modules provides all of the data-related function for gridmap.</em>    </li>
+    <li class="private"> <strong class="uidlink"><a href="gridmap.job-module.html" onclick="show_private();">gridmap.job</a></strong>: <em class="summary">This module provides wrappers that simplify submission and 
+        collection of jobs, in a more 'pythonic' fashion.</em>    </li>
+    <li> <strong class="uidlink"><a href="gridmap.runner-module.html">gridmap.runner</a></strong>: <em class="summary">This module executes pickled jobs on the cluster.</em>    </li>
+  </ul></td></tr>
+</table>
+
+<br />
+<!-- ==================== CLASSES ==================== -->
 <a name="section-Classes"></a>
 <table class="summary" border="1" cellpadding="3"
        cellspacing="0" width="100%" bgcolor="white">
@@ -73,7 +93,7 @@
     <td width="15%" align="right" valign="top" class="summary">
       <span class="summary-type">&nbsp;</span>
     </td><td class="summary">
-        <a href="gridmap.Job-class.html" class="summary-name">Job</a><br />
+        <a href="gridmap.job.Job-class.html" class="summary-name">Job</a><br />
       Central entity that wraps a function and its data.
     </td>
   </tr>
@@ -92,6 +112,27 @@
     </td><td class="summary">
       <table width="100%" cellpadding="0" cellspacing="0" border="0">
         <tr>
+          <td><span class="summary-sig"><a href="gridmap-module.html#process_jobs" class="summary-sig-name">process_jobs</a>(<span class="summary-sig-arg">jobs</span>,
+        <span class="summary-sig-arg">temp_dir</span>=<span class="summary-sig-default"><code class="variable-quote">u'</code><code class="variable-string">/scratch/</code><code class="variable-quote">'</code></span>,
+        <span class="summary-sig-arg">wait</span>=<span class="summary-sig-default">True</span>,
+        <span class="summary-sig-arg">white_list</span>=<span class="summary-sig-default">None</span>,
+        <span class="summary-sig-arg">quiet</span>=<span class="summary-sig-default">True</span>)</span><br />
+      Take a list of jobs and process them on the cluster.</td>
+          <td align="right" valign="top">
+            <span class="codelink"><a href="gridmap.job-pysrc.html#process_jobs">source&nbsp;code</a></span>
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
           <td><span class="summary-sig"><a href="gridmap-module.html#grid_map" class="summary-sig-name">grid_map</a>(<span class="summary-sig-arg">f</span>,
         <span class="summary-sig-arg">args_list</span>,
         <span class="summary-sig-arg">cleanup</span>=<span class="summary-sig-default">True</span>,
@@ -104,7 +145,7 @@
         <span class="summary-sig-arg">quiet</span>=<span class="summary-sig-default">True</span>)</span><br />
       Maps a function onto the cluster.</td>
           <td align="right" valign="top">
-            <span class="codelink"><a href="gridmap-pysrc.html#grid_map">source&nbsp;code</a></span>
+            <span class="codelink"><a href="gridmap.job-pysrc.html#grid_map">source&nbsp;code</a></span>
             
           </td>
         </tr>
@@ -129,91 +170,12 @@
         <span class="summary-sig-arg">queue</span>=<span class="summary-sig-default"><code class="variable-quote">u'</code><code class="variable-string">all.q</code><code class="variable-quote">'</code></span>,
         <span class="summary-sig-arg">quiet</span>=<span class="summary-sig-default">True</span>)</span></td>
           <td align="right" valign="top">
-            <span class="codelink"><a href="gridmap-pysrc.html#pg_map">source&nbsp;code</a></span>
+            <span class="codelink"><a href="gridmap.job-pysrc.html#pg_map">source&nbsp;code</a></span>
             
           </td>
         </tr>
       </table>
       
-    </td>
-  </tr>
-<tr>
-    <td width="15%" align="right" valign="top" class="summary">
-      <span class="summary-type">&nbsp;</span>
-    </td><td class="summary">
-      <table width="100%" cellpadding="0" cellspacing="0" border="0">
-        <tr>
-          <td><span class="summary-sig"><a href="gridmap-module.html#process_jobs" class="summary-sig-name">process_jobs</a>(<span class="summary-sig-arg">jobs</span>,
-        <span class="summary-sig-arg">temp_dir</span>=<span class="summary-sig-default"><code class="variable-quote">u'</code><code class="variable-string">/scratch/</code><code class="variable-quote">'</code></span>,
-        <span class="summary-sig-arg">wait</span>=<span class="summary-sig-default">True</span>,
-        <span class="summary-sig-arg">white_list</span>=<span class="summary-sig-default">None</span>,
-        <span class="summary-sig-arg">quiet</span>=<span class="summary-sig-default">True</span>)</span><br />
-      Take a list of jobs and process them on the cluster.</td>
-          <td align="right" valign="top">
-            <span class="codelink"><a href="gridmap-pysrc.html#process_jobs">source&nbsp;code</a></span>
-            
-          </td>
-        </tr>
-      </table>
-      
-    </td>
-  </tr>
-</table>
-<!-- ==================== VARIABLES ==================== -->
-<a name="section-Variables"></a>
-<table class="summary" border="1" cellpadding="3"
-       cellspacing="0" width="100%" bgcolor="white">
-<tr bgcolor="#70b0f0" class="table-header">
-  <td align="left" colspan="2" class="table-header">
-    <span class="table-header">Variables</span></td>
-</tr>
-<tr>
-    <td width="15%" align="right" valign="top" class="summary">
-      <span class="summary-type">&nbsp;</span>
-    </td><td class="summary">
-        <a name="DEFAULT_QUEUE"></a><span class="summary-name">DEFAULT_QUEUE</span> = <code title="u'all.q'"><code class="variable-quote">u'</code><code class="variable-string">all.q</code><code class="variable-quote">'</code></code>
-    </td>
-  </tr>
-<tr>
-    <td width="15%" align="right" valign="top" class="summary">
-      <span class="summary-type">&nbsp;</span>
-    </td><td class="summary">
-        <a name="MAX_TRIES"></a><span class="summary-name">MAX_TRIES</span> = <code title="50">50</code>
-    </td>
-  </tr>
-<tr>
-    <td width="15%" align="right" valign="top" class="summary">
-      <span class="summary-type">&nbsp;</span>
-    </td><td class="summary">
-        <a name="REDIS_DB"></a><span class="summary-name">REDIS_DB</span> = <code title="2">2</code>
-    </td>
-  </tr>
-<tr>
-    <td width="15%" align="right" valign="top" class="summary">
-      <span class="summary-type">&nbsp;</span>
-    </td><td class="summary">
-        <a name="REDIS_PORT"></a><span class="summary-name">REDIS_PORT</span> = <code title="7272">7272</code>
-    </td>
-  </tr>
-<tr>
-    <td width="15%" align="right" valign="top" class="summary">
-      <span class="summary-type">&nbsp;</span>
-    </td><td class="summary">
-        <a name="SLEEP_TIME"></a><span class="summary-name">SLEEP_TIME</span> = <code title="3">3</code>
-    </td>
-  </tr>
-<tr>
-    <td width="15%" align="right" valign="top" class="summary">
-      <span class="summary-type">&nbsp;</span>
-    </td><td class="summary">
-        <a name="USE_MEM_FREE"></a><span class="summary-name">USE_MEM_FREE</span> = <code title="False">False</code>
-    </td>
-  </tr>
-<tr>
-    <td width="15%" align="right" valign="top" class="summary">
-      <span class="summary-type">&nbsp;</span>
-    </td><td class="summary">
-        <a name="__package__"></a><span class="summary-name">__package__</span> = <code title="None">None</code>
     </td>
   </tr>
 </table>
@@ -226,6 +188,39 @@
     <span class="table-header">Function Details</span></td>
 </tr>
 </table>
+<a name="process_jobs"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">process_jobs</span>(<span class="sig-arg">jobs</span>,
+        <span class="sig-arg">temp_dir</span>=<span class="sig-default"><code class="variable-quote">u'</code><code class="variable-string">/scratch/</code><code class="variable-quote">'</code></span>,
+        <span class="sig-arg">wait</span>=<span class="sig-default">True</span>,
+        <span class="sig-arg">white_list</span>=<span class="sig-default">None</span>,
+        <span class="sig-arg">quiet</span>=<span class="sig-default">True</span>)</span>
+  </h3>
+  </td><td align="right" valign="top"
+    ><span class="codelink"><a href="gridmap.job-pysrc.html#process_jobs">source&nbsp;code</a></span>&nbsp;
+    </td>
+  </tr></table>
+  
+  <p>Take a list of jobs and process them on the cluster.</p>
+  <dl class="fields">
+    <dt>Parameters:</dt>
+    <dd><ul class="nomargin-top">
+        <li><strong class="pname"><code>temp_dir</code></strong> (<code>basestring</code>) - Local temporary directory for storing output for an individual 
+          job.</li>
+        <li><strong class="pname"><code>wait</code></strong> (<code>bool</code>) - Should we wait for jobs to finish? (Should only be false if the 
+          function you're running doesn't return anything)</li>
+        <li><strong class="pname"><code>white_list</code></strong> (<code>list</code> of <code>basestring</code>) - If specified, limit nodes used to only those in list.</li>
+        <li><strong class="pname"><code>quiet</code></strong> (<code>bool</code>) - When true, do not output information about the jobs that have 
+          been submitted.</li>
+    </ul></dd>
+  </dl>
+</td></tr></table>
+</div>
 <a name="grid_map"></a>
 <div>
 <table class="details" border="1" cellpadding="3"
@@ -245,7 +240,7 @@
         <span class="sig-arg">quiet</span>=<span class="sig-default">True</span>)</span>
   </h3>
   </td><td align="right" valign="top"
-    ><span class="codelink"><a href="gridmap-pysrc.html#grid_map">source&nbsp;code</a></span>&nbsp;
+    ><span class="codelink"><a href="gridmap.job-pysrc.html#grid_map">source&nbsp;code</a></span>&nbsp;
     </td>
   </tr></table>
   
@@ -296,7 +291,7 @@
         <span class="sig-arg">quiet</span>=<span class="sig-default">True</span>)</span>
   </h3>
   </td><td align="right" valign="top"
-    ><span class="codelink"><a href="gridmap-pysrc.html#pg_map">source&nbsp;code</a></span>&nbsp;
+    ><span class="codelink"><a href="gridmap.job-pysrc.html#pg_map">source&nbsp;code</a></span>&nbsp;
     </td>
   </tr></table>
   
@@ -327,39 +322,6 @@
       </p>
 </div></td></tr></table>
 </div>
-<a name="process_jobs"></a>
-<div>
-<table class="details" border="1" cellpadding="3"
-       cellspacing="0" width="100%" bgcolor="white">
-<tr><td>
-  <table width="100%" cellpadding="0" cellspacing="0" border="0">
-  <tr valign="top"><td>
-  <h3 class="epydoc"><span class="sig"><span class="sig-name">process_jobs</span>(<span class="sig-arg">jobs</span>,
-        <span class="sig-arg">temp_dir</span>=<span class="sig-default"><code class="variable-quote">u'</code><code class="variable-string">/scratch/</code><code class="variable-quote">'</code></span>,
-        <span class="sig-arg">wait</span>=<span class="sig-default">True</span>,
-        <span class="sig-arg">white_list</span>=<span class="sig-default">None</span>,
-        <span class="sig-arg">quiet</span>=<span class="sig-default">True</span>)</span>
-  </h3>
-  </td><td align="right" valign="top"
-    ><span class="codelink"><a href="gridmap-pysrc.html#process_jobs">source&nbsp;code</a></span>&nbsp;
-    </td>
-  </tr></table>
-  
-  <p>Take a list of jobs and process them on the cluster.</p>
-  <dl class="fields">
-    <dt>Parameters:</dt>
-    <dd><ul class="nomargin-top">
-        <li><strong class="pname"><code>temp_dir</code></strong> (<code>basestring</code>) - Local temporary directory for storing output for an individual 
-          job.</li>
-        <li><strong class="pname"><code>wait</code></strong> (<code>bool</code>) - Should we wait for jobs to finish? (Should only be false if the 
-          function you're running doesn't return anything)</li>
-        <li><strong class="pname"><code>white_list</code></strong> (<code>list</code> of <code>basestring</code>) - If specified, limit nodes used to only those in list.</li>
-        <li><strong class="pname"><code>quiet</code></strong> (<code>bool</code>) - When true, do not output information about the jobs that have 
-          been submitted.</li>
-    </ul></dd>
-  </dl>
-</td></tr></table>
-</div>
 <br />
 <!-- ==================== NAVIGATION BAR ==================== -->
 <table class="navbar" border="0" width="100%" cellpadding="0"
@@ -387,7 +349,7 @@
 <table border="0" cellpadding="0" cellspacing="0" width="100%%">
   <tr>
     <td align="left" class="footer">
-    Generated by Epydoc 3.0.1 on Mon Jul 15 22:16:40 2013
+    Generated by Epydoc 3.0.1 on Wed Jul 17 10:46:25 2013
     </td>
     <td align="right" class="footer">
       <a target="mainFrame" href="http://epydoc.sourceforge.net"
