@@ -38,4 +38,10 @@ Recommended
 License
 ~~~~~~~
 
-GPLv3
+-  GPLv3
+
+Changelog
+~~~~~~~~~
+-  0.9.3
+   -  Fixed serious bug where gridmap could not be imported in some instances.
+   -  Refactored things a bit so there is no longer one large module with all of the code in it. (Doesn't change package interface)
