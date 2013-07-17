@@ -32,18 +32,6 @@ from __future__ import absolute_import, print_function, unicode_literals
 
 from .job import Job, process_jobs, grid_map, pg_map
 
-#### Global settings ####
-# Redis settings
-REDIS_DB = 2
-REDIS_PORT = 7272
-MAX_TRIES = 50
-SLEEP_TIME = 3
-
-# Is mem_free configured properly on the cluster?
-USE_MEM_FREE = False
-
-# Which queue should we use by default
-DEFAULT_QUEUE = 'all.q'
 
 # Version info
 __version__ = '0.9.3'

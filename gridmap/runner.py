@@ -36,8 +36,8 @@ import sys
 
 from redis import StrictRedis
 
-from gridmap import REDIS_DB, REDIS_PORT
 from gridmap.data import clean_path, zload_db, zsave_db
+from gridmap.job import REDIS_DB, REDIS_PORT
 
 
 def _run_job(uniq_id, job_num, temp_dir, redis_host):

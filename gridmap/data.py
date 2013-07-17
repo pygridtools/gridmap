@@ -38,7 +38,10 @@ except ImportError:
 import re
 from time import sleep
 
-from gridmap import MAX_TRIES, SLEEP_TIME
+
+#### Global settings ####
+MAX_TRIES = 50
+SLEEP_TIME = 3
 
 
 def clean_path(path):
@@ -61,7 +64,7 @@ def zsave_db(obj, redis_server, prefix, job_num):
     @param obj: The object/function to store.
     @type obj: C{object} or C{function}
     @param redis_server: An open connection to the database
-    @type redis_server: L{StrictRedis}
+    @type redis_server: C{StrictRedis}
     @param prefix: The prefix to use for the key for this data.
     @type prefix: C{basestring}
     @param job_num: The ID of the job this data is for.
@@ -80,7 +83,7 @@ def zload_db(redis_server, prefix, job_num):
     Loads bz2-compressed pickled object from a Redis database
 
     @param redis_server: An open connection to the database
-    @type redis_server: L{StrictRedis}
+    @type redis_server: C{StrictRedis}
     @param prefix: The prefix to use for the key for this data.
     @type prefix: C{basestring}
     @param job_num: The ID of the job this data is for.

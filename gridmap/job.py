@@ -44,12 +44,23 @@ import drmaa
 from redis import StrictRedis
 from redis.exceptions import ConnectionError as RedisConnectionError
 
-from gridmap import DEFAULT_QUEUE, REDIS_DB, REDIS_PORT, USE_MEM_FREE
 from gridmap.data import clean_path, zload_db, zsave_db
 
 # Python 2.x backward compatibility
 if sys.version_info < (3, 0):
     range = xrange
+
+
+#### Global settings ####
+# Redis settings
+REDIS_DB = 2
+REDIS_PORT = 7272
+
+# Is mem_free configured properly on the cluster?
+USE_MEM_FREE = False
+
+# Which queue should we use by default
+DEFAULT_QUEUE = 'all.q'
 
 
 class Job(object):
