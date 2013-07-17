@@ -39,7 +39,7 @@ def compute_factorial(n):
     """
     time.sleep(10)
     ret = 1
-    for i in xrange(n):
+    for i in range(n):
         ret = ret * (i + 1)
     return ret
 
