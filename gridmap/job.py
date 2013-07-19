@@ -40,7 +40,8 @@ import uuid
 from socket import gethostname
 from time import sleep
 
-import drmaa
+from drmaa import Session
+from drmaa.errors import InvalidJobException
 from redis import StrictRedis
 from redis.exceptions import ConnectionError as RedisConnectionError
 
@@ -213,7 +214,7 @@ def _submit_jobs(jobs, uniq_id, temp_dir='/scratch', white_list=None,
     @type quiet: C{bool}
     """
 
-    session = drmaa.Session()
+    session = Session()
     session.initialize()
     jobids = []
 
@@ -239,7 +240,7 @@ def _append_job_to_session(session, job, uniq_id, job_num, temp_dir='/scratch/',
     object. Also sets job.job_id to the ID of the job on the grid.
 
     @param session: The current DRMAA session with the grid engine.
-    @type session: C{drmaa.Session}
+    @type session: C{Session}
     @param job: The Job to add to the queue.
     @type job: L{Job}
     @param uniq_id: The unique suffix for the tables corresponding to this job
@@ -321,12 +322,12 @@ def _collect_jobs(sid, jobids, joblist, redis_server, uniq_id,
         assert(jobids[ix] == joblist[ix].jobid)
 
     # Open DRMAA session as context manager
-    with drmaa.Session(sid) as session:
+    with Session(sid) as session:
 
         if wait:
-            drmaaWait = drmaa.Session.TIMEOUT_WAIT_FOREVER
+            drmaaWait = Session.TIMEOUT_WAIT_FOREVER
         else:
-            drmaaWait = drmaa.Session.TIMEOUT_NO_WAIT
+            drmaaWait = Session.TIMEOUT_NO_WAIT
 
         # Wait for jobs to finish
         session.synchronize(jobids, drmaaWait, False)
@@ -365,12 +366,17 @@ def _collect_jobs(sid, jobids, joblist, redis_server, uniq_id,
                           file=sys.stderr)
                     print("Core dumped: {0}".format(job_info.hasCoreDump),
                           file=sys.stderr)
-                print("Job aborted: {0}".format(job_info.wasAborted),
-                      file=sys.stderr)
-                print("Job SGE status: {0}".format(session.jobStatus(job.name)),
+                print(("Job aborted before it ran: " +
+                       "{0}").format(job_info.wasAborted),
                       file=sys.stderr)
                 print("Job resources: {0}".format(job_info.resourceUsage),
                       file=sys.stderr)
+                try:
+                    print(("Job SGE status: " +
+                           "{0}").format(session.jobStatus(job.jobid)),
+                          file=sys.stderr)
+                except InvalidJobException:
+                    pass
                 print("Unpickling exception: {0}".format(detail),
                       file=sys.stderr)
                 sys.exit(2)
