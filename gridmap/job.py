@@ -27,6 +27,16 @@ in a more 'pythonic' fashion.
 @author: Christian Widmer
 @author: Cheng Soon Ong
 @author: Dan Blanchard (dblanchard@ets.org)
+
+@var REDIS_DB: The index of the database to select on the Redis server. Can be
+               overriden by setting the GRID_MAP_REDIS_DB environment variable.
+@var REDIS_PORT: The port of the Redis server to use. Can be overriden by
+                 setting the GRID_MAP_REDIS_PORT environment variable.
+@var USE_MEM_FREE: Does your cluster support specifying how much memory a job
+                   will use via mem_free? Can be overriden by setting the
+                   GRID_MAP_USE_MEM_FREE environment variable.
+@var DEFAULT_QUEUE: The default job scheduling queue to use. Can be overriden
+                    via the GRID_MAP_DEFAULT_QUEUE environment variable.
 """
 
 from __future__ import absolute_import, print_function, unicode_literals
@@ -58,7 +68,7 @@ REDIS_DB = int(os.getenv('GRID_MAP_REDIS_DB', '2'))
 REDIS_PORT = int(os.getenv('GRID_MAP_REDIS_PORT', '7272'))
 
 # Is mem_free configured properly on the cluster?
-USE_MEM_FREE = 'True' == os.getenv('GRID_MAP_USE_MEM_FREE', 'False')
+USE_MEM_FREE = 'TRUE' == os.getenv('GRID_MAP_USE_MEM_FREE', 'False').upper()
 
 # Which queue should we use by default
 DEFAULT_QUEUE = os.getenv('GRID_MAP_DEFAULT_QUEUE', 'all.q')
