@@ -43,10 +43,12 @@ License
 Changelog
 ~~~~~~~~~
 -  0.9.4
-   -  Added support for overriding the default queue and other constants via environment variables. For example, to change the
-      default queue, just set the environment variable GRID_MAP_DEFAULT_QUEUE.
-   -  Substantially more information is given about crashing jobs when we fail to unpickle the results from the Redis database.
+
+   +  Added support for overriding the default queue and other constants via environment variables. For example, to change the default queue, just set the environment variable GRID_MAP_DEFAULT_QUEUE.
+   +  Substantially more information is given about crashing jobs when we fail to unpickle the results from the Redis database.
+
 -  0.9.3
-   -  Fixed serious bug where gridmap could not be imported in some instances.
-   -  Refactored things a bit so there is no longer one large module with all of the code in it. (Doesn't change package interface)
+
+   +  Fixed serious bug where gridmap could not be imported in some instances.
+   +  Refactored things a bit so there is no longer one large module with all of the code in it. (Doesn't change package interface)
 
