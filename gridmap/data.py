@@ -29,10 +29,10 @@ This modules provides all of the data-related function for gridmap.
 
 @var MAX_TRIES: Maximum number of times to try to get the output of a job from
                 the Redis database before giving up and assuming the job died
-                before writing its output. Can be overriden by setting the
+                before writing its output; can be overriden by setting the
                 GRID_MAP_MAX_TRIES environment variable.
 @var SLEEP_TIME: Number of seconds to sleep between attempts to retrieve job
-                 output from the Redis database. Can be overriden by setting the
+                 output from the Redis database; can be overriden by setting the
                  GRID_MAP_SLEEP_TIME environment variable.
 """
 

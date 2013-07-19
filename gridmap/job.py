@@ -28,14 +28,14 @@ in a more 'pythonic' fashion.
 @author: Cheng Soon Ong
 @author: Dan Blanchard (dblanchard@ets.org)
 
-@var REDIS_DB: The index of the database to select on the Redis server. Can be
+@var REDIS_DB: The index of the database to select on the Redis server; can be
                overriden by setting the GRID_MAP_REDIS_DB environment variable.
-@var REDIS_PORT: The port of the Redis server to use. Can be overriden by
+@var REDIS_PORT: The port of the Redis server to use; can be overriden by
                  setting the GRID_MAP_REDIS_PORT environment variable.
 @var USE_MEM_FREE: Does your cluster support specifying how much memory a job
                    will use via mem_free? Can be overriden by setting the
                    GRID_MAP_USE_MEM_FREE environment variable.
-@var DEFAULT_QUEUE: The default job scheduling queue to use. Can be overriden
+@var DEFAULT_QUEUE: The default job scheduling queue to use; can be overriden
                     via the GRID_MAP_DEFAULT_QUEUE environment variable.
 """
 
