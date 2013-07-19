@@ -115,7 +115,6 @@ class Job(object):
         self.num_slots = num_slots
         self.mem_free = mem_free
         self.white_list = []
-        self.uniq_id = None
         self.name = name.replace(' ', '_')
         self.queue = queue
 
@@ -312,7 +311,7 @@ def _collect_jobs(sid, jobids, joblist, redis_server, uniq_id,
                          be stored.
     @type redis_server: L{StrictRedis}
     @param wait: Wait for jobs to finish?
-    @type wait: Boolean, defaults to False
+    @type wait: bool
     @param temp_dir: Local temporary directory for storing output for an
                      individual job.
     @type temp_dir: C{basestring}
@@ -321,59 +320,70 @@ def _collect_jobs(sid, jobids, joblist, redis_server, uniq_id,
     for ix in range(len(jobids)):
         assert(jobids[ix] == joblist[ix].jobid)
 
-    s = drmaa.Session()
-    s.initialize(sid)
+    # Open DRMAA session as context manager
+    with drmaa.Session(sid) as session:
 
-    if wait:
-        drmaaWait = drmaa.Session.TIMEOUT_WAIT_FOREVER
-    else:
-        drmaaWait = drmaa.Session.TIMEOUT_NO_WAIT
+        if wait:
+            drmaaWait = drmaa.Session.TIMEOUT_WAIT_FOREVER
+        else:
+            drmaaWait = drmaa.Session.TIMEOUT_NO_WAIT
 
-    s.synchronize(jobids, drmaaWait, True)
-    # print("success: all jobs finished", file=sys.stderr)
-    s.exit()
+        # Wait for jobs to finish
+        session.synchronize(jobids, drmaaWait, False)
 
-    # attempt to collect results
-    job_output_list = []
-    for ix, job in enumerate(joblist):
+        # attempt to collect results
+        job_output_list = []
+        for ix, job in enumerate(joblist):
 
-        log_stdout_fn = os.path.join(temp_dir, job.name + '.o' + jobids[ix])
-        log_stderr_fn = os.path.join(temp_dir, job.name + '.e' + jobids[ix])
+            log_stdout_fn = os.path.join(temp_dir, job.name + '.o' + jobids[ix])
+            log_stderr_fn = os.path.join(temp_dir, job.name + '.e' + jobids[ix])
 
-        try:
-            job_output = zload_db(redis_server, 'output{0}'.format(uniq_id),
-                                   ix)
-        except Exception as detail:
-            print(("Error while unpickling output for gridmap job {1} from" +
-                   " stored with key output_{0}_{1}").format(uniq_id, ix),
-                  file=sys.stderr)
-            print("This could caused by a problem with the cluster " +
-                  "environment, imports or environment variables.",
-                  file=sys.stderr)
-            print(("Try running `{5} -m gridmap.runner {0} {1} {2} {3} " +
-                   "{4}` to see if your job crashed before writing its " +
-                   "output.").format(uniq_id,
-                                     ix,
-                                     job.path,
-                                     temp_dir,
-                                     gethostname(),
-                                     sys.executable),
-                  file=sys.stderr)
-            print("Check log files for more information: ", file=sys.stderr)
-            print("stdout:", log_stdout_fn, file=sys.stderr)
-            print("stderr:", log_stderr_fn, file=sys.stderr)
-            print("Exception: {0}".format(detail))
-            sys.exit(2)
+            # Get the exit status and other status info about the job
+            job_info = session.wait(job.jobid, drmaaWait)
 
-        #print exceptions
-        if isinstance(job_output, Exception):
-            print("Exception encountered in job with log file:",
-                  file=sys.stderr)
-            print(log_stdout_fn, file=sys.stderr)
-            print(job_output, file=sys.stderr)
-            print(file=sys.stderr)
+            try:
+                job_output = zload_db(redis_server,
+                                      'output_{0}'.format(uniq_id),
+                                      ix)
+            except Exception as detail:
+                print(("Error while unpickling output for gridmap job {1} " +
+                       "stored with key output_{0}_{1}").format(uniq_id, ix),
+                      file=sys.stderr)
+                print("This usually happens when a job has crashed before " +
+                      "writing its output to the database.",
+                      file=sys.stderr)
+                print("\nHere is some information about the problem job:",
+                      file=sys.stderr)
+                print("stdout:", log_stdout_fn, file=sys.stderr)
+                print("stderr:", log_stderr_fn, file=sys.stderr)
+                if job_info.hasExited:
+                    print("Exit status: {0}".format(job_info.exitStatus),
+                          file=sys.stderr)
+                if job_info.hasSignal:
+                    print(("Terminating signal: " +
+                           "{0}").format(job_info.terminatedSignal),
+                          file=sys.stderr)
+                    print("Core dumped: {0}".format(job_info.hasCoreDump),
+                          file=sys.stderr)
+                print("Job aborted: {0}".format(job_info.wasAborted),
+                      file=sys.stderr)
+                print("Job SGE status: {0}".format(session.jobStatus(job.name)),
+                      file=sys.stderr)
+                print("Job resources: {0}".format(job_info.resourceUsage),
+                      file=sys.stderr)
+                print("Unpickling exception: {0}".format(detail),
+                      file=sys.stderr)
+                sys.exit(2)
 
-        job_output_list.append(job_output)
+            #print exceptions
+            if isinstance(job_output, Exception):
+                print("Exception encountered in job with log file:",
+                      file=sys.stderr)
+                print(log_stdout_fn, file=sys.stderr)
+                print(job_output, file=sys.stderr)
+                print(file=sys.stderr)
+
+            job_output_list.append(job_output)
 
     return job_output_list
 
@@ -422,7 +432,7 @@ def process_jobs(jobs, temp_dir='/scratch/', wait=True, white_list=None,
 
     # Save jobs to database
     for job_id, job in enumerate(jobs):
-        zsave_db(job, redis_server, 'job{0}'.format(uniq_id), job_id)
+        zsave_db(job, redis_server, 'job_{0}'.format(uniq_id), job_id)
 
     # Submit jobs to cluster
     sids, jobids = _submit_jobs(jobs, uniq_id, white_list=white_list,
@@ -436,8 +446,8 @@ def process_jobs(jobs, temp_dir='/scratch/', wait=True, white_list=None,
     assert(len(jobs) == len(job_outputs))
 
     # Delete keys from existing server or just
-    redis_server.delete(*redis_server.keys('job{0}_*'.format(uniq_id)))
-    redis_server.delete(*redis_server.keys('output{0}_*'.format(uniq_id)))
+    redis_server.delete(*redis_server.keys('job_{0}_*'.format(uniq_id)))
+    redis_server.delete(*redis_server.keys('output_{0}_*'.format(uniq_id)))
     return job_outputs
 
 

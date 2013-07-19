@@ -34,7 +34,7 @@ from gridmap.job import Job, process_jobs, grid_map, pg_map
 
 
 # Version info
-__version__ = '0.9.3'
+__version__ = '0.9.4'
 VERSION = tuple(int(x) for x in __version__.split('.'))
 
 # For * imports
