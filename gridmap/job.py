@@ -65,6 +65,7 @@ if sys.version_info < (3, 0):
 #### Global settings ####
 # Redis settings
 REDIS_DB = int(os.getenv('GRID_MAP_REDIS_DB', '2'))
+
 REDIS_PORT = int(os.getenv('GRID_MAP_REDIS_PORT', '7272'))
 
 # Is mem_free configured properly on the cluster?

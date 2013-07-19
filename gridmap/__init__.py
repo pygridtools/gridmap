@@ -26,11 +26,30 @@ in a more 'pythonic' fashion.
 @author: Christian Widmer
 @author: Cheng Soon Ong
 @author: Dan Blanchard (dblanchard@ets.org)
+
+@var REDIS_DB: The index of the database to select on the Redis server; can be
+               overriden by setting the GRID_MAP_REDIS_DB environment variable.
+@var REDIS_PORT: The port of the Redis server to use; can be overriden by
+                 setting the GRID_MAP_REDIS_PORT environment variable.
+@var USE_MEM_FREE: Does your cluster support specifying how much memory a job
+                   will use via mem_free? Can be overriden by setting the
+                   GRID_MAP_USE_MEM_FREE environment variable.
+@var DEFAULT_QUEUE: The default job scheduling queue to use; can be overriden
+                    via the GRID_MAP_DEFAULT_QUEUE environment variable.
+@var MAX_TRIES: Maximum number of times to try to get the output of a job from
+                the Redis database before giving up and assuming the job died
+                before writing its output; can be overriden by setting the
+                GRID_MAP_MAX_TRIES environment variable.
+@var SLEEP_TIME: Number of seconds to sleep between attempts to retrieve job
+                 output from the Redis database; can be overriden by setting the
+                 GRID_MAP_SLEEP_TIME environment variable.
 '''
 
 from __future__ import absolute_import, print_function, unicode_literals
 
-from gridmap.job import Job, process_jobs, grid_map, pg_map
+from gridmap.job import (Job, process_jobs, grid_map, pg_map, USE_MEM_FREE,
+                         DEFAULT_QUEUE, REDIS_PORT, REDIS_DB)
+from gridmap.data import MAX_TRIES, SLEEP_TIME
 
 
 # Version info
@@ -38,4 +57,5 @@ __version__ = '0.9.5'
 VERSION = tuple(int(x) for x in __version__.split('.'))
 
 # For * imports
-__all__ = ['Job', 'process_jobs', 'grid_map', 'pg_map']
+__all__ = ['Job', 'process_jobs', 'grid_map', 'pg_map', 'USE_MEM_FREE',
+           'DEFAULT_QUEUE', 'REDIS_DB', 'REDIS_PORT', 'MAX_TRIES', 'SLEEP_TIME']

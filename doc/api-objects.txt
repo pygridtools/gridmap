@@ -1,9 +1,15 @@
 gridmap	gridmap-module.html
 gridmap.grid_map	gridmap-module.html#grid_map
 gridmap.process_jobs	gridmap-module.html#process_jobs
+gridmap.DEFAULT_QUEUE	gridmap-module.html#DEFAULT_QUEUE
+gridmap.USE_MEM_FREE	gridmap-module.html#USE_MEM_FREE
+gridmap.REDIS_DB	gridmap-module.html#REDIS_DB
 gridmap.pg_map	gridmap-module.html#pg_map
 gridmap.__package__	gridmap-module.html#__package__
 gridmap.VERSION	gridmap-module.html#VERSION
+gridmap.REDIS_PORT	gridmap-module.html#REDIS_PORT
+gridmap.MAX_TRIES	gridmap-module.html#MAX_TRIES
+gridmap.SLEEP_TIME	gridmap-module.html#SLEEP_TIME
 gridmap.data	gridmap.data-module.html
 gridmap.data.clean_path	gridmap.data-module.html#clean_path
 gridmap.data.zsave_db	gridmap.data-module.html#zsave_db

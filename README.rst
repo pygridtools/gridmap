@@ -42,6 +42,11 @@ License
 
 Changelog
 ~~~~~~~~~
+-  0.9.5
+   
+   + Fixed bug where GRID_MAP_USE_MEM_FREE would only be interpretted as true if spelled 'True'.
+   + Added documentation describing how to override constants.
+   
 -  0.9.4
 
    +  Added support for overriding the default queue and other constants via environment variables. For example, to change the default queue, just set the environment variable GRID_MAP_DEFAULT_QUEUE.
