@@ -54,14 +54,14 @@ if sys.version_info < (3, 0):
 
 #### Global settings ####
 # Redis settings
-REDIS_DB = 2
-REDIS_PORT = 7272
+REDIS_DB = int(os.getenv('GRID_MAP_REDIS_DB', '2'))
+REDIS_PORT = int(os.getenv('GRID_MAP_REDIS_PORT', '7272'))
 
 # Is mem_free configured properly on the cluster?
-USE_MEM_FREE = False
+USE_MEM_FREE = 'True' == os.getenv('GRID_MAP_USE_MEM_FREE', 'False')
 
 # Which queue should we use by default
-DEFAULT_QUEUE = 'all.q'
+DEFAULT_QUEUE = os.getenv('GRID_MAP_DEFAULT_QUEUE', 'all.q')
 
 
 class Job(object):

@@ -31,6 +31,7 @@ This modules provides all of the data-related function for gridmap.
 from __future__ import absolute_import, print_function, unicode_literals
 
 import bz2
+import os
 try:
     import cPickle as pickle  # For Python 2.x
 except ImportError:
@@ -40,8 +41,8 @@ from time import sleep
 
 
 #### Global settings ####
-MAX_TRIES = 10
-SLEEP_TIME = 3
+MAX_TRIES = int(os.getenv('GRID_MAP_MAX_TRIES', '10'))
+SLEEP_TIME = int(os.getenv('GRID_MAP_SLEEP_TIME', '3'))
 
 
 def clean_path(path):
