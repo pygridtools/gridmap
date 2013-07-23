@@ -42,15 +42,25 @@ License
 
 Changelog
 ~~~~~~~~~
+
+-  0.9.7
+
+   + No longer dies with InvalidJobException when failing to retrieve job
+     metadata from DRMAA service.
+   + Now print all exceptions encountered for jobs submitted instead of just
+     exiting after first one.
+   + Die via exception instead of sys.exit when there were problems with some
+     of the submitted jobs.
+
 -  0.9.6
-   
+
    + Fixed bug where jobs were being aborted before they ran.
 
 -  0.9.5
-   
+
    + Fixed bug where GRID_MAP_USE_MEM_FREE would only be interpretted as true if spelled 'True'.
    + Added documentation describing how to override constants.
-   
+
 -  0.9.4
 
    +  Added support for overriding the default queue and other constants via environment variables. For example, to change the default queue, just set the environment variable GRID_MAP_DEFAULT_QUEUE.
