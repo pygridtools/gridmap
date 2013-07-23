@@ -44,6 +44,7 @@ Changelog
 ~~~~~~~~~
 
 -  0.9.8
+
    + Fixed a bug where only the first error was still showing because of an extra exception caused by job_output being undefined.
    + Fixed unhandled Exception with error code 24 (since somehow that is not an InvalidJobException, but just an Exception in drmaa-python).
 
