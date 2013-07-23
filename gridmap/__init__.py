@@ -53,7 +53,7 @@ from gridmap.data import MAX_TRIES, SLEEP_TIME
 
 
 # Version info
-__version__ = '0.9.7'
+__version__ = '0.9.8'
 VERSION = tuple(int(x) for x in __version__.split('.'))
 
 # For * imports

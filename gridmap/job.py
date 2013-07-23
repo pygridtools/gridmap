@@ -362,6 +362,7 @@ def _collect_jobs(sid, jobids, joblist, redis_server, uniq_id,
                                       'output_{0}'.format(uniq_id),
                                       ix)
             except Exception as detail:
+                job_output = None
                 print(("Error while unpickling output for gridmap job {1} " +
                        "stored with key output_{0}_{1}").format(uniq_id, ix),
                       file=sys.stderr)

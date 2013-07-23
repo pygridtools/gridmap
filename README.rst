@@ -43,31 +43,34 @@ License
 Changelog
 ~~~~~~~~~
 
+-  0.9.8
+   +  Fixed a bug where only the first error was still showing because of an extra exception caused by job_output being undefined.
+
 -  0.9.7
 
-   + No longer dies with InvalidJobException when failing to retrieve job
+   +  No longer dies with InvalidJobException when failing to retrieve job
      metadata from DRMAA service.
-   + Now print all exceptions encountered for jobs submitted instead of just
+   +  Now print all exceptions encountered for jobs submitted instead of just
      exiting after first one.
-   + Die via exception instead of sys.exit when there were problems with some
+   +  Die via exception instead of sys.exit when there were problems with some
      of the submitted jobs.
 
 -  0.9.6
 
-   + Fixed bug where jobs were being aborted before they ran.
+   +  Fixed bug where jobs were being aborted before they ran.
 
 -  0.9.5
 
-   + Fixed bug where GRID_MAP_USE_MEM_FREE would only be interpretted as true if spelled 'True'.
-   + Added documentation describing how to override constants.
+   +  Fixed bug where GRID_MAP_USE_MEM_FREE would only be interpretted as true if spelled 'True'.
+   +  Added documentation describing how to override constants.
 
 -  0.9.4
 
-   +  Added support for overriding the default queue and other constants via environment variables. For example, to change the default queue, just set the environment variable GRID_MAP_DEFAULT_QUEUE.
-   +  Substantially more information is given about crashing jobs when we fail to unpickle the results from the Redis database.
+   +   Added support for overriding the default queue and other constants via environment variables. For example, to change the default queue, just set the environment variable GRID_MAP_DEFAULT_QUEUE.
+   +   Substantially more information is given about crashing jobs when we fail to unpickle the results from the Redis database.
 
 -  0.9.3
 
-   +  Fixed serious bug where gridmap could not be imported in some instances.
-   +  Refactored things a bit so there is no longer one large module with all of the code in it. (Doesn't change package interface)
+   +   Fixed serious bug where gridmap could not be imported in some instances.
+   +   Refactored things a bit so there is no longer one large module with all of the code in it. (Doesn't change package interface)
 
