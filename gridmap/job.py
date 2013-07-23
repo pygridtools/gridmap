@@ -189,7 +189,7 @@ class Job(object):
         define python-style getter
         """
 
-        ret = ""
+        ret = "-shell yes -b yes"
 
         if self.name:
             ret += " -N {0}".format(self.name)

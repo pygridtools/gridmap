@@ -42,6 +42,10 @@ License
 
 Changelog
 ~~~~~~~~~
+-  0.9.6
+   
+   + Fixed bug where jobs were being aborted before they ran.
+
 -  0.9.5
    
    + Fixed bug where GRID_MAP_USE_MEM_FREE would only be interpretted as true if spelled 'True'.
