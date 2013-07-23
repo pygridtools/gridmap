@@ -351,7 +351,10 @@ def _collect_jobs(sid, jobids, joblist, redis_server, uniq_id,
             log_stderr_fn = os.path.join(temp_dir, job.name + '.e' + jobids[ix])
 
             # Get the exit status and other status info about the job
-            job_info = session.wait(job.jobid, drmaaWait)
+            try:
+                job_info = session.wait(job.jobid, drmaaWait)
+            except InvalidJobException:
+                job_info = None
 
             try:
                 job_output = zload_db(redis_server,
@@ -368,36 +371,43 @@ def _collect_jobs(sid, jobids, joblist, redis_server, uniq_id,
                       file=sys.stderr)
                 print("stdout:", log_stdout_fn, file=sys.stderr)
                 print("stderr:", log_stderr_fn, file=sys.stderr)
-                if job_info.hasExited:
-                    print("Exit status: {0}".format(job_info.exitStatus),
+                if job_info is not None:
+                    if job_info.hasExited:
+                        print("Exit status: {0}".format(job_info.exitStatus),
+                              file=sys.stderr)
+                    if job_info.hasSignal:
+                        print(("Terminating signal: " +
+                               "{0}").format(job_info.terminatedSignal),
+                              file=sys.stderr)
+                        print("Core dumped: {0}".format(job_info.hasCoreDump),
+                              file=sys.stderr)
+                    print(("Job aborted before it ran: " +
+                           "{0}").format(job_info.wasAborted),
                           file=sys.stderr)
-                if job_info.hasSignal:
-                    print(("Terminating signal: " +
-                           "{0}").format(job_info.terminatedSignal),
+                    print("Job resources: {0}".format(job_info.resourceUsage),
                           file=sys.stderr)
-                    print("Core dumped: {0}".format(job_info.hasCoreDump),
-                          file=sys.stderr)
-                print(("Job aborted before it ran: " +
-                       "{0}").format(job_info.wasAborted),
-                      file=sys.stderr)
-                print("Job resources: {0}".format(job_info.resourceUsage),
-                      file=sys.stderr)
-                try:
-                    print(("Job SGE status: " +
-                           "{0}").format(session.jobStatus(job.jobid)),
-                          file=sys.stderr)
-                except InvalidJobException:
-                    pass
+                    try:
+                        print(("Job SGE status: " +
+                               "{0}").format(session.jobStatus(job.jobid)),
+                              file=sys.stderr)
+                    except InvalidJobException:
+                        pass
+                else:
+                    print("Extended info about this job was unavailable. This" +
+                          " is usually because the job information was pushed" +
+                          " out of the grid engine's finished_jobs queue " +
+                          "before we could retrieve it.", file=sys.stderr)
                 print("Unpickling exception: {0}".format(detail),
                       file=sys.stderr)
                 sys.exit(2)
 
             #print exceptions
             if isinstance(job_output, Exception):
-                print("Exception encountered in job with log file:",
+                print("Exception encountered in job {0}.".format(uniq_id),
                       file=sys.stderr)
-                print(log_stdout_fn, file=sys.stderr)
-                print(job_output, file=sys.stderr)
+                print("stdout:", log_stdout_fn, file=sys.stderr)
+                print("stderr:", log_stderr_fn, file=sys.stderr)
+                print("Exception: \n\t{0}".format(job_output), file=sys.stderr)
                 print(file=sys.stderr)
 
             job_output_list.append(job_output)
