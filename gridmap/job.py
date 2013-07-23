@@ -354,8 +354,8 @@ def _collect_jobs(sid, jobids, joblist, redis_server, uniq_id,
             # Get the exit status and other status info about the job
             try:
                 job_info = session.wait(job.jobid, drmaaWait)
-            except InvalidJobException:
-                job_info = None
+            except Exception as e:  # code 24 errors are just Exceptions *sigh*
+                job_info = e
 
             try:
                 job_output = zload_db(redis_server,
@@ -373,7 +373,7 @@ def _collect_jobs(sid, jobids, joblist, redis_server, uniq_id,
                       file=sys.stderr)
                 print("stdout:", log_stdout_fn, file=sys.stderr)
                 print("stderr:", log_stderr_fn, file=sys.stderr)
-                if job_info is not None:
+                if not isinstance(job_info, Exception):
                     if job_info.hasExited:
                         print("Exit status: {0}".format(job_info.exitStatus),
                               file=sys.stderr)
@@ -399,7 +399,8 @@ def _collect_jobs(sid, jobids, joblist, redis_server, uniq_id,
                           " is usually because the job information was pushed" +
                           " out of the grid engine's finished_jobs queue " +
                           "before we could retrieve it.", file=sys.stderr)
-                print("Unpickling exception: {0}".format(detail),
+                    print("Job info exception: \n\t{0}".format(job_info))
+                print("Unpickling exception: \n\t{0}".format(detail),
                       file=sys.stderr)
                 job_died = True
 
