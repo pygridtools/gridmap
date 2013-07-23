@@ -345,6 +345,7 @@ def _collect_jobs(sid, jobids, joblist, redis_server, uniq_id,
 
         # attempt to collect results
         job_output_list = []
+        job_died = False
         for ix, job in enumerate(joblist):
 
             log_stdout_fn = os.path.join(temp_dir, job.name + '.o' + jobids[ix])
@@ -399,7 +400,7 @@ def _collect_jobs(sid, jobids, joblist, redis_server, uniq_id,
                           "before we could retrieve it.", file=sys.stderr)
                 print("Unpickling exception: {0}".format(detail),
                       file=sys.stderr)
-                sys.exit(2)
+                job_died = True
 
             #print exceptions
             if isinstance(job_output, Exception):
@@ -409,8 +410,13 @@ def _collect_jobs(sid, jobids, joblist, redis_server, uniq_id,
                 print("stderr:", log_stderr_fn, file=sys.stderr)
                 print("Exception: \n\t{0}".format(job_output), file=sys.stderr)
                 print(file=sys.stderr)
+                job_died = True
 
             job_output_list.append(job_output)
+
+    # Check for problem jobs and raise exception if necessary.
+    if job_died:
+        raise Exception("At least one of the gridmap jobs failed to complete.")
 
     return job_output_list
 
