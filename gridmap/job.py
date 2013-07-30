@@ -47,6 +47,7 @@ import subprocess
 import sys
 import traceback
 import uuid
+from multiprocessing.pool import ThreadPool
 from socket import gethostname
 from time import sleep
 
@@ -310,6 +311,33 @@ def _append_job_to_session(session, job, uniq_id, job_num, temp_dir='/scratch/',
     return jobid
 
 
+def _retrieve_job_output(redis_server, uniq_id, ix):
+    """
+    Little helper function to retrieve job output. This will used with a thread
+    pool to speed result retrieval up.
+
+    @param redis_server: Open connection to the database where the results will
+                         be stored.
+    @type redis_server: L{StrictRedis}
+    @param uniq_id: The UUID of the current set of jobs.
+    @type uniq_id: string
+    @param ix: The index of the current job.
+    @type ix: int
+
+    @returns: A tuple of the job output and any possible unpickling exceptions.
+    """
+    try:
+        job_output = zload_db(redis_server,
+                              'output_{0}'.format(uniq_id),
+                              ix)
+        unpickle_exception = None
+    except Exception as detail:
+        job_output = None
+        unpickle_exception = detail
+
+    return job_output, unpickle_exception
+
+
 def _collect_jobs(sid, jobids, joblist, redis_server, uniq_id,
                   temp_dir='/scratch/', wait=True):
     """
@@ -319,14 +347,18 @@ def _collect_jobs(sid, jobids, joblist, redis_server, uniq_id,
     @type sid: string returned by cluster
     @param jobids: list of job identifiers returned by the cluster
     @type jobids: list of strings
+    @param joblist: list of jobs we're trying to run on the grid.
+    @type joblist: list of Jobs
     @param redis_server: Open connection to the database where the results will
                          be stored.
     @type redis_server: L{StrictRedis}
-    @param wait: Wait for jobs to finish?
-    @type wait: bool
+    @param uniq_id: The UUID of the current set of jobs.
+    @type uniq_id: string
     @param temp_dir: Local temporary directory for storing output for an
                      individual job.
     @type temp_dir: C{basestring}
+    @param wait: Wait for jobs to finish?
+    @type wait: bool
     """
 
     for ix in range(len(jobids)):
@@ -346,23 +378,30 @@ def _collect_jobs(sid, jobids, joblist, redis_server, uniq_id,
         # attempt to collect results
         job_output_list = []
         job_died = False
-        for ix, job in enumerate(joblist):
+        job_info_list = []
 
-            log_stdout_fn = os.path.join(temp_dir, job.name + '.o' + jobids[ix])
-            log_stderr_fn = os.path.join(temp_dir, job.name + '.e' + jobids[ix])
-
+        # Build job info list (Do this in one thread to avoid thread safety
+        # issues)
+        # We do this in a separate loop to try to prevent job info from
+        # disappearing before we retrieve it.
+        for job in joblist:
             # Get the exit status and other status info about the job
             try:
-                job_info = session.wait(job.jobid, drmaaWait)
+                job_info_list.append(session.wait(job.jobid, drmaaWait))
             except Exception as e:  # code 24 errors are just Exceptions *sigh*
-                job_info = e
+                job_info_list.append(e)
 
-            try:
-                job_output = zload_db(redis_server,
-                                      'output_{0}'.format(uniq_id),
-                                      ix)
-            except Exception as detail:
-                job_output = None
+        # Retrieve all job results from database in parallel
+        pool = ThreadPool()
+        retrieve_args = [(redis_server, uniq_id, ix) for ix in
+                         range(len(joblist))]
+        job_output_tuples = pool.map_async(_retrieve_job_output, retrieve_args)
+
+        # Iterate through job outputs and check them for problems
+        for ix, job in enumerate(joblist):
+            job_output, unpickle_exception = job_output_tuples[ix]
+
+            if unpickle_exception is not None:
                 print(("Error while unpickling output for gridmap job {1} " +
                        "stored with key output_{0}_{1}").format(uniq_id, ix),
                       file=sys.stderr)
@@ -371,8 +410,14 @@ def _collect_jobs(sid, jobids, joblist, redis_server, uniq_id,
                       file=sys.stderr)
                 print("\nHere is some information about the problem job:",
                       file=sys.stderr)
+                log_stdout_fn = os.path.join(temp_dir, (job.name + '.o' +
+                                                        jobids[ix]))
+                log_stderr_fn = os.path.join(temp_dir, (job.name + '.e' +
+                                                        jobids[ix]))
                 print("stdout:", log_stdout_fn, file=sys.stderr)
                 print("stderr:", log_stderr_fn, file=sys.stderr)
+                # See if we have extended job info, and print it if we do
+                job_info = job_info_list[ix]
                 if not isinstance(job_info, Exception):
                     if job_info.hasExited:
                         print("Exit status: {0}".format(job_info.exitStatus),
@@ -400,7 +445,7 @@ def _collect_jobs(sid, jobids, joblist, redis_server, uniq_id,
                           " out of the grid engine's finished_jobs queue " +
                           "before we could retrieve it.", file=sys.stderr)
                     print("Job info exception: \n\t{0}".format(job_info))
-                print("Unpickling exception: \n\t{0}".format(detail),
+                print("Unpickling exception:\n\t{0}".format(unpickle_exception),
                       file=sys.stderr)
                 job_died = True
 

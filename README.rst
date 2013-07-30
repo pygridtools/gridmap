@@ -43,6 +43,11 @@ License
 Changelog
 ~~~~~~~~~
 
+-  0.9.9
+
+   + Changed way job results are retrieved to be a bit more efficient in cases of errors.
+   + All job metadata is now retrieved before job output is, which should hopefully alleviate issues where we can't get the metadata because its been flushed too quickly by the grid engine.
+
 -  0.9.8
 
    + Fixed a bug where only the first error was still showing because of an extra exception caused by job_output being undefined.
