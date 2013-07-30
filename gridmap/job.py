@@ -404,6 +404,11 @@ def _collect_jobs(sid, jobids, joblist, redis_server, uniq_id,
         # Iterate through job outputs and check them for problems
         for ix, job in enumerate(joblist):
             job_output, unpickle_exception = job_output_tuples[ix]
+            log_stdout_fn = os.path.join(temp_dir, (job.name + '.o' +
+                                                    jobids[ix]))
+            log_stderr_fn = os.path.join(temp_dir, (job.name + '.e' +
+                                                    jobids[ix]))
+
 
             if unpickle_exception is not None:
                 print(("Error while unpickling output for gridmap job {1} " +
@@ -414,10 +419,6 @@ def _collect_jobs(sid, jobids, joblist, redis_server, uniq_id,
                       file=sys.stderr)
                 print("\nHere is some information about the problem job:",
                       file=sys.stderr)
-                log_stdout_fn = os.path.join(temp_dir, (job.name + '.o' +
-                                                        jobids[ix]))
-                log_stderr_fn = os.path.join(temp_dir, (job.name + '.e' +
-                                                        jobids[ix]))
                 print("stdout:", log_stdout_fn, file=sys.stderr)
                 print("stderr:", log_stderr_fn, file=sys.stderr)
                 # See if we have extended job info, and print it if we do
