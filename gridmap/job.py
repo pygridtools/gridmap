@@ -395,7 +395,7 @@ def _collect_jobs(sid, jobids, joblist, redis_server, uniq_id,
         pool = ThreadPool()
         retrieve_args = [(redis_server, uniq_id, ix) for ix in
                          range(len(joblist))]
-        job_output_tuples = pool.map_async(_retrieve_job_output, retrieve_args)
+        job_output_tuples = pool.map(_retrieve_job_output, retrieve_args)
 
         # Iterate through job outputs and check them for problems
         for ix, job in enumerate(joblist):
