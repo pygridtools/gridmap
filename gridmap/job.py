@@ -311,10 +311,13 @@ def _append_job_to_session(session, job, uniq_id, job_num, temp_dir='/scratch/',
     return jobid
 
 
-def _retrieve_job_output(redis_server, uniq_id, ix):
+def _retrieve_job_output(arg_tuple):
     """
     Little helper function to retrieve job output. This will used with a thread
     pool to speed result retrieval up.
+
+    This takes a single tuple argument, but the tuple is assumed to contain the
+    following parameters:
 
     @param redis_server: Open connection to the database where the results will
                          be stored.
@@ -326,6 +329,7 @@ def _retrieve_job_output(redis_server, uniq_id, ix):
 
     @returns: A tuple of the job output and any possible unpickling exceptions.
     """
+    redis_server, uniq_id, ix = arg_tuple
     try:
         job_output = zload_db(redis_server,
                               'output_{0}'.format(uniq_id),
