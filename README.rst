@@ -79,3 +79,9 @@ Changelog
    +  Fixed serious bug where gridmap could not be imported in some instances.
    +  Refactored things a bit so there is no longer one large module with all of the code in it. (Doesn't change package interface)
 
+
+
+.. image:: https://d2weczhvl823v0.cloudfront.net/EducationalTestingService/gridmap/trend.png
+   :alt: Bitdeli badge
+   :target: https://bitdeli.com/free
+
