@@ -1,6 +1,19 @@
 Grid Map
 -----------
 
+.. image:: https://pypip.in/d/gridmap/badge.png
+   :target: https://crate.io/packages/gridmap
+   :alt: PyPI downloads
+
+.. image:: https://pypip.in/v/gridmap/badge.png
+   :target: https://crate.io/packages/gridmap
+   :alt: Latest version on PyPI
+
+.. image:: https://d2weczhvl823v0.cloudfront.net/EducationalTestingService/gridmap/trend.png
+   :alt: Bitdeli badge
+   :target: https://bitdeli.com/free
+
+
 A module to allow you to easily create jobs on the cluster directly from
 Python. You can directly map Python functions onto the cluster without
 needing to write any wrapper code yourself.
@@ -80,14 +93,4 @@ Changelog
    +  Refactored things a bit so there is no longer one large module with all of the code in it. (Doesn't change package interface)
 
 
-
-.. image:: https://d2weczhvl823v0.cloudfront.net/EducationalTestingService/gridmap/trend.png
-   :alt: Bitdeli badge
-   :target: https://bitdeli.com/free
-
-
-
-.. image:: https://d2weczhvl823v0.cloudfront.net/EducationalTestingService/gridmap/trend.png
-   :alt: Bitdeli badge
-   :target: https://bitdeli.com/free
 
