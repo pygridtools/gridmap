@@ -47,11 +47,12 @@ in a more 'pythonic' fashion.
 
 from __future__ import absolute_import, print_function, unicode_literals
 
-from gridmap.job import (Job, process_jobs, grid_map, pg_map, USE_MEM_FREE,
-                         DEFAULT_QUEUE, REDIS_PORT, REDIS_DB)
+from gridmap.job import (Job, JobException, process_jobs, grid_map, pg_map,
+                         USE_MEM_FREE, DEFAULT_QUEUE, REDIS_PORT, REDIS_DB)
 from gridmap.data import MAX_TRIES, SLEEP_TIME
 from gridmap.version import __version__, VERSION
 
 # For * imports
-__all__ = ['Job', 'process_jobs', 'grid_map', 'pg_map', 'USE_MEM_FREE',
-           'DEFAULT_QUEUE', 'REDIS_DB', 'REDIS_PORT', 'MAX_TRIES', 'SLEEP_TIME']
+__all__ = ['Job', 'JobException', 'process_jobs', 'grid_map', 'pg_map',
+           'USE_MEM_FREE', 'DEFAULT_QUEUE', 'REDIS_DB', 'REDIS_PORT',
+           'MAX_TRIES', 'SLEEP_TIME']

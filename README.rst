@@ -56,8 +56,13 @@ License
 Changelog
 ~~~~~~~~~
 
+-  0.10.1
+
+   + Can now import ``JobException`` directly from ``gridmap`` package instead
+     of having to import from ``gridmap.job``.
+
 -  0.10.0
-   
+
    + Now raise a ``JobException`` instead of an ``Exception`` when one of the jobs has crashed.
    + Fixed potential pip installation issue from importing package for version number.
 
