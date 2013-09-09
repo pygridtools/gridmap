@@ -56,6 +56,11 @@ License
 Changelog
 ~~~~~~~~~
 
+-  0.10.0
+   
+   + Now raise a ``JobException`` instead of an ``Exception`` when one of the jobs has crashed.
+   + Fixed potential pip installation issue from importing package for version number.
+
 -  0.9.9
 
    + Changed way job results are retrieved to be a bit more efficient in cases of errors.

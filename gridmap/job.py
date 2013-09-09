@@ -76,6 +76,13 @@ USE_MEM_FREE = 'TRUE' == os.getenv('GRID_MAP_USE_MEM_FREE', 'False').upper()
 DEFAULT_QUEUE = os.getenv('GRID_MAP_DEFAULT_QUEUE', 'all.q')
 
 
+class JobException(Exception):
+    '''
+    New exception type for when one of the jobs crashed.
+    '''
+    pass
+
+
 class Job(object):
     """
     Central entity that wraps a function and its data. Basically, a job consists
@@ -468,7 +475,8 @@ def _collect_jobs(sid, jobids, joblist, redis_server, uniq_id,
 
     # Check for problem jobs and raise exception if necessary.
     if job_died:
-        raise Exception("At least one of the gridmap jobs failed to complete.")
+        raise JobException("At least one of the gridmap jobs failed to " +
+                           "complete.")
 
     return job_output_list
 

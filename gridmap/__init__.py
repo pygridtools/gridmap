@@ -50,11 +50,7 @@ from __future__ import absolute_import, print_function, unicode_literals
 from gridmap.job import (Job, process_jobs, grid_map, pg_map, USE_MEM_FREE,
                          DEFAULT_QUEUE, REDIS_PORT, REDIS_DB)
 from gridmap.data import MAX_TRIES, SLEEP_TIME
-
-
-# Version info
-__version__ = '0.9.9'
-VERSION = tuple(int(x) for x in __version__.split('.'))
+from gridmap.version import __version__, VERSION
 
 # For * imports
 __all__ = ['Job', 'process_jobs', 'grid_map', 'pg_map', 'USE_MEM_FREE',
