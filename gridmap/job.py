@@ -94,8 +94,8 @@ class Job(object):
     """
 
     __slots__ = ('_f', 'args', 'jobid', 'kwlist', 'cleanup', 'ret', 'exception',
-                 'environment', 'replace_env', 'working_dir', 'num_slots',
-                 'mem_free', 'white_list', 'path', 'uniq_id', 'name', 'queue')
+                 'working_dir', 'num_slots', 'mem_free', 'white_list', 'path',
+                 'uniq_id', 'name', 'queue')
 
     def __init__(self, f, args, kwlist=None, cleanup=True, mem_free="1G",
                  name='gridmap_job', num_slots=1, queue=DEFAULT_QUEUE):
@@ -129,8 +129,6 @@ class Job(object):
         self.kwlist = kwlist if kwlist is not None else {}
         self.cleanup = cleanup
         self.ret = None
-        self.environment = None
-        self.replace_env = False
         self.working_dir = os.getcwd()
         self.num_slots = num_slots
         self.mem_free = mem_free
@@ -279,27 +277,14 @@ def _append_job_to_session(session, job, uniq_id, job_num, temp_dir='/scratch/',
     jt = session.createJobTemplate()
 
     # fetch env vars from shell
-    shell_env = os.environ
-
-    if job.environment and job.replace_env:
-        # only consider defined env vars
-        jt.jobEnvironment = job.environment
-
-    elif job.environment and not job.replace_env:
-        # replace env var from shell with defined env vars
-        env = shell_env
-        env.update(job.environment)
-        jt.jobEnvironment = env
-
-    else:
-        # only consider env vars from shell
-        jt.jobEnvironment = shell_env
+    jt.jobEnvironment = os.environ
 
     # Run module using python -m to avoid ImportErrors when unpickling jobs
     jt.remoteCommand =  sys.executable
     jt.args = ['-m', 'gridmap.runner', '{0}'.format(uniq_id),
                '{0}'.format(job_num), job.path, temp_dir, gethostname()]
     jt.nativeSpecification = job.native_specification
+    jt.workingDirectory = job.working_dir
     jt.outputPath = ":" + temp_dir
     jt.errorPath = ":" + temp_dir
 
