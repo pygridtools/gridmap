@@ -56,6 +56,11 @@ License
 Changelog
 ~~~~~~~~~
 
+-  0.10.2
+
+   + Working directory is now correctly set for each job.
+   + Simplified handling of environment variables. Should now all be passed on properly.
+
 -  0.10.1
 
    + Can now import ``JobException`` directly from ``gridmap`` package instead
