@@ -94,7 +94,7 @@ class Job(object):
     """
 
     __slots__ = ('_f', 'args', 'jobid', 'kwlist', 'cleanup', 'ret', 'exception',
-                 'working_dir', 'num_slots', 'mem_free', 'white_list', 'path',
+                 'num_slots', 'mem_free', 'white_list', 'path',
                  'uniq_id', 'name', 'queue')
 
     def __init__(self, f, args, kwlist=None, cleanup=True, mem_free="1G",
@@ -129,7 +129,6 @@ class Job(object):
         self.kwlist = kwlist if kwlist is not None else {}
         self.cleanup = cleanup
         self.ret = None
-        self.working_dir = os.getcwd()
         self.num_slots = num_slots
         self.mem_free = mem_free
         self.white_list = []
@@ -284,7 +283,7 @@ def _append_job_to_session(session, job, uniq_id, job_num, temp_dir='/scratch/',
     jt.args = ['-m', 'gridmap.runner', '{0}'.format(uniq_id),
                '{0}'.format(job_num), job.path, temp_dir, gethostname()]
     jt.nativeSpecification = job.native_specification
-    jt.workingDirectory = job.working_dir
+    jt.workingDirectory = os.getcwd()
     jt.outputPath = ":" + temp_dir
     jt.errorPath = ":" + temp_dir
 
