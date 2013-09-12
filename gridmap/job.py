@@ -283,7 +283,7 @@ def _append_job_to_session(session, job, uniq_id, job_num, temp_dir='/scratch/',
     jt.args = ['-m', 'gridmap.runner', '{0}'.format(uniq_id),
                '{0}'.format(job_num), job.path, temp_dir, gethostname()]
     jt.nativeSpecification = job.native_specification
-    jt.workingDirectory = os.getcwd()
+    jt.workingDirectory = clean_path(os.getcwd())
     jt.outputPath = ":" + temp_dir
     jt.errorPath = ":" + temp_dir
 
