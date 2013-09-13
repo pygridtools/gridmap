@@ -58,7 +58,6 @@ from socket import gethostname
 from time import sleep
 
 from drmaa import Session
-from drmaa.errors import InvalidJobException
 from nose.tools import eq_
 from redis import StrictRedis
 from redis.exceptions import ConnectionError as RedisConnectionError
