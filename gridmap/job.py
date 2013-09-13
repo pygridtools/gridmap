@@ -341,7 +341,7 @@ def _collect_jobs(sid, jobids, joblist, redis_server, uniq_id,
 
     # Sort and unpickle results
     assert len(messages) == len(jobids)
-    ix_for_message = lambda x: int(x['channel'].rsplit('_', 1)[1]
+    ix_for_message = lambda x: int(x['channel'].rsplit('_', 1)[1])
     job_output_list = [] 
     for ix, message in enumerate(sorted(messages, key=ix_for_message)):
         try:
