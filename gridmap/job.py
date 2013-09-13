@@ -41,22 +41,29 @@ in a more 'pythonic' fashion.
 
 from __future__ import absolute_import, print_function, unicode_literals
 
+import bz2
 import inspect
 import logging
 import os
+try:
+    import cPickle as pickle  # For Python 2.x
+except ImportError:
+    import pickle
 import subprocess
 import sys
 import traceback
 import uuid
+from functools import reduce
 from socket import gethostname
 from time import sleep
 
 from drmaa import Session
 from drmaa.errors import InvalidJobException
+from nose.tools import eq_
 from redis import StrictRedis
 from redis.exceptions import ConnectionError as RedisConnectionError
 
-from gridmap.data import clean_path, zload_db, zsave_db
+from gridmap.data import clean_path, zsave_db
 
 # Python 2.x backward compatibility
 if sys.version_info < (3, 0):
@@ -230,23 +237,19 @@ def _submit_jobs(jobs, uniq_id, temp_dir='/scratch', white_list=None,
     @type quiet: C{bool}
     """
 
-    session = Session()
-    session.initialize()
-    jobids = []
+    with Session() as session:
+        jobids = []
 
-    for job_num, job in enumerate(jobs):
-        # set job white list
-        job.white_list = white_list
+        for job_num, job in enumerate(jobs):
+            # set job white list
+            job.white_list = white_list
 
-        # append jobs
-        jobid = _append_job_to_session(session, job, uniq_id, job_num,
-                                       temp_dir=temp_dir, quiet=quiet)
-        jobids.append(jobid)
+            # append jobs
+            jobid = _append_job_to_session(session, job, uniq_id, job_num,
+                                           temp_dir=temp_dir, quiet=quiet)
+            jobids.append(jobid)
 
-    sid = session.contact
-    session.exit()
-
-    return (sid, jobids)
+    return jobids
 
 
 def _append_job_to_session(session, job, uniq_id, job_num, temp_dir='/scratch/',
@@ -302,12 +305,14 @@ def _append_job_to_session(session, job, uniq_id, job_num, temp_dir='/scratch/',
     return jobid
 
 
-def _collect_jobs(jobids, redis_server, uniq_id, temp_dir='/scratch/'):
+def _collect_jobs(jobids, joblist, redis_server, uniq_id, temp_dir='/scratch/'):
     """
     Collect the results from the jobids, returns a list of Jobs
 
     @param jobids: list of job identifiers returned by the cluster
     @type jobids: list of strings
+    @param joblist: list of jobs we're trying to run on the grid.
+    @type joblist: list of Jobs
     @param redis_server: Open connection to the database where the results will
                          be stored.
     @type redis_server: L{StrictRedis}
@@ -317,6 +322,12 @@ def _collect_jobs(jobids, redis_server, uniq_id, temp_dir='/scratch/'):
                      individual job.
     @type temp_dir: C{basestring}
     """
+    # Little helper for sorting and message parsing
+    ix_for_message = lambda x: int(x['channel'].rsplit('_', 1)[1])
+
+    # Double-check that IDs match with what we expect
+    for ix in range(len(jobids)):
+        eq_(jobids[ix], joblist[ix].jobid)
 
     # Listen on channels that jobs will submit results
     pubsub = redis_server.pubsub()
@@ -324,42 +335,43 @@ def _collect_jobs(jobids, redis_server, uniq_id, temp_dir='/scratch/'):
     pubsub.psubscribe(channel_pattern)
 
     # Wait for job completion messages (and results)
-    messages = []
-    for i in range(len(jobids)):
+    messages = [None] * len(jobids)
+    while not reduce(lambda x, y: x and y, messages):
         message = next(pubsub.listen())  # This could wait forever...
         logging.debug('Received message: {0}'.format(message))
-        messages.append(message)
+        if message['type'] == 'pmessage':
+            messages[ix_for_message(message)] = message
     pubsub.punsubscribe(channel_pattern)
 
     # Sort and unpickle results
     assert len(messages) == len(jobids)
-    ix_for_message = lambda x: int(x['channel'].rsplit('_', 1)[1])
-    job_output_list = [] 
+    job_output_list = []
+    job_died = False
     for ix, message in enumerate(sorted(messages, key=ix_for_message)):
         try:
             job_output = pickle.loads(bz2.decompress(message['data']))
         except Exception as unpickle_exception:
+            job = joblist[ix]
             log_stdout_fn = os.path.join(temp_dir, (job.name + '.o' +
                                                     jobids[ix]))
             log_stderr_fn = os.path.join(temp_dir, (job.name + '.e' +
                                                     jobids[ix]))
-            logging.error(("Error while unpickling output for gridmap job " + 
-                           "{1} stored with key output_{0}_{1}").format(uniq_id, 
-                                                                        ix))
+            logging.error(("Error while unpickling output for gridmap job " +
+                           "{1} sent over channel {0}_{1}").format(uniq_id, ix))
             logging.error("\nHere is some information about the problem job:")
             logging.error("stdout: {0}".format(log_stdout_fn))
             logging.error("stderr: {0}".format(log_stderr_fn))
-            logging.error(("Unpickling exception:\n" + 
+            logging.error(("Unpickling exception:\n" +
                            "\t{0}").format(unpickle_exception))
             job_died = True
-        else: 
+        else:
             #print exceptions
             if isinstance(job_output, Exception):
                 log_stdout_fn = os.path.join(temp_dir, (job.name + '.o' +
                                                         jobids[ix]))
                 log_stderr_fn = os.path.join(temp_dir, (job.name + '.e' +
                                                         jobids[ix]))
-                logging.error(("Exception encountered in job " + 
+                logging.error(("Exception encountered in job " +
                                "{0}.").format(uniq_id))
                 logging.error("stdout: {0}".format(log_stdout_fn))
                 logging.error("stderr: {0}".format(log_stderr_fn))
@@ -376,17 +388,13 @@ def _collect_jobs(jobids, redis_server, uniq_id, temp_dir='/scratch/'):
     return job_output_list
 
 
-def process_jobs(jobs, temp_dir='/scratch/', wait=True, white_list=None,
-                 quiet=True):
+def process_jobs(jobs, temp_dir='/scratch/', white_list=None, quiet=True):
     """
     Take a list of jobs and process them on the cluster.
 
     @param temp_dir: Local temporary directory for storing output for an
                      individual job.
     @type temp_dir: C{basestring}
-    @param wait: Should we wait for jobs to finish? (Should only be false if the
-                 function you're running doesn't return anything)
-    @type wait: C{bool}
     @param white_list: If specified, limit nodes used to only those in list.
     @type white_list: C{list} of C{basestring}
     @param quiet: When true, do not output information about the jobs that have
@@ -422,20 +430,19 @@ def process_jobs(jobs, temp_dir='/scratch/', wait=True, white_list=None,
     for job_id, job in enumerate(jobs):
         zsave_db(job, redis_server, 'job_{0}'.format(uniq_id), job_id)
 
-    # Submit jobs to cluster 
+    # Submit jobs to cluster
     jobids = _submit_jobs(jobs, uniq_id, white_list=white_list,
                           temp_dir=temp_dir, quiet=quiet)
 
     # Reconnect and retrieve outputs
-    job_outputs = _collect_jobs(jobids, redis_server, uniq_id, 
+    job_outputs = _collect_jobs(jobids, jobs, redis_server, uniq_id,
                                 temp_dir=temp_dir)
 
     # Make sure we have enough output
     assert(len(jobs) == len(job_outputs))
 
-    # Delete keys from existing server or just
+    # Delete keys
     redis_server.delete(*redis_server.keys('job_{0}_*'.format(uniq_id)))
-    redis_server.delete(*redis_server.keys('output_{0}_*'.format(uniq_id)))
     return job_outputs
 
 

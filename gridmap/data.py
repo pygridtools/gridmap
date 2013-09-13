@@ -106,6 +106,13 @@ def zpublish_db(obj, redis_server, prefix, job_num):
     pickled_data = bz2.compress(pickle.dumps(obj, pickle.HIGHEST_PROTOCOL), 9)
 
     # Publish message
+    attempt = 0
+    receivers = 0
+    while not receivers and attempt < MAX_TRIES:
+        receivers = redis_server.publish('{0}_{1}'.format(prefix, job_num),
+                                         pickled_data)
+        attempt += 1
+        sleep(SLEEP_TIME)
     redis_server.publish('{0}_{1}'.format(prefix, job_num), pickled_data)
 
 
