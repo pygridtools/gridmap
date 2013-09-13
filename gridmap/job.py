@@ -326,7 +326,9 @@ def _collect_jobs(jobids, redis_server, uniq_id, temp_dir='/scratch/'):
     # Wait for job completion messages (and results)
     messages = []
     for i in range(len(jobids)):
-        messages.append(next(pubsub.listen()))  # This could wait forever...
+        message = next(pubsub.listen())  # This could wait forever...
+        logging.debug('Received message: {0}'.format(message))
+        messages.append(message)
     pubsub.punsubscribe(channel_pattern)
 
     # Sort and unpickle results
