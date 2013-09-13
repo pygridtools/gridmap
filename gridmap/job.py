@@ -302,13 +302,11 @@ def _append_job_to_session(session, job, uniq_id, job_num, temp_dir='/scratch/',
     return jobid
 
 
-def _collect_jobs(sid, jobids, joblist, redis_server, uniq_id,
-                  temp_dir='/scratch/', wait=True):
+def _collect_jobs(jobids, joblist, redis_server, uniq_id, temp_dir='/scratch/',
+                  wait=True):
     """
     Collect the results from the jobids, returns a list of Jobs
 
-    @param sid: session identifier
-    @type sid: string returned by cluster
     @param jobids: list of job identifiers returned by the cluster
     @type jobids: list of strings
     @param joblist: list of jobs we're trying to run on the grid.
