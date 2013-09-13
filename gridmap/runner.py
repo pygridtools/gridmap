@@ -36,7 +36,7 @@ import sys
 
 from redis import StrictRedis
 
-from gridmap.data import clean_path, zload_db, zsave_db
+from gridmap.data import clean_path, zload_db, zpublish_db
 from gridmap.job import REDIS_DB, REDIS_PORT
 
 
@@ -70,7 +70,7 @@ def _run_job(uniq_id, job_num, temp_dir, redis_host):
         print("Writing exception to database for job {0}...".format(job_num),
               end="", file=sys.stderr)
         sys.stderr.flush()
-        zsave_db(detail, redis_server, 'output_{0}'.format(uniq_id), job_num)
+        zpublish_db(detail, redis_server, 'output_{0}'.format(uniq_id), job_num)
         print("done", file=sys.stderr)
     else:
         print("done", file=sys.stderr)
@@ -83,7 +83,7 @@ def _run_job(uniq_id, job_num, temp_dir, redis_host):
         print("Writing output to database for job {0}...".format(job_num),
               end="", file=sys.stderr)
         sys.stderr.flush()
-        zsave_db(job.ret, redis_server, 'output_{0}'.format(uniq_id), job_num)
+        zpublish_db(job.ret, redis_server, 'output_{0}'.format(uniq_id), job_num)
         print("done", file=sys.stderr)
 
         #remove files
