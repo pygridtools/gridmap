@@ -302,15 +302,12 @@ def _append_job_to_session(session, job, uniq_id, job_num, temp_dir='/scratch/',
     return jobid
 
 
-def _collect_jobs(jobids, joblist, redis_server, uniq_id, temp_dir='/scratch/',
-                  wait=True):
+def _collect_jobs(jobids, redis_server, uniq_id, temp_dir='/scratch/'):
     """
     Collect the results from the jobids, returns a list of Jobs
 
     @param jobids: list of job identifiers returned by the cluster
     @type jobids: list of strings
-    @param joblist: list of jobs we're trying to run on the grid.
-    @type joblist: list of Jobs
     @param redis_server: Open connection to the database where the results will
                          be stored.
     @type redis_server: L{StrictRedis}
@@ -319,12 +316,7 @@ def _collect_jobs(jobids, joblist, redis_server, uniq_id, temp_dir='/scratch/',
     @param temp_dir: Local temporary directory for storing output for an
                      individual job.
     @type temp_dir: C{basestring}
-    @param wait: Wait for jobs to finish?
-    @type wait: bool
     """
-
-    for ix in range(len(jobids)):
-        assert(jobids[ix] == joblist[ix].jobid)
 
     # Listen on channels that jobs will submit results
     pubsub = redis_server.pubsub()
@@ -433,8 +425,8 @@ def process_jobs(jobs, temp_dir='/scratch/', wait=True, white_list=None,
                           temp_dir=temp_dir, quiet=quiet)
 
     # Reconnect and retrieve outputs
-    job_outputs = _collect_jobs(jobids, jobs, redis_server, uniq_id,
-                                temp_dir=temp_dir, wait=wait)
+    job_outputs = _collect_jobs(jobids, redis_server, uniq_id, 
+                                temp_dir=temp_dir)
 
     # Make sure we have enough output
     assert(len(jobs) == len(job_outputs))
