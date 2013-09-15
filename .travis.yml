@@ -10,8 +10,7 @@ notifications:
 virtualenv:
   system_site_packages: true
 before_install:
-  - hostname
-  - cat /etc/hosts
+  - sudo sed -i -r "s/^(127.0.0.1\s)/\1$(hostname) /" /etc/hosts
   - sudo apt-get update -qq
   - echo "gridengine-master shared/gridenginemaster string localhost" | sudo debconf-set-selections
   - echo "gridengine-master shared/gridenginecell string default" | sudo debconf-set-selections
