@@ -11,7 +11,7 @@ virtualenv:
   system_site_packages: true
 before_install:
   - hostname
-  - nslookup localhost
+  - cat /etc/hosts
   - sudo apt-get update -qq
   - echo "gridengine-master shared/gridenginemaster string localhost" | sudo debconf-set-selections
   - echo "gridengine-master shared/gridenginecell string default" | sudo debconf-set-selections
