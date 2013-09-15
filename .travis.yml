@@ -11,23 +11,23 @@ virtualenv:
   system_site_packages: true
 before_install:
   - sudo sed -i -r "s/^(127.0.0.1\s)/\1$(hostname) /" /etc/hosts
+  - cat /etc/hosts
   - sudo apt-get update -qq
   - echo "gridengine-master shared/gridenginemaster string localhost" | sudo debconf-set-selections
   - echo "gridengine-master shared/gridenginecell string default" | sudo debconf-set-selections
   - echo "gridengine-master shared/gridengineconfig boolean true" | sudo debconf-set-selections
   - sudo apt-get install 'gridengine-*'
   - export CORES=$(grep -c '^processor' /proc/cpuinfo)
-  - echo "name $USER\noticket 0\nfshare 0\ndelete_time 0\ndefault_project NONE\n" > user_template
-  - cat user_template
-  - sudo qconf -Auser user_template
+  - sed -i -r "s/template/$USER" .user_template
+  - cat .user_template
+  - sudo qconf -Auser .user_template
   - sudo qconf -au $USER arusers
   - sudo qconf -as localhost
-  - echo "hostname\tlocalhost\nload_scaling\tNONE\ncomplex_values\tNONE\nuser_lists\tarusers\nxuser_lists\tNONE\nprojects\tNONE\nxprojects\tNONE\nusage_scaling\tNONE\nreport_variables\tNONE\n" > host_template
-  - cat host_template
-  - sudo qconf -Ae host_template
-  - echo "qname\tall.q\nhostlist\tlocalhost\nseq_no\t0\nload_thresholds\tnp_load_avg=1.75\nsuspend_thresholds\tNONE\nnsuspend\t1\nsuspend_interval\t00:05:00\npriority\t0\nmin_cpu_interval\t00:05:00\nprocessors\t$CORES\nqtype\tBATCH\tINTERACTIVE\nckpt_list\tNONE\npe_list\tmake\nrerun\tFALSE\nslots\t$CORES\ntmpdir\t/tmp\nshell\t/bin/bash\nprolog\tNONE\nepilog\tNONE\nshell_start_mode\tposix_compliant\nstarter_method\tNONE\nsuspend_method\tNONE\nresume_method\tNONE\nterminate_method\tNONE\nnotify\t00:00:60\nowner_list\tarusers\nuser_lists\tarusers\nxuser_lists\tNONE\nsubordinate_list\tNONE\ncomplex_values\tNONE\nprojects\tNONE\nxprojects\tNONE\ncalendar\tNONE\ninitial_state\tdefault\ns_rt\tINFINITY\nh_rt\tINFINITY\ns_cpu\tINFINITY\nh_cpu\tINFINITY\ns_fsize\tINFINITY\nh_fsize\tINFINITY\ns_data\tINFINITY\nh_data\tINFINITY\ns_stack\tINFINITY\nh_stack\tINFINITY\ns_core\tINFINITY\nh_core\tINFINITY\ns_rss\tINFINITY\nh_rss\tINFINITY\ns_vmem\tINFINITY\nh_vmem\tINFINITY\n" > queue_template
-  - cat queue_template
-  - sudo qconf -Aq queue_template
+  - cat .host_template
+  - sudo qconf -Ae .host_template
+  - sed -i -r "s/UNDEFINED/$CORES/" .queue_template
+  - cat .queue_template
+  - sudo qconf -Aq .queue_template
   - sudo rm -rf /dev/shm
   - sudo ln -s /run/shm /dev/shm
 install:
