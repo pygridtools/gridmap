@@ -449,8 +449,8 @@ def process_jobs(jobs, temp_dir='/scratch/', white_list=None, quiet=True):
 # MapReduce Interface
 #####################################################################
 def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
-           num_slots=1, temp_dir='/scratch/', white_list=None,
-           queue=DEFAULT_QUEUE, quiet=True):
+             num_slots=1, temp_dir='/scratch/', white_list=None,
+             queue=DEFAULT_QUEUE, quiet=True):
     """
     Maps a function onto the cluster.
     @note: This can only be used with picklable functions (i.e., those that are
