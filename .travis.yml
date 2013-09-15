@@ -18,7 +18,7 @@ before_install:
   - echo "gridengine-master shared/gridengineconfig boolean true" | sudo debconf-set-selections
   - sudo apt-get install 'gridengine-*'
   - export CORES=$(grep -c '^processor' /proc/cpuinfo)
-  - sed -i -r "s/template/$USER" .user_template
+  - sed -i -r "s/template/$USER/" .user_template
   - cat .user_template
   - sudo qconf -Auser .user_template
   - sudo qconf -au $USER arusers
