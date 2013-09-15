@@ -11,9 +11,9 @@ virtualenv:
   system_site_packages: true
 before_install:
   - sudo apt-get update -qq
-  - sudo echo "gridengine-master shared/gridenginemaster localhost" | debconf-set-selections
-  - sudo echo "gridengine-master shared/gridenginecell default" | debconf-set-selections
-  - sudo echo "gridengine-master shared/gridengineconfig true" | debconf-set-selections
+  - echo "gridengine-master shared/gridenginemaster localhost" | sudo debconf-set-selections
+  - echo "gridengine-master shared/gridenginecell default" | sudo debconf-set-selections
+  - echo "gridengine-master shared/gridengineconfig true" | sudo debconf-set-selections
   - sudo apt-get install 'gridengine-*'
   - export CORES=$(grep -c '^processor' /proc/cpuinfo)
   - echo "name $USER\noticket 0\nfshare 0\ndelete_time 0\ndefault_project NONE\n" > user_template
