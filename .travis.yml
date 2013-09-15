@@ -16,7 +16,7 @@ before_install:
   - echo "gridengine-master shared/gridenginemaster string localhost" | sudo debconf-set-selections
   - echo "gridengine-master shared/gridenginecell string default" | sudo debconf-set-selections
   - echo "gridengine-master shared/gridengineconfig boolean true" | sudo debconf-set-selections
-  - sudo apt-get install gridengine-master gridengine-exec gridengine-common gridengine-qmon gridengine-client gridengine-drmaa
+  - sudo apt-get install 'gridengine-*'
   - export CORES=$(grep -c '^processor' /proc/cpuinfo)
   - sed -i -r "s/template/$USER/" .user_template
   - cat .user_template
