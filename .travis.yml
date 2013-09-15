@@ -16,7 +16,7 @@ before_install:
   - echo "gridengine-master shared/gridenginemaster string localhost" | sudo debconf-set-selections
   - echo "gridengine-master shared/gridenginecell string default" | sudo debconf-set-selections
   - echo "gridengine-master shared/gridengineconfig boolean true" | sudo debconf-set-selections
-  - sudo apt-get install 'gridengine-*'
+  - sudo apt-get install gridengine-master gridengine-exec gridengine-common gridengine-qmon gridengine-client gridengine-drmaa
   - export CORES=$(grep -c '^processor' /proc/cpuinfo)
   - sed -i -r "s/template/$USER/" .user_template
   - cat .user_template
@@ -30,6 +30,8 @@ before_install:
   - sudo qconf -Aq .queue_template
   - sudo rm -rf /dev/shm
   - sudo ln -s /run/shm /dev/shm
+  - export DRMAA_LIBRARY_PATH=/usr/lib/libdrmaa.so
+
 install:
   - pip install -r requirements.txt --use-mirrors
   - pip install python-coveralls --use-mirrors
