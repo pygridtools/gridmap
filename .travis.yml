@@ -43,7 +43,7 @@ install:
 
 # Run test
 script:
-  - nosetests --with-cov --cov skll --cov-config .coveragerc
+  - nosetests --with-cov --cov gridmap --cov-config .coveragerc
 
 # Calculate coverage
 after_success:
