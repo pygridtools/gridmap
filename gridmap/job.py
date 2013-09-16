@@ -298,6 +298,10 @@ def _append_job_to_session(session, job, uniq_id, job_num, temp_dir='/scratch/',
     jt.outputPath = ":" + temp_dir
     jt.errorPath = ":" + temp_dir
 
+    # Create temp directory if necessary
+    if not os.path.exists(temp_dir):
+        os.makedirs(temp_dir)
+
     jobid = session.runJob(jt)
 
     # set job fields that depend on the jobid assigned by grid engine
