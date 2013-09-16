@@ -412,11 +412,11 @@ def process_jobs(jobs, temp_dir='/scratch/', white_list=None, quiet=True):
                                              stdout=null_file,
                                              stdin=subprocess.PIPE,
                                              stderr=null_file)
-            redis_process.stdin.write('''daemonize yes
-                                         pidfile {0}
-                                         port {1}
-                                      '''.format(os.path.join(temp_dir,
-                                                              'redis{0}.pid'.format(REDIS_PORT)),
+            redis_process.stdin.write(b'''daemonize yes
+                                          pidfile {0}
+                                          port {1}
+                                       '''.format(os.path.join(temp_dir,
+                                                               'redis{0}.pid'.format(REDIS_PORT)),
                                                  REDIS_PORT))
             redis_process.stdin.close()
             # Wait for things to get started
