@@ -1,0 +1,59 @@
+language: python
+python:
+  - 2.7
+  - 3.2
+
+notifications:
+  email: false
+
+# Install stuff
+virtualenv:
+  system_site_packages: true
+before_install:
+  - sudo sed -i -r "s/^(127.0.0.1\s)(localhost\.localdomain\slocalhost)/\1localhost localhost.localdomain $(hostname) /" /etc/hosts
+  - cat /etc/hosts
+  - sudo apt-get update -qq
+  - echo "gridengine-master shared/gridenginemaster string localhost" | sudo debconf-set-selections
+  - echo "gridengine-master shared/gridenginecell string default" | sudo debconf-set-selections
+  - echo "gridengine-master shared/gridengineconfig boolean true" | sudo debconf-set-selections
+  - sudo apt-get install 'gridengine-*' libdrmaa1.0
+  - sudo dpkg-query -L libdrmaa1.0
+  - sleep 10
+  - export CORES=$(grep -c '^processor' /proc/cpuinfo)
+  - sed -i -r "s/template/$USER/" .user_template
+  - cat .user_template
+  - sudo qconf -Auser .user_template
+  - sudo qconf -au $USER arusers
+  - sudo qconf -as localhost
+  - cat .host_template
+  - export LOCALHOST_IN_SEL=$(qconf -sel | grep -c 'localhost')
+  - if [ $LOCALHOST_IN_SEL != "1" ]; then sudo qconf -Ae .host_template; else sudo qconf -Me .host_template; fi
+  - sed -i -r "s/UNDEFINED/$CORES/" .queue_template
+  - cat .queue_template
+  - sudo qconf -Aq .queue_template
+  - sudo rm -rf /dev/shm
+  - sudo ln -s /run/shm /dev/shm
+  - export DRMAA_LIBRARY_PATH=/usr/lib/libdrmaa.so.1.0
+  - export SGE_ROOT=/var/lib/gridengine
+  - export SGE_CELL=default
+  - export GRID_MAP_REDIS_PORT=12345
+  - qstat -f -q all.q
+  - ps aux | grep "sge"
+
+install:
+  - pip install -r requirements.txt --use-mirrors
+  - pip install python-coveralls --use-mirrors
+  - pip install nose-cov --use-mirrors
+  - python setup.py install
+
+# Run test
+script:
+  - nosetests -d -v --with-cov --cov gridmap --cov-config .coveragerc
+
+# Calculate coverage
+after_success:
+  - coveralls --config_file .coveragerc
+
+# Print out scratch job info if failed
+after_failure:
+  - tail -n 1000 /scratch/*

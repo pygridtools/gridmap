@@ -28,5 +28,5 @@ in one place. Based on the suggestion `here. <http://bit.ly/16LbuJF>`_
 :organization: ETS
 '''
 
-__version__ = '0.10.2'
+__version__ = '0.10.3'
 VERSION = tuple(int(x) for x in __version__.split('.'))
