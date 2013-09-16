@@ -276,7 +276,16 @@ def _append_job_to_session(session, job, uniq_id, job_num, temp_dir='/scratch/',
     jt = session.createJobTemplate()
 
     # fetch env vars from shell
-    jt.jobEnvironment = os.environ
+    env = {env_var: value for env_var, value in os.environ.items()}
+    # Work around for bug in drmaa-python
+    if sys.version_info >= (3, 0):
+        for env_var, value in os.environ.items():
+            if isinstance(env_var, str):
+                env_var = env_var.encode('utf-8')
+            if isinstance(value, str):
+                value = value.encode('utf-8')
+            env[env_var] = value
+    jt.jobEnvironment = env
 
     # Run module using python -m to avoid ImportErrors when unpickling jobs
     jt.remoteCommand =  sys.executable
@@ -494,12 +503,14 @@ def process_jobs(jobs, temp_dir='/scratch/', wait=True, white_list=None,
                                              stdout=null_file,
                                              stdin=subprocess.PIPE,
                                              stderr=null_file)
-            redis_process.stdin.write('''daemonize yes
-                                         pidfile {0}
-                                         port {1}
-                                      '''.format(os.path.join(temp_dir,
-                                                              'redis{0}.pid'.format(REDIS_PORT)),
-                                                 REDIS_PORT))
+            config = '''daemonize yes
+                        pidfile {0}
+                        port {1}
+                     '''.format(os.path.join(temp_dir,
+                                             'redis{0}.pid'.format(REDIS_PORT)),
+                                REDIS_PORT)
+            config = config.encode('utf-8')
+            redis_process.stdin.write(config)
             redis_process.stdin.close()
             # Wait for things to get started
             sleep(5)
