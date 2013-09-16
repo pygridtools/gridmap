@@ -39,6 +39,8 @@ before_install:
   - export GRID_MAP_REDIS_PORT=12345
   - qstat -f -q all.q
   - ps aux | grep "sge"
+  - sudo mkdir /scratch/
+  - sudo chmod 777 /scratch/
 
 install:
   - pip install -r requirements.txt --use-mirrors
