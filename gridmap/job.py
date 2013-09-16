@@ -134,16 +134,17 @@ class Job(object):
         self.white_list = []
         self.name = name.replace(' ', '_')
         self.queue = queue
-        # fetch env vars from shell
-        env = {env_var: value for env_var, value in os.environ.items()}
-        # Work around for bug in drmaa-python
+        # fetch env vars from shell, using a work around for bug in drmaa-python
         if sys.version_info >= (3, 0):
+            env = {}
             for env_var, value in os.environ.items():
                 if isinstance(env_var, str):
                     env_var = env_var.encode('utf-8')
                 if isinstance(value, str):
                     value = value.encode('utf-8')
                 env[env_var] = value
+        else:
+            env = {env_var: value for env_var, value in os.environ.items()}
         self.environment = env
         self.working_dir = clean_path(os.getcwd())
 
