@@ -42,6 +42,7 @@ in a more 'pythonic' fashion.
 from __future__ import absolute_import, print_function, unicode_literals
 
 import inspect
+import logging
 import os
 import subprocess
 import sys
