@@ -301,7 +301,12 @@ def _append_job_to_session(session, job, uniq_id, job_num, temp_dir='/scratch/',
 
     # Create temp directory if necessary
     if not os.path.exists(temp_dir):
-        os.makedirs(temp_dir)
+        try:
+            os.makedirs(temp_dir)
+        except OSError:
+            logging.warning(("Failed to create temporary directory " +
+                             "{0}.  Your jobs may not start " +
+                             "correctly.").format(temp_dir))
 
     jobid = session.runJob(jt)
 
