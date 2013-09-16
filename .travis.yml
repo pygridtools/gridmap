@@ -31,3 +31,4 @@ after_success:
 # Print out scratch job info if failed
 after_failure:
   - tail -n 1000 /scratch/*
+
