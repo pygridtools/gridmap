@@ -37,7 +37,7 @@ def compute_factorial(n):
 def test_map():
     inputs = [1, 2, 4, 8, 16]
     expected = map(compute_factorial, inputs)
-    outputs = grid_map(compute_factorial, inputs)
+    outputs = grid_map(compute_factorial, inputs, quiet=False)
     eq_(expected, outputs)
 
 
@@ -59,5 +59,5 @@ def test_process_jobs():
     inputs = [1, 2, 4, 8, 16]
     expected = map(compute_factorial, inputs)
     function_jobs = make_jobs(inputs, compute_factorial)
-    outputs = process_jobs(function_jobs)
+    outputs = process_jobs(function_jobs, quiet=False)
     eq_(expected, outputs)
