@@ -18,6 +18,7 @@ before_install:
   - echo "gridengine-master shared/gridengineconfig boolean true" | sudo debconf-set-selections
   - sudo apt-get install 'gridengine-*' libdrmaa1.0
   - sudo dpkg-query -L libdrmaa1.0
+  - sleep 10
   - export CORES=$(grep -c '^processor' /proc/cpuinfo)
   - sed -i -r "s/template/$USER/" .user_template
   - cat .user_template
