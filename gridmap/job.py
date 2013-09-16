@@ -95,7 +95,7 @@ class Job(object):
 
     __slots__ = ('_f', 'args', 'jobid', 'kwlist', 'cleanup', 'ret', 'exception',
                  'num_slots', 'mem_free', 'white_list', 'path',
-                 'uniq_id', 'name', 'queue')
+                 'uniq_id', 'name', 'queue', 'environment', 'working_dir')
 
     def __init__(self, f, args, kwlist=None, cleanup=True, mem_free="1G",
                  name='gridmap_job', num_slots=1, queue=DEFAULT_QUEUE):
@@ -134,6 +134,18 @@ class Job(object):
         self.white_list = []
         self.name = name.replace(' ', '_')
         self.queue = queue
+        # fetch env vars from shell
+        env = {env_var: value for env_var, value in os.environ.items()}
+        # Work around for bug in drmaa-python
+        if sys.version_info >= (3, 0):
+            for env_var, value in os.environ.items():
+                if isinstance(env_var, str):
+                    env_var = env_var.encode('utf-8')
+                if isinstance(value, str):
+                    value = value.encode('utf-8')
+                env[env_var] = value
+        self.environment = env
+        self.working_dir = clean_path(os.getcwd())
 
     @property
     def function(self):
@@ -275,24 +287,14 @@ def _append_job_to_session(session, job, uniq_id, job_num, temp_dir='/scratch/',
 
     jt = session.createJobTemplate()
 
-    # fetch env vars from shell
-    env = {env_var: value for env_var, value in os.environ.items()}
-    # Work around for bug in drmaa-python
-    if sys.version_info >= (3, 0):
-        for env_var, value in os.environ.items():
-            if isinstance(env_var, str):
-                env_var = env_var.encode('utf-8')
-            if isinstance(value, str):
-                value = value.encode('utf-8')
-            env[env_var] = value
-    jt.jobEnvironment = env
+    jt.jobEnvironment = job.environment
 
     # Run module using python -m to avoid ImportErrors when unpickling jobs
     jt.remoteCommand =  sys.executable
     jt.args = ['-m', 'gridmap.runner', '{0}'.format(uniq_id),
                '{0}'.format(job_num), job.path, temp_dir, gethostname()]
     jt.nativeSpecification = job.native_specification
-    jt.workingDirectory = clean_path(os.getcwd())
+    jt.workingDirectory = job.working_dir
     jt.outputPath = ":" + temp_dir
     jt.errorPath = ":" + temp_dir
 
@@ -421,6 +423,9 @@ def _collect_jobs(sid, jobids, joblist, redis_server, uniq_id,
                       file=sys.stderr)
                 print("stdout:", log_stdout_fn, file=sys.stderr)
                 print("stderr:", log_stderr_fn, file=sys.stderr)
+                print("Environment variables: {0}".format(job.environment),
+                      file=sys.stderr)
+                print("Working directory: {0}".format(job.working_dir))
                 # See if we have extended job info, and print it if we do
                 job_info = job_info_list[ix]
                 if not isinstance(job_info, Exception):
