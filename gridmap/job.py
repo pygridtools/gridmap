@@ -101,7 +101,7 @@ class Job(object):
 
     __slots__ = ('_f', 'args', 'jobid', 'kwlist', 'cleanup', 'ret', 'exception',
                  'num_slots', 'mem_free', 'white_list', 'path',
-                 'uniq_id', 'name', 'queue')
+                 'uniq_id', 'name', 'queue', 'environment', 'working_dir')
 
     def __init__(self, f, args, kwlist=None, cleanup=True, mem_free="1G",
                  name='gridmap_job', num_slots=1, queue=DEFAULT_QUEUE):
@@ -140,6 +140,10 @@ class Job(object):
         self.white_list = []
         self.name = name.replace(' ', '_')
         self.queue = queue
+        # Save copy of environment variables
+        self.environment = {env_var: value for env_var, value in
+                            os.environ.items()}
+        self.working_dir = clean_path(os.getcwd())
 
     @property
     def function(self):
@@ -277,17 +281,8 @@ def _append_job_to_session(session, job, uniq_id, job_num, temp_dir='/scratch/',
 
     jt = session.createJobTemplate()
 
-    # fetch env vars from shell
-    env = {env_var: value for env_var, value in os.environ.items()}
-    # Work around for bug in drmaa-python
-    if sys.version_info >= (3, 0):
-        for env_var, value in os.environ.items():
-            if isinstance(env_var, str):
-                env_var = env_var.encode('utf-8')
-            if isinstance(value, str):
-                value = value.encode('utf-8')
-            env[env_var] = value
-    jt.jobEnvironment = env
+    logging.debug('{0}'.format(job.environment))
+    jt.jobEnvironment = job.environment
 
     # Run module using python -m to avoid ImportErrors when unpickling jobs
     jt.remoteCommand =  sys.executable
@@ -297,7 +292,14 @@ def _append_job_to_session(session, job, uniq_id, job_num, temp_dir='/scratch/',
     jt.workingDirectory = clean_path(os.getcwd())
     jt.outputPath = ":" + temp_dir
     jt.errorPath = ":" + temp_dir
-
+    # Create temp directory if necessary
+    if not os.path.exists(temp_dir):
+        try:
+            os.makedirs(temp_dir)
+        except OSError:
+            logging.warning(("Failed to create temporary directory " +
+                             "{0}.  Your jobs may not start " +
+                             "correctly.").format(temp_dir))
     jobid = session.runJob(jt)
 
     # set job fields that depend on the jobid assigned by grid engine
@@ -369,6 +371,8 @@ def _collect_jobs(jobids, joblist, redis_server, uniq_id, temp_dir='/scratch/'):
             logging.error("\nHere is some information about the problem job:")
             logging.error("stdout: {0}".format(log_stdout_fn))
             logging.error("stderr: {0}".format(log_stderr_fn))
+            logging.error("Environment variables: {0}".format(job.environment))
+            logging.error("Working directory: {0}".format(job.working_dir))
             logging.error(("Unpickling exception:\n" +
                            "\t{0}").format(unpickle_exception))
             job_died = True
@@ -383,6 +387,9 @@ def _collect_jobs(jobids, joblist, redis_server, uniq_id, temp_dir='/scratch/'):
                                "{0}.").format(uniq_id))
                 logging.error("stdout: {0}".format(log_stdout_fn))
                 logging.error("stderr: {0}".format(log_stderr_fn))
+                logging.error(("Environment variables: " +
+                               "{0}").format(job.environment))
+                logging.error("Working directory: {0}".format(job.working_dir))
                 logging.error("Exception: \n\t{0}\n".format(job_output))
                 job_died = True
 
