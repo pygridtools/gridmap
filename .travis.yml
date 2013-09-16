@@ -53,3 +53,7 @@ script:
 # Calculate coverage
 after_success:
   - coveralls --config_file .coveragerc
+
+# Print out scratch job info if failed
+after_failure:
+  - tail -n 1000 /scratch/*
