@@ -36,6 +36,7 @@ before_install:
   - export SGE_ROOT=/var/lib/gridengine
   - export SGE_CELL=default
   - qstat -f -q all.q
+  - ps aux | grep "sge"
 
 install:
   - pip install -r requirements.txt --use-mirrors
