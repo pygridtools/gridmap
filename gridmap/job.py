@@ -288,6 +288,7 @@ def _append_job_to_session(session, job, uniq_id, job_num, temp_dir='/scratch/',
 
     jt = session.createJobTemplate()
 
+    logging.debug('{0}'.format(job.environment))
     jt.jobEnvironment = job.environment
 
     # Run module using python -m to avoid ImportErrors when unpickling jobs
