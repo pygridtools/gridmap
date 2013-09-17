@@ -1,6 +1,15 @@
 Grid Map
 -----------
 
+.. image:: https://travis-ci.org/EducationalTestingService/gridmap.png
+   :target: https://travis-ci.org/EducationalTestingService/gridmap
+   :alt: Travis build status
+
+
+.. image:: https://coveralls.io/repos/EducationalTestingService/gridmap/badge.png
+  :target: https://coveralls.io/r/EducationalTestingService/gridmap
+  :alt: Test coverage
+
 .. image:: https://pypip.in/d/gridmap/badge.png
    :target: https://crate.io/packages/gridmap
    :alt: PyPI downloads
@@ -10,8 +19,8 @@ Grid Map
    :alt: Latest version on PyPI
 
 .. image:: https://d2weczhvl823v0.cloudfront.net/EducationalTestingService/gridmap/trend.png
-   :alt: Bitdeli badge
    :target: https://bitdeli.com/free
+   :alt: Bitdeli badge
 
 
 A module to allow you to easily create jobs on the cluster directly from Python.
