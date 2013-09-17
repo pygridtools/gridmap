@@ -284,13 +284,13 @@ def _append_job_to_session(session, job, uniq_id, job_num, temp_dir='/scratch/',
     jt.jobEnvironment = job.environment
 
     # Run module using python -m to avoid ImportErrors when unpickling jobs
-    jt.remoteCommand =  sys.executable
+    jt.remoteCommand = sys.executable
     jt.args = ['-m', 'gridmap.runner', '{0}'.format(uniq_id),
                '{0}'.format(job_num), job.path, temp_dir, gethostname()]
     jt.nativeSpecification = job.native_specification
     jt.workingDirectory = job.working_dir
-    jt.outputPath = ":" + temp_dir
-    jt.errorPath = ":" + temp_dir
+    jt.outputPath = ":{0}".format(temp_dir)
+    jt.errorPath = ":{0}".format(temp_dir)
 
     # Create temp directory if necessary
     if not os.path.exists(temp_dir):
@@ -413,7 +413,6 @@ def _collect_jobs(sid, jobids, joblist, redis_server, uniq_id,
                                                     jobids[ix]))
             log_stderr_fn = os.path.join(temp_dir, (job.name + '.e' +
                                                     jobids[ix]))
-
 
             if unpickle_exception is not None:
                 print(("Error while unpickling output for gridmap job {1} " +
@@ -551,8 +550,8 @@ def process_jobs(jobs, temp_dir='/scratch/', wait=True, white_list=None,
 # MapReduce Interface
 #####################################################################
 def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
-           num_slots=1, temp_dir='/scratch/', white_list=None,
-           queue=DEFAULT_QUEUE, quiet=True):
+             num_slots=1, temp_dir='/scratch/', white_list=None,
+             queue=DEFAULT_QUEUE, quiet=True):
     """
     Maps a function onto the cluster.
     @note: This can only be used with picklable functions (i.e., those that are
