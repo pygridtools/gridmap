@@ -340,9 +340,9 @@ def _retrieve_job_output(arg_tuple):
                               'output_{0}'.format(uniq_id),
                               ix)
         unpickle_exception = None
-    except Exception as detail:
+    except Exception:
         job_output = None
-        unpickle_exception = detail
+        unpickle_exception = traceback.format_exc()
 
     return job_output, unpickle_exception
 
@@ -459,7 +459,7 @@ def _collect_jobs(sid, jobids, joblist, redis_server, uniq_id,
                           " out of the grid engine's finished_jobs queue " +
                           "before we could retrieve it.", file=sys.stderr)
                     print("Job info exception: \n\t{0}".format(job_info))
-                print("Unpickling exception:\n\t{0}".format(unpickle_exception),
+                print("Unpickling exception:\n{0}".format(unpickle_exception),
                       file=sys.stderr)
                 job_died = True
 
