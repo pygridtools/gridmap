@@ -515,7 +515,7 @@ def process_jobs(jobs, temp_dir='/scratch/', wait=True, white_list=None,
             config = '''daemonize yes
                         pidfile {0}
                         port {1}
-                     '''.format(os.path.join(temp_dir,
+                     '''.format(os.path.join('/tmp',
                                              'redis{0}.pid'.format(REDIS_PORT)),
                                 REDIS_PORT)
             config = config.encode('utf-8')
