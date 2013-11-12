@@ -68,15 +68,6 @@ From :py:mod:`~gridmap.conf` Module
     :show-inheritance:
 
 
-:mod:`monitor` Module
-------------------
-
-.. automodule:: gridmap.monitor
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
-
 :mod:`runner` Module
 ------------------
 
