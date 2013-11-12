@@ -24,57 +24,45 @@
 This module provides wrappers that simplify submission and collection of jobs,
 in a more 'pythonic' fashion.
 
-@author: Christian Widmer
-@author: Cheng Soon Ong
-@author: Dan Blanchard (dblanchard@ets.org)
+We use pyZMQ to provide a heart beat feature that allows close monitoring
+of submitted jobs and take appropriate action in case of failure.
 
-@var REDIS_DB: The index of the database to select on the Redis server; can be
+:author: Christian Widmer
+:author: Cheng Soon Ong
+:author: Dan Blanchard (dblanchard@ets.org)
+
+:var REDIS_DB: The index of the database to select on the Redis server; can be
                overriden by setting the GRID_MAP_REDIS_DB environment variable.
-@var REDIS_PORT: The port of the Redis server to use; can be overriden by
+:var REDIS_PORT: The port of the Redis server to use; can be overriden by
                  setting the GRID_MAP_REDIS_PORT environment variable.
-@var USE_MEM_FREE: Does your cluster support specifying how much memory a job
+:var USE_MEM_FREE: Does your cluster support specifying how much memory a job
                    will use via mem_free? Can be overriden by setting the
                    GRID_MAP_USE_MEM_FREE environment variable.
-@var DEFAULT_QUEUE: The default job scheduling queue to use; can be overriden
+:var DEFAULT_QUEUE: The default job scheduling queue to use; can be overriden
                     via the GRID_MAP_DEFAULT_QUEUE environment variable.
 """
 
-from __future__ import absolute_import, print_function, unicode_literals
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals)
 
 import inspect
 import logging
 import os
-import subprocess
 import sys
 import traceback
-import uuid
-from multiprocessing.pool import ThreadPool
-from socket import gethostname
-from time import sleep
+from multiprocessing import Pool
+from socket import gethostbyname, gethostname
 
-from drmaa import Session
-from drmaa.errors import InvalidJobException
-from redis import StrictRedis
-from redis.exceptions import ConnectionError as RedisConnectionError
+from gridmap.conf import DEFAULT_QUEUE, DRMAA_PRESENT, USE_MEM_FREE
+from gridmap.data import clean_path
+from gridmap.monitor import JobMonitor
 
-from gridmap.data import clean_path, zload_db, zsave_db
+if DRMAA_PRESENT:
+    from drmaa import JobControlAction, Session
 
 # Python 2.x backward compatibility
 if sys.version_info < (3, 0):
     range = xrange
-
-
-#### Global settings ####
-# Redis settings
-REDIS_DB = int(os.getenv('GRID_MAP_REDIS_DB', '2'))
-
-REDIS_PORT = int(os.getenv('GRID_MAP_REDIS_PORT', '7272'))
-
-# Is mem_free configured properly on the cluster?
-USE_MEM_FREE = 'TRUE' == os.getenv('GRID_MAP_USE_MEM_FREE', 'False').upper()
-
-# Which queue should we use by default
-DEFAULT_QUEUE = os.getenv('GRID_MAP_DEFAULT_QUEUE', 'all.q')
 
 
 class JobException(Exception):
@@ -90,38 +78,40 @@ class Job(object):
     of a function, its argument list, its keyword list and a field "ret" which
     is filled, when the execute method gets called.
 
-    @note: This can only be used to wrap picklable functions (i.e., those that
+    :note: This can only be used to wrap picklable functions (i.e., those that
     are defined at the module or class level).
     """
 
     __slots__ = ('_f', 'args', 'jobid', 'kwlist', 'cleanup', 'ret', 'exception',
                  'num_slots', 'mem_free', 'white_list', 'path',
-                 'uniq_id', 'name', 'queue', 'environment', 'working_dir')
+                 'uniq_id', 'name', 'queue', 'environment', 'working_dir',
+                 'cause_of_death', 'num_resubmits')
 
     def __init__(self, f, args, kwlist=None, cleanup=True, mem_free="1G",
                  name='gridmap_job', num_slots=1, queue=DEFAULT_QUEUE):
         """
         Initializes a new Job.
 
-        @param f: a function, which should be executed.
-        @type f: function
-        @param args: argument list of function f
-        @type args: list
-        @param kwlist: dictionary of keyword arguments for f
-        @type kwlist: dict
-        @param cleanup: flag that determines the cleanup of input and log file
-        @type cleanup: boolean
-        @param mem_free: Estimate of how much memory this job will need (for
+        :param f: a function, which should be executed.
+        :type f: function
+        :param args: argument list of function f
+        :type args: list
+        :param kwlist: dictionary of keyword arguments for f
+        :type kwlist: dict
+        :param cleanup: flag that determines the cleanup of input and log file
+        :type cleanup: boolean
+        :param mem_free: Estimate of how much memory this job will need (for
                          scheduling)
-        @type mem_free: C{basestring}
-        @param name: Name to give this job
-        @type name: C{basestring}
-        @param num_slots: Number of slots this job should use.
-        @type num_slots: C{int}
-        @param queue: SGE queue to schedule job on.
-        @type queue: C{basestring}
+        :type mem_free: str
+        :param name: Name to give this job
+        :type name: str
+        :param num_slots: Number of slots this job should use.
+        :type num_slots: int
+        :param queue: SGE queue to schedule job on.
+        :type queue: str
         """
-
+        self.num_resubmits = 0
+        self.cause_of_death = ''
         self.path = None
         self._f = None
         self.function = f
@@ -215,67 +205,95 @@ class Job(object):
         return ret
 
 
-def _submit_jobs(jobs, uniq_id, temp_dir='/scratch', white_list=None,
+def _execute(job):
+    """Cannot pickle method instances, so fake a function.
+    Used by _process_jobs_locally"""
+
+    return job.f(*job.args, **job.kwlist)
+
+
+def _process_jobs_locally(jobs, max_processes=1):
+    """
+    Local execution using the package multiprocessing, if present
+
+    :param jobs: jobs to be executed
+    :type jobs: list of Job
+    :param max_processes: maximal number of processes
+    :type max_processes: int
+
+    :return: list of jobs, each with return in job.ret
+    :rtype: list of Job
+    """
+    logger = logging.getLogger(__name__)
+    logger.info("using %i processes", max_processes)
+
+    if max_processes == 1:
+        # perform sequential computation
+        for job in jobs:
+            job.execute()
+    else:
+        pool = Pool(max_processes)
+        result = pool.map(_execute, jobs)
+        for ix, job in enumerate(jobs):
+            job.ret = result[ix]
+        pool.close()
+        pool.join()
+
+    return jobs
+
+
+def _submit_jobs(jobs, home_address, temp_dir='/scratch', white_list=None,
                  quiet=True):
     """
     Method used to send a list of jobs onto the cluster.
-    @param jobs: list of jobs to be executed
-    @type jobs: c{list} of L{Job}
-    @param uniq_id: The unique suffix for the tables corresponding to this job
-                    in the database.
-    @type uniq_id: C{basestring}
-    @param temp_dir: Local temporary directory for storing output for an
+    :param jobs: list of jobs to be executed
+    :type jobs: list of `Job`
+    :param home_address: IP address of submitting machine. Running jobs will
+                         communicate with the parent process at that IP via ZMQ.
+    :type home_address: str
+    :param temp_dir: Local temporary directory for storing output for an
                      individual job.
-    @type temp_dir: C{basestring}
-    @param white_list: List of acceptable nodes to use for scheduling job. If
+    :type temp_dir: str
+    :param white_list: List of acceptable nodes to use for scheduling job. If
                        None, all are used.
-    @type white_list: C{list} of C{basestring}
-    @param quiet: When true, do not output information about the jobs that have
+    :type white_list: list of str
+    :param quiet: When true, do not output information about the jobs that have
                   been submitted.
-    @type quiet: C{bool}
+    :type quiet: bool
     """
+    with Session() as session:
+        jobids = []
+        for job in jobs:
+            # set job white list
+            job.white_list = white_list
 
-    session = Session()
-    session.initialize()
-    jobids = []
+            # remember address of submission host
+            job.home_address = home_address
 
-    for job_num, job in enumerate(jobs):
-        # set job white list
-        job.white_list = white_list
+            # append jobs
+            jobid = _append_job_to_session(session, job, temp_dir=temp_dir,
+                                           quiet=quiet)
+            jobids.append(jobid)
 
-        # append jobs
-        jobid = _append_job_to_session(session, job, uniq_id, job_num,
-                                       temp_dir=temp_dir, quiet=quiet)
-        jobids.append(jobid)
-
-    sid = session.contact
-    session.exit()
-
+        sid = session.contact
     return (sid, jobids)
 
 
-def _append_job_to_session(session, job, uniq_id, job_num, temp_dir='/scratch/',
-                           quiet=True):
+def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
     """
     For an active session, append new job based on information stored in job
     object. Also sets job.job_id to the ID of the job on the grid.
 
-    @param session: The current DRMAA session with the grid engine.
-    @type session: C{Session}
-    @param job: The Job to add to the queue.
-    @type job: L{Job}
-    @param uniq_id: The unique suffix for the tables corresponding to this job
-                    in the database.
-    @type uniq_id: C{basestring}
-    @param job_num: The row in the table to store/retrieve data on. This is only
-                    non-zero for jobs created via grid_map.
-    @type job_num: C{int}
-    @param temp_dir: Local temporary directory for storing output for an
+    :param session: The current DRMAA session with the grid engine.
+    :type session: Session
+    :param job: The Job to add to the queue.
+    :type job: `Job`
+    :param temp_dir: Local temporary directory for storing output for an
                     individual job.
-    @type temp_dir: C{basestring}
-    @param quiet: When true, do not output information about the jobs that have
+    :type temp_dir: str
+    :param quiet: When true, do not output information about the jobs that have
                   been submitted.
-    @type quiet: C{bool}
+    :type quiet: bool
     """
 
     jt = session.createJobTemplate()
@@ -285,8 +303,9 @@ def _append_job_to_session(session, job, uniq_id, job_num, temp_dir='/scratch/',
 
     # Run module using python -m to avoid ImportErrors when unpickling jobs
     jt.remoteCommand = sys.executable
-    jt.args = ['-m', 'gridmap.runner', '{0}'.format(uniq_id),
-               '{0}'.format(job_num), job.path, temp_dir, gethostname()]
+    ip = gethostbyname(gethostname())
+    jt.args = ['-m', 'gridmap.runner', '{0}'.format(job.name), '{0}'.format(ip),
+               job.path]
     jt.nativeSpecification = job.native_specification
     jt.workingDirectory = job.working_dir
     jt.outputPath = ":{0}".format(temp_dir)
@@ -316,275 +335,114 @@ def _append_job_to_session(session, job, uniq_id, job_num, temp_dir='/scratch/',
     return jobid
 
 
-def _retrieve_job_output(arg_tuple):
-    """
-    Little helper function to retrieve job output. This will used with a thread
-    pool to speed result retrieval up.
-
-    This takes a single tuple argument, but the tuple is assumed to contain the
-    following parameters:
-
-    @param redis_server: Open connection to the database where the results will
-                         be stored.
-    @type redis_server: L{StrictRedis}
-    @param uniq_id: The UUID of the current set of jobs.
-    @type uniq_id: string
-    @param ix: The index of the current job.
-    @type ix: int
-
-    @returns: A tuple of the job output and any possible unpickling exceptions.
-    """
-    redis_server, uniq_id, ix = arg_tuple
-    try:
-        job_output = zload_db(redis_server,
-                              'output_{0}'.format(uniq_id),
-                              ix)
-        unpickle_exception = None
-    except Exception:
-        job_output = None
-        unpickle_exception = traceback.format_exc()
-
-    return job_output, unpickle_exception
-
-
-def _collect_jobs(sid, jobids, joblist, redis_server, uniq_id,
-                  temp_dir='/scratch/', wait=True):
-    """
-    Collect the results from the jobids, returns a list of Jobs
-
-    @param sid: session identifier
-    @type sid: string returned by cluster
-    @param jobids: list of job identifiers returned by the cluster
-    @type jobids: list of strings
-    @param joblist: list of jobs we're trying to run on the grid.
-    @type joblist: list of Jobs
-    @param redis_server: Open connection to the database where the results will
-                         be stored.
-    @type redis_server: L{StrictRedis}
-    @param uniq_id: The UUID of the current set of jobs.
-    @type uniq_id: string
-    @param temp_dir: Local temporary directory for storing output for an
-                     individual job.
-    @type temp_dir: C{basestring}
-    @param wait: Wait for jobs to finish?
-    @type wait: bool
-    """
-
-    for ix in range(len(jobids)):
-        assert(jobids[ix] == joblist[ix].jobid)
-
-    # Open DRMAA session as context manager
-    with Session(sid) as session:
-
-        if wait:
-            drmaaWait = Session.TIMEOUT_WAIT_FOREVER
-        else:
-            drmaaWait = Session.TIMEOUT_NO_WAIT
-
-        # Wait for jobs to finish
-        session.synchronize(jobids, drmaaWait, False)
-
-        # attempt to collect results
-        job_output_list = []
-        job_died = False
-        job_info_list = []
-
-        # Build job info list (Do this in one thread to avoid thread safety
-        # issues)
-        # We do this in a separate loop to try to prevent job info from
-        # disappearing before we retrieve it.
-        for job in joblist:
-            # Get the exit status and other status info about the job
-            try:
-                job_info_list.append(session.wait(job.jobid, drmaaWait))
-            except Exception as e:  # code 24 errors are just Exceptions *sigh*
-                job_info_list.append(e)
-
-        # Retrieve all job results from database in parallel
-        pool = ThreadPool()
-        retrieve_args = [(redis_server, uniq_id, ix) for ix in
-                         range(len(joblist))]
-        job_output_tuples = pool.map(_retrieve_job_output, retrieve_args)
-
-        # Iterate through job outputs and check them for problems
-        for ix, job in enumerate(joblist):
-            job_output, unpickle_exception = job_output_tuples[ix]
-            log_stdout_fn = os.path.join(temp_dir,
-                                         ('{0}.o{1}'.format(job.name,
-                                                            jobids[ix])))
-            log_stderr_fn = os.path.join(temp_dir,
-                                         ('{0}.e{1}'.format(job.name,
-                                                            jobids[ix])))
-
-            if unpickle_exception is not None:
-                print(("Error while unpickling output for gridmap job {1} " +
-                       "stored with key output_{0}_{1}").format(uniq_id, ix),
-                      file=sys.stderr)
-                print("This usually happens when a job has crashed before " +
-                      "writing its output to the database.",
-                      file=sys.stderr)
-                print("\nHere is some information about the problem job:",
-                      file=sys.stderr)
-                print("stdout:", log_stdout_fn, file=sys.stderr)
-                print("stderr:", log_stderr_fn, file=sys.stderr)
-                print("Environment variables: {0}".format(job.environment),
-                      file=sys.stderr)
-                print("Working directory: {0}".format(job.working_dir))
-                # See if we have extended job info, and print it if we do
-                job_info = job_info_list[ix]
-                if not isinstance(job_info, Exception):
-                    if job_info.hasExited:
-                        print("Exit status: {0}".format(job_info.exitStatus),
-                              file=sys.stderr)
-                    if job_info.hasSignal:
-                        print(("Terminating signal: " +
-                               "{0}").format(job_info.terminatedSignal),
-                              file=sys.stderr)
-                        print("Core dumped: {0}".format(job_info.hasCoreDump),
-                              file=sys.stderr)
-                    print(("Job aborted before it ran: " +
-                           "{0}").format(job_info.wasAborted),
-                          file=sys.stderr)
-                    print("Job resources: {0}".format(job_info.resourceUsage),
-                          file=sys.stderr)
-                    try:
-                        print(("Job SGE status: " +
-                               "{0}").format(session.jobStatus(job.jobid)),
-                              file=sys.stderr)
-                    except InvalidJobException:
-                        pass
-                else:
-                    print("Extended info about this job was unavailable. This" +
-                          " is usually because the job information was pushed" +
-                          " out of the grid engine's finished_jobs queue " +
-                          "before we could retrieve it.", file=sys.stderr)
-                    print("Job info exception: \n\t{0}".format(job_info))
-                print("Unpickling exception:\n{0}".format(unpickle_exception),
-                      file=sys.stderr)
-                job_died = True
-
-            #print exceptions
-            if isinstance(job_output, Exception):
-                print("Exception encountered in job {0}.".format(uniq_id),
-                      file=sys.stderr)
-                print("stdout:", log_stdout_fn, file=sys.stderr)
-                print("stderr:", log_stderr_fn, file=sys.stderr)
-                print("Exception: \n\t{0}".format(job_output), file=sys.stderr)
-                print(file=sys.stderr)
-                job_died = True
-
-            job_output_list.append(job_output)
-
-    # Check for problem jobs and raise exception if necessary.
-    if job_died:
-        raise JobException("At least one of the gridmap jobs failed to " +
-                           "complete.")
-
-    return job_output_list
-
-
-def process_jobs(jobs, temp_dir='/scratch/', wait=True, white_list=None,
-                 quiet=True):
+def process_jobs(jobs, temp_dir='/scratch/', white_list=None, quiet=True,
+                 max_processes=1, local=False):
     """
     Take a list of jobs and process them on the cluster.
 
-    @param temp_dir: Local temporary directory for storing output for an
+    :param jobs: Jobs to run.
+    :type jobs: list of Job
+    :param temp_dir: Local temporary directory for storing output for an
                      individual job.
-    @type temp_dir: C{basestring}
-    @param wait: Should we wait for jobs to finish? (Should only be false if the
-                 function you're running doesn't return anything)
-    @type wait: C{bool}
-    @param white_list: If specified, limit nodes used to only those in list.
-    @type white_list: C{list} of C{basestring}
-    @param quiet: When true, do not output information about the jobs that have
+    :type temp_dir: str
+    :param white_list: If specified, limit nodes used to only those in list.
+    :type white_list: list of str
+    :param quiet: When true, do not output information about the jobs that have
                   been submitted.
-    @type quiet: C{bool}
+    :type quiet: bool
+    :param max_processes: The maximum number of concurrent processes to use if
+                          processing jobs locally.
+    :type max_processes: int
+    :param local: Should we execute the jobs locally in separate processes
+                  instead of on the the cluster?
+    :type local: bool
     """
-    # Create new connection to Redis database with pickled jobs
-    redis_server = StrictRedis(host=gethostname(), db=REDIS_DB, port=REDIS_PORT)
+    if (not local and not DRMAA_PRESENT):
+        logger = logging.getLogger(__name__)
+        logger.warning('Could not import drmaa. Processing jobs locally.')
+        local = False
 
-    # Check if Redis server is launched, and spawn it if not.
-    try:
-        redis_server.set('connection_test', True)
-    except RedisConnectionError:
-        with open('/dev/null') as null_file:
-            redis_process = subprocess.Popen(['redis-server', '-'],
-                                             stdout=null_file,
-                                             stdin=subprocess.PIPE,
-                                             stderr=null_file)
-            config = '''daemonize yes
-                        pidfile {0}
-                        port {1}
-                     '''.format(os.path.join('/tmp',
-                                             'redis{0}.pid'.format(REDIS_PORT)),
-                                REDIS_PORT)
-            config = config.encode('utf-8')
-            redis_process.stdin.write(config)
-            redis_process.stdin.close()
-            # Wait for things to get started
-            sleep(5)
+    if not local:
+        # initialize monitor to get port number
+        monitor = JobMonitor()
 
-    # Generate random name for keys
-    uniq_id = uuid.uuid4()
+        # get interface and port
+        home_address = monitor.home_address
 
-    # Save jobs to database
-    for job_id, job in enumerate(jobs):
-        zsave_db(job, redis_server, 'job_{0}'.format(uniq_id), job_id)
+        # jobid field is attached to each job object
+        sid = _submit_jobs(jobs, home_address, temp_dir=temp_dir,
+                           white_list=white_list, quiet=quiet)[0]
 
-    # Submit jobs to cluster
-    sids, jobids = _submit_jobs(jobs, uniq_id, white_list=white_list,
-                                temp_dir=temp_dir, quiet=quiet)
+        # handling of inputs, outputs and heartbeats
+        monitor.check(sid, jobs)
+    else:
+        _process_jobs_locally(jobs, max_processes=max_processes)
 
-    # Reconnect and retrieve outputs
-    job_outputs = _collect_jobs(sids, jobids, jobs, redis_server, uniq_id,
-                                temp_dir=temp_dir, wait=wait)
-
-    # Make sure we have enough output
-    assert(len(jobs) == len(job_outputs))
-
-    # Delete keys from existing server or just
-    redis_server.delete(*redis_server.keys('job_{0}_*'.format(uniq_id)))
-    redis_server.delete(*redis_server.keys('output_{0}_*'.format(uniq_id)))
-    return job_outputs
+    return [job.ret for job in jobs]
 
 
-#####################################################################
+def _resubmit(session_id, job):
+    """
+    Resubmit a failed job.
+    """
+    logger = logging.getLogger(__name__)
+    logger.info("starting resubmission process")
+
+    if DRMAA_PRESENT:
+        # append to session
+        with Session(session_id) as session:
+            # try to kill off old job
+            try:
+                # TODO: ask SGE more questions about job status etc
+                # TODO: write unit test for this
+                session.control(job.jobid, JobControlAction.TERMINATE)
+                logger.info("zombie job killed")
+            except Exception:
+                logger.error("Could not kill job with SGE id %s", job.jobid,
+                             exc_info=True)
+            # create new job
+            _append_job_to_session(session, job)
+    else:
+        logger.error("Could not restart job because we're in local mode.")
+
+
+#####################
 # MapReduce Interface
-#####################################################################
+#####################
 def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
              num_slots=1, temp_dir='/scratch/', white_list=None,
              queue=DEFAULT_QUEUE, quiet=True):
     """
     Maps a function onto the cluster.
-    @note: This can only be used with picklable functions (i.e., those that are
+    :note: This can only be used with picklable functions (i.e., those that are
            defined at the module or class level).
 
-    @param f: The function to map on args_list
-    @type f: C{function}
-    @param args_list: List of arguments to pass to f
-    @type args_list: C{list}
-    @param cleanup: Should we remove the stdout and stderr temporary files for
+    :param f: The function to map on args_list
+    :type f: function
+    :param args_list: List of arguments to pass to f
+    :type args_list: list
+    :param cleanup: Should we remove the stdout and stderr temporary files for
                     each job when we're done? (They are left in place if there's
                     an error.)
-    @type cleanup: C{bool}
-    @param mem_free: Estimate of how much memory each job will need (for
+    :type cleanup: bool
+    :param mem_free: Estimate of how much memory each job will need (for
                      scheduling). (Not currently used, because our cluster does
                      not have that setting enabled.)
-    @type mem_free: C{basestring}
-    @param name: Base name to give each job (will have a number add to end)
-    @type name: C{basestring}
-    @param num_slots: Number of slots each job should use.
-    @type num_slots: C{int}
-    @param temp_dir: Local temporary directory for storing output for an
+    :type mem_free: str
+    :param name: Base name to give each job (will have a number add to end)
+    :type name: str
+    :param num_slots: Number of slots each job should use.
+    :type num_slots: int
+    :param temp_dir: Local temporary directory for storing output for an
                      individual job.
-    @type temp_dir: C{basestring}
-    @param white_list: If specified, limit nodes used to only those in list.
-    @type white_list: C{list} of C{basestring}
-    @param queue: The SGE queue to use for scheduling.
-    @type queue: C{basestring}
-    @param quiet: When true, do not output information about the jobs that have
+    :type temp_dir: str
+    :param white_list: If specified, limit nodes used to only those in list.
+    :type white_list: list of str
+    :param queue: The SGE queue to use for scheduling.
+    :type queue: str
+    :param quiet: When true, do not output information about the jobs that have
                   been submitted.
-    @type quiet: C{bool}
+    :type quiet: bool
     """
 
     # construct jobs
@@ -605,34 +463,34 @@ def pg_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
            num_slots=1, temp_dir='/scratch/', white_list=None,
            queue=DEFAULT_QUEUE, quiet=True):
     """
-    @deprecated: This function has been renamed grid_map.
+    :deprecated: This function has been renamed grid_map.
 
-    @param f: The function to map on args_list
-    @type f: C{function}
-    @param args_list: List of arguments to pass to f
-    @type args_list: C{list}
-    @param cleanup: Should we remove the stdout and stderr temporary files for
+    :param f: The function to map on args_list
+    :type f: function
+    :param args_list: List of arguments to pass to f
+    :type args_list: list
+    :param cleanup: Should we remove the stdout and stderr temporary files for
                     each job when we're done? (They are left in place if there's
                     an error.)
-    @type cleanup: C{bool}
-    @param mem_free: Estimate of how much memory each job will need (for
+    :type cleanup: bool
+    :param mem_free: Estimate of how much memory each job will need (for
                      scheduling). (Not currently used, because our cluster does
                      not have that setting enabled.)
-    @type mem_free: C{basestring}
-    @param name: Base name to give each job (will have a number add to end)
-    @type name: C{basestring}
-    @param num_slots: Number of slots each job should use.
-    @type num_slots: C{int}
-    @param temp_dir: Local temporary directory for storing output for an
+    :type mem_free: str
+    :param name: Base name to give each job (will have a number add to end)
+    :type name: str
+    :param num_slots: Number of slots each job should use.
+    :type num_slots: int
+    :param temp_dir: Local temporary directory for storing output for an
                      individual job.
-    @type temp_dir: C{basestring}
-    @param white_list: If specified, limit nodes used to only those in list.
-    @type white_list: C{list} of C{basestring}
-    @param queue: The SGE queue to use for scheduling.
-    @type queue: C{basestring}
-    @param quiet: When true, do not output information about the jobs that have
+    :type temp_dir: str
+    :param white_list: If specified, limit nodes used to only those in list.
+    :type white_list: list of str
+    :param queue: The SGE queue to use for scheduling.
+    :type queue: str
+    :param quiet: When true, do not output information about the jobs that have
                   been submitted.
-    @type quiet: C{bool}
+    :type quiet: bool
     """
     return grid_map(f, args_list, cleanup=cleanup, mem_free=mem_free, name=name,
                     num_slots=num_slots, temp_dir=temp_dir,

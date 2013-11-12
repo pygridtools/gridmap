@@ -28,76 +28,194 @@ This module executes pickled jobs on the cluster.
 @author: Dan Blanchard (dblanchard@ets.org)
 """
 
-from __future__ import absolute_import, print_function, unicode_literals
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals)
 
 import argparse
+import logging
+import multiprocessing
 import os
+import random
+import socket
 import sys
+import time
+from io import open
+from subprocess import check_output
 
-from redis import StrictRedis
+import zmq
 
-from gridmap.data import clean_path, zload_db, zsave_db
-from gridmap.job import REDIS_DB, REDIS_PORT
+from gridmap.conf import HEARTBEAT_FREQUENCY
+from gridmap.data import zloads, zdumps
 
 
-def _run_job(uniq_id, job_num, temp_dir, redis_host):
+def _send_zmq_msg(job_id, command, data, address):
+    """
+    simple code to send messages back to host
+    (and get a reply back)
+    """
+
+    context = zmq.Context()
+    zsocket = context.socket(zmq.REQ)
+    zsocket.connect(address)
+
+    host_name = socket.gethostname()
+    ip_address = socket.gethostbyname(host_name)
+
+    msg_container = {}
+    msg_container["job_id"] = job_id
+    msg_container["host_name"] = host_name
+    msg_container["ip_address"] = ip_address
+    msg_container["command"] = command
+    msg_container["data"] = data
+
+    msg_string = zdumps(msg_container)
+
+    zsocket.send(msg_string)
+    msg = zloads(zsocket.recv())
+
+    return msg
+
+
+def _heart_beat(job_id, address, parent_pid=-1, log_file="", wait_sec=45):
+    """
+    will send reponses to the server with
+    information about the current state of
+    the process
+    """
+
+    while True:
+        status = get_job_status(parent_pid)
+        status["log_file"] = log_file
+        _send_zmq_msg(job_id, "heart_beat", status, address)
+        time.sleep(wait_sec)
+
+
+def _VmB(VmKey, pid):
+    """
+    get various mem usage properties of process with id pid in MB
+    """
+
+    _proc_status = '/proc/%d/status' % pid
+
+    _scale = {'kB': 1.0/1024.0, 'mB': 1.0,
+              'KB': 1.0/1024.0, 'MB': 1.0}
+
+     # get pseudo file  /proc/<pid>/status
+    try:
+        with open(_proc_status) as t:
+            v = t.read()
+    except:
+        return 0.0  # non-Linux?
+     # get VmKey line e.g. 'VmRSS:  9999  kB\n ...'
+    i = v.index(VmKey)
+    v = v[i:].split(None, 3)  # whitespace
+    if len(v) < 3:
+        return 0.0  # invalid format?
+     # convert Vm value to bytes
+    return float(v[1]) * _scale[v[2]]
+
+
+def get_memory_usage(pid):
+    """
+    return memory usage of process in Mb.
+    """
+
+    return _VmB('VmSize:', pid)
+
+
+def get_cpu_load(pid):
+    """
+    return cpu usage of process
+    """
+
+    command = ["ps", "h", "-o", "pcpu", "-p", "%d" % (pid)]
+
+    try:
+        info = check_output()
+        ps_pseudofile = os.popen(command)
+        info = ps_pseudofile.read()
+        ps_pseudofile.close()
+
+        cpu_load = info.strip()
+    except:
+        logger = logging.getLogger(__name__)
+        logger.warning('Getting CPU info failed.', exc_info=True)
+        cpu_load = "Unknown"
+
+    return cpu_load
+
+
+def get_job_status(parent_pid):
+    """
+    Determines the status of the current worker and its machine (currently not
+    cross-platform)
+    """
+
+    status_container = {}
+
+    if parent_pid != -1:
+        status_container["memory"] = get_memory_usage(parent_pid)
+        status_container["cpu_load"] = get_cpu_load(parent_pid)
+
+    return status_container
+
+
+def _run_job(job_id, address):
     """
     Execute the pickled job and produce pickled output.
 
-    @param uniq_id: The unique suffix for the tables corresponding to this job
-                    in the database.
-    @type uniq_id: C{basestring}
-    @param job_num: The index for this job's content in the job and output
-                    tables.
-    @type job_num: C{int}
-    @param temp_dir: Local temporary directory for storing output for an
-                     individual job.
-    @type temp_dir: C{basestring}
-    @param redis_host: Hostname of the database to connect to get the job data.
-    @type redis_host: C{basestring}
+    :param job_id: Unique ID of job
+    :type job_id: str
+    :param address: IP address of submitting host.
+    :type address: str
     """
-    # Connect to database
-    redis_server = StrictRedis(host=redis_host, port=REDIS_PORT, db=REDIS_DB)
+    wait_sec = random.randint(0, 5)
+    logger = logging.getLogger(__name__)
+    logger.info("waiting %i seconds before starting", wait_sec)
+    time.sleep(wait_sec)
 
-    print("Loading job...", end="", file=sys.stderr)
-    sys.stderr.flush()
     try:
-        job = zload_db(redis_server, 'job_{0}'.format(uniq_id), job_num)
-    except Exception as detail:
-        job = None
-        print("FAILED", file=sys.stderr)
+        job = _send_zmq_msg(job_id, "fetch_input", None, address)
+    except Exception as e:
+        # here we will catch errors caused by pickled objects
+        # of classes defined in modules not in PYTHONPATH
+        logger.error('Could not retrieve input for job {}'.format(job_id),
+                     exc_info=True)
 
-        print("Writing exception to database for job {0}...".format(job_num),
-              end="", file=sys.stderr)
-        sys.stderr.flush()
-        zsave_db(detail, redis_server, 'output_{0}'.format(uniq_id), job_num)
-        print("done", file=sys.stderr)
-    else:
-        print("done", file=sys.stderr)
+        # send back exception
+        thank_you_note = _send_zmq_msg(job_id, "store_output", e, address)
+        logger.info('Sending reply: {}'.format(thank_you_note))
+        return
 
-        print("Running job...", end="", file=sys.stderr)
-        sys.stderr.flush()
-        job.execute()
-        print("done", file=sys.stderr)
+    logger.info("input arguments loaded, starting computation %s", job.args)
 
-        print("Writing output to database for job {0}...".format(job_num),
-              end="", file=sys.stderr)
-        sys.stderr.flush()
-        zsave_db(job.ret, redis_server, 'output_{0}'.format(uniq_id), job_num)
-        print("done", file=sys.stderr)
+    # create heart beat process
+    parent_pid = os.getpid()
+    heart = multiprocessing.Process(target=_heart_beat,
+                                    args=(job_id, address, parent_pid,
+                                          job.log_stdout_fn,
+                                          HEARTBEAT_FREQUENCY))
+    logger.info("starting heart beat")
+    heart.start()
 
-        #remove files
-        if job.cleanup:
-            log_stdout_fn = os.path.join(temp_dir, '{0}.o{1}'.format(job.name,
-                                                                     job.jobid))
-            log_stderr_fn = os.path.join(temp_dir, '{0}.e{1}'.format(job.name,
-                                                                     job.jobid))
+    # change working directory
+    logger.info("changing working directory")
+    if 1:
+        if job.working_dir is not None:
+            logger.info("Changing working directory: %s", job.working_dir)
+            os.chdir(job.working_dir)
 
-            try:
-                os.remove(log_stdout_fn)
-                os.remove(log_stderr_fn)
-            except OSError:
-                pass
+
+    # run job
+    logger.info("executing job")
+    job.execute()
+
+    # send back result
+    thank_you_note = _send_zmq_msg(job_id, "store_output", job, address)
+    logger.info(thank_you_note)
+
+    # stop heartbeat
+    heart.terminate()
 
 
 def _main():
@@ -107,40 +225,30 @@ def _main():
 
     # Get command line arguments
     parser = argparse.ArgumentParser(description="This wrapper script will run \
-                                                 a pickled Python function on \
-                                                 some pickled data in a Redis\
-                                                 database, " + "and write the\
-                                                 results back to the database.\
-                                                 You almost never want to run\
-                                                 this yourself.",
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-                                     conflict_handler='resolve')
-    parser.add_argument('uniq_id',
-                        help='The unique suffix for the tables corresponding to\
-                              this job in the database.')
-    parser.add_argument('job_number',
-                        help='Which job number should be run. Dictates which \
-                              input data is read from database and where output\
-                              data is stored.',
-                        type=int)
+                                                  a pickled Python function on \
+                                                  some pickled retrieved data \
+                                                  via 0MQ. You almost never \
+                                                  want to run this yourself.")
+    parser.add_argument('job_id',
+                        help='Which job should be run.')
+    parser.add_argument('home_address',
+                        help='IP address of submitting host.')
     parser.add_argument('module_dir',
                         help='Directory that contains module containing pickled\
                               function. This will get added to PYTHONPATH \
                               temporarily.')
-    parser.add_argument('temp_dir',
-                        help='Directory that temporary output will be stored\
-                              in.')
-    parser.add_argument('redis_host',
-                        help='The hostname of the server that where the Redis\
-                              database is.')
     args = parser.parse_args()
+
+    # Make warnings from built-in warnings module get formatted more nicely
+    logging.captureWarnings(True)
+    logging.basicConfig(format=('%(asctime)s - %(name)s - %(levelname)s - ' +
+                                '%(message)s'))
 
     print("Appended {0} to PYTHONPATH".format(args.module_dir), file=sys.stderr)
     sys.path.append(clean_path(args.module_dir))
 
     # Process the database and get job started
-    _run_job(args.uniq_id, args.job_number, clean_path(args.temp_dir),
-             args.redis_host)
+    _run_job(args.job_id, args.home_address)
 
 
 if __name__ == "__main__":

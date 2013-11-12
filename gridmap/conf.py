@@ -19,9 +19,10 @@
 
 # You should have received a copy of the GNU General Public License
 # along with Grid Map.  If not, see <http://www.gnu.org/licenses/>.
-'''
-Grid Map provides wrappers that simplify submission and collection of jobs,
-in a more 'pythonic' fashion.
+
+"""
+Global settings for Grid Map. All of these settings can be overridden by
+specifying environment variables with the same name.
 
 :author: Christian Widmer
 :author: Cheng Soon Ong
@@ -59,23 +60,77 @@ in a more 'pythonic' fashion.
                           (Default: 10)
 :var WEB_PORT: Port to use for CherryPy server when using web monitor.
                (Default: 8076)
-'''
+"""
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals)
 
-from __future__ import absolute_import, print_function, unicode_literals
+import logging
+import os
 
-from gridmap.conf import (CHECK_FREQUENCY, CREATE_PLOTS, DEFAULT_QUEUE,
-                          ERROR_MAIL_RECIPIENT, ERROR_MAIL_SENDER,
-                          HEARTBEAT_FREQUENCY, MAX_MSG_LENGTH,
-                          MAX_TIME_BETWEEN_HEARTBEATS, NUM_RESUBMITS,
-                          SEND_ERROR_MAILS, SMTP_SERVER, USE_CHERRYPY,
-                          USE_MEM_FREE, WEB_PORT)
-from gridmap.job import Job, JobException, process_jobs, grid_map, pg_map
-from gridmap.version import __version__, VERSION
+# Check if certain libraries are present
+try:
+    import drmaa
+    DRMAA_PRESENT = True
+except ImportError:
+    logger = logging.getLogger(__name__)
+    logger.warning('Could not import drmaa. Only local multiprocessing ' +
+                   'supported.')
+    DRMAA_PRESENT = False
 
-# For * imports
-__all__ = ['Job', 'JobException', 'process_jobs', 'grid_map', 'pg_map',
-           'CHECK_FREQUENCY', 'CREATE_PLOTS', 'DEFAULT_QUEUE',
-           'ERROR_MAIL_RECIPIENT', 'ERROR_MAIL_SENDER', 'HEARTBEAT_FREQUENCY',
-           'MAX_MSG_LENGTH', 'MAX_TIME_BETWEEN_HEARTBEATS', 'NUM_RESUBMITS',
-           'SEND_ERROR_MAILS', 'SMTP_SERVER', 'USE_CHERRYPY', 'USE_MEM_FREE',
-           'WEB_PORT']
+# plot cpu and mem usage and send via email
+CREATE_PLOTS = 'TRUE' == os.getenv('CREATE_PLOTS', 'True').upper()
+if CREATE_PLOTS:
+    try:
+        import matplotlib.pyplot
+    except ImportError:
+        logger = logging.getLogger(__name__)
+        logger.warning('Could not import matplotlib. No plots will be created' +
+                       ' in debug emails.')
+        CREATE_PLOTS = False
+
+# enable web-interface to monitor jobs
+USE_CHERRYPY = 'TRUE' == os.getenv('USE_CHERRYPY', 'True').upper()
+if USE_CHERRYPY:
+    try:
+        import cherypy
+    except ImportError:
+        logger = logging.getLogger(__name__)
+        logger.warning('Could not import cherrypy. Web-based monitoring will ' +
+                       'be disabled.')
+        USE_CHERRYPY = False
+
+# Global settings ####
+# email settings
+SEND_ERROR_MAILS = 'TRUE' == os.getenv('SEND_ERROR_MAILS', 'True').upper()
+SMTP_SERVER = os.getenv('SMTP_SERVER', '')
+ERROR_MAIL_SENDER = os.getenv('ERROR_MAIL_SENDER', 'error@gridmap.py')
+ERROR_MAIL_RECIPIENT = os.getenv('ERROR_MAIL_RECIPIENT', 'error@gridmap.py')
+MAX_MSG_LENGTH = int(os.getenv('MAX_MSG_LENGTH', '5000'))
+
+
+# how much time can pass between heartbeats, before
+# job is assummed to be dead in seconds
+MAX_TIME_BETWEEN_HEARTBEATS = int(os.getenv('MAX_TIME_BETWEEN_HEARTBEATS',
+                                            '90'))
+
+# defines how many times can a particular job can die,
+# before we give up
+NUM_RESUBMITS = int(os.getenv('NUM_RESUBMITS', '3'))
+
+# check interval: how many seconds pass before we check
+# on the status of a particular job in seconds
+CHECK_FREQUENCY = int(os.getenv('CHECK_FREQUENCY', '15'))
+
+# heartbeat frequency: how many seconds pass before jobs
+# on the cluster send back heart beats to the submission
+# host
+HEARTBEAT_FREQUENCY = int(os.getenv('HEARTBEAT_FREQUENCY', '10'))
+
+# Is mem_free configured properly on the cluster?
+USE_MEM_FREE = 'TRUE' == os.getenv('USE_MEM_FREE', 'False').upper()
+
+# Which queue should we use by default
+DEFAULT_QUEUE = os.getenv('DEFAULT_QUEUE', 'all.q')
+
+# Port to use for web server
+WEB_PORT = 8076
