@@ -5,20 +5,20 @@
 # Written (W) 2012-2013 Daniel Blanchard, dblanchard@ets.org
 # Copyright (C) 2008-2012 Max-Planck-Society, 2012-2013 ETS
 
-# This file is part of Grid Map.
+# This file is part of GridMap.
 
-# Grid Map is free software: you can redistribute it and/or modify
+# GridMap is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 
-# Grid Map is distributed in the hope that it will be useful,
+# GridMap is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 
 # You should have received a copy of the GNU General Public License
-# along with Grid Map.  If not, see <http://www.gnu.org/licenses/>.
+# along with GridMap.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 This module provides wrappers that simplify submission and collection of jobs,

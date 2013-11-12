@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Grid Map documentation build configuration file, created by
+# GridMap documentation build configuration file, created by
 # sphinx-quickstart on Tue Jul 16 09:06:32 2013.
 #
 # This file is execfile()d with the current directory set to its containing dir.
@@ -42,7 +42,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'Grid Map'
+project = u'GridMap'
 copyright = u'2008-2012 Max-Planck-Society, 2012-2013 ETS'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -184,7 +184,7 @@ latex_elements = {
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-  ('index', 'GridMap.tex', u'Grid Map Documentation',
+  ('index', 'GridMap.tex', u'GridMap Documentation',
    u'Daniel Blanchard \\and Cheng Soon Ong \\and Christian Widmer', 'manual'),
 ]
 
@@ -214,7 +214,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'GridMap', u'Grid Map Documentation',
+    ('index', 'GridMap', u'GridMap Documentation',
      [u'Daniel Blanchard, Cheng Soon Ong, Christian Widmer'], 1)
 ]
 
@@ -228,7 +228,7 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-  ('index', 'GridMap', u'Grid Map Documentation',
+  ('index', 'GridMap', u'GridMap Documentation',
    u'Daniel Blanchard, Cheng Soon Ong, Christian Widmer', 'SciKit-LearnLab', 'One line description of project.',
    'Miscellaneous'),
 ]
@@ -249,7 +249,7 @@ texinfo_documents = [
 # -- Options for Epub output ---------------------------------------------------
 
 # Bibliographic Dublin Core info.
-epub_title = u'Grid Map'
+epub_title = u'GridMap'
 epub_author = u'Daniel Blanchard, Cheng Soon Ong, Christian Widmer'
 epub_publisher = u'Educational Testing Service'
 epub_copyright = u'2008-2012 Max-Planck-Society, 2012-2013 Educational Testing Service'

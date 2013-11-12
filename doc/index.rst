@@ -1,14 +1,14 @@
-.. Grid Map documentation master file, created by
+.. GridMap documentation master file, created by
    sphinx-quickstart on Tue Jul 16 09:06:32 2013.
 
-Grid Map
+GridMap
 ==============================
 
 A package to allow you to easily create jobs on the cluster directly from
 Python. You can directly map Python functions onto the cluster without needing
 to write any wrapper code yourself.
 
-This is the ETS fork of an older project called Python Grid. Unlike the older
+This is the ETS fork of an older project called PythonGrid. Unlike the older
 version, it is Python 2/3 compatible.
 
 For some examples of how to use it, check out ``map_reduce.py`` (for a simple
