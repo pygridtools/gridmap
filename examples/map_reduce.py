@@ -54,7 +54,7 @@ def main():
 
     print("reducing result")
     for i, ret in enumerate(intermediate_results):
-        print("f({}) = {}".format(args[i], ret))
+        print("f({0}) = {1}".format(args[i], ret))
 
 
 if __name__ == "__main__":

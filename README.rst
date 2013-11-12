@@ -41,8 +41,8 @@ For complete documentation `read the docs <http://gridmap.readthedocs.org>`__.
 Requirements
 ~~~~~~~~~~~~
 
+-  `drmaa <https://github.com/drmaa-python/drmaa-python>`__
 -  `pyzmq <https://github.com/zeromq/pyzmq>`__
--  `drmaa-python <https://github.com/drmaa-python/drmaa-python>`__
 -  Python 2.6+
 
 License

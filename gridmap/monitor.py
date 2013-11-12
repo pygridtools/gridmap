@@ -252,26 +252,26 @@ def send_error_mail(job):
 
     # create message
     msg = MIMEMultipart()
-    msg["subject"] = "GridMap error {}".format(job.name)
+    msg["subject"] = "GridMap error {0}".format(job.name)
     msg["From"] = ERROR_MAIL_SENDER
     msg["To"] = ERROR_MAIL_RECIPIENT
 
     # compose error message
     body_text = ""
-    body_text += "job {}\n".format(job.name)
-    body_text += "last timestamp: {}\n".format(job.timestamp)
-    body_text += "num_resubmits: {}\n".format(job.num_resubmits)
-    body_text += "cause_of_death: {}\n".format(job.cause_of_death)
+    body_text += "job {0}\n".format(job.name)
+    body_text += "last timestamp: {0}\n".format(job.timestamp)
+    body_text += "num_resubmits: {0}\n".format(job.num_resubmits)
+    body_text += "cause_of_death: {0}\n".format(job.cause_of_death)
 
     if job.heart_beat:
-        body_text += "last memory usage: {}\n".format(job.heart_beat["memory"])
-        body_text += "last cpu load: {}\n\n".format(job.heart_beat["cpu_load"])
+        body_text += "last memory usage: {0}\n".format(job.heart_beat["memory"])
+        body_text += "last cpu load: {0}\n\n".format(job.heart_beat["cpu_load"])
 
-    body_text += "host: {}\n\n".format(job.host_name)
+    body_text += "host: {0}\n\n".format(job.host_name)
 
     if isinstance(job.ret, Exception):
-        body_text += "job encountered exception: {}\n".format(job.ret)
-        body_text += "stacktrace: {}\n\n".format(job.exception)
+        body_text += "job encountered exception: {0}\n".format(job.ret)
+        body_text += "stacktrace: {0}\n\n".format(job.exception)
 
     logger.info('Email body: %s', body_text)
 
@@ -340,7 +340,7 @@ def handle_resubmit(session_id, job):
                        "(previous resubmits = %i)", job.num_resubmits)
 
         # remove node from white_list
-        node_name = '{}@{}'.format(job.queue, job.host_name)
+        node_name = '{0}@{1}'.format(job.queue, job.host_name)
         if job.white_list.count(node_name) > 0:
             job.white_list.remove(node_name)
 

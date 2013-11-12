@@ -87,7 +87,7 @@ def main():
 
     print("results from each job")
     for (i, result) in enumerate(job_outputs):
-        print("Job {}- result: {}".format(i, result))
+        print("Job {0}- result: {1}".format(i, result))
 
 
 if __name__ == "__main__":

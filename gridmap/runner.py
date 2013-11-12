@@ -179,12 +179,12 @@ def _run_job(job_id, address):
     except Exception as e:
         # here we will catch errors caused by pickled objects
         # of classes defined in modules not in PYTHONPATH
-        logger.error('Could not retrieve input for job {}'.format(job_id),
+        logger.error('Could not retrieve input for job {0}'.format(job_id),
                      exc_info=True)
 
         # send back exception
         thank_you_note = _send_zmq_msg(job_id, "store_output", e, address)
-        logger.info('Sending reply: {}'.format(thank_you_note))
+        logger.info('Sending reply: {0}'.format(thank_you_note))
         return
 
     logger.info("input arguments loaded, starting computation %s", job.args)

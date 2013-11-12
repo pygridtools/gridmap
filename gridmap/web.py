@@ -31,13 +31,13 @@ from __future__ import (absolute_import, division, print_function,
 
 import argparse
 import logging
-import os.path
 from io import open
 from socket import gethostname
 
 import cherrypy
 
-from gridmap.runner import send_zmq_msg
+from gridmap.conf import WEB_PORT
+from gridmap.runner import _send_zmq_msg
 
 
 class WebMonitor(object):
@@ -57,7 +57,7 @@ class WebMonitor(object):
         display list of jobs
         """
         job_id = -1
-        jobs = send_zmq_msg(job_id, "get_jobs", "", address)
+        jobs = _send_zmq_msg(job_id, "get_jobs", "", address)
 
         out_html = '''
             <form action="list_jobs" method="GET">
@@ -86,7 +86,7 @@ class WebMonitor(object):
         """
         display individual job details
         """
-        job = send_zmq_msg(job_id, "get_job", "", address)
+        job = _send_zmq_msg(job_id, "get_job", "", address)
         out_html = ""
         details = self.job_to_html(job)
         out_html += details
@@ -99,22 +99,22 @@ class WebMonitor(object):
         """
 
         # compose error message
-        body_text = "job {}\n<br>".format(job.name)
-        body_text += "last timestamp: {}\n<br>".format(job.timestamp)
-        body_text += "num_resubmits: {}\n<br>".format(job.num_resubmits)
-        body_text += "cause_of_death: {}\n<br>".format(job.cause_of_death)
+        body_text = "job {0}\n<br>".format(job.name)
+        body_text += "last timestamp: {0}\n<br>".format(job.timestamp)
+        body_text += "num_resubmits: {0}\n<br>".format(job.num_resubmits)
+        body_text += "cause_of_death: {0}\n<br>".format(job.cause_of_death)
 
         if job.heart_beat:
-            body_text += ("last memory usage: {}\n" +
+            body_text += ("last memory usage: {0}\n" +
                           "<br>").format(job.heart_beat["memory"])
-            body_text += ("last cpu load: {}\n" +
+            body_text += ("last cpu load: {0}\n" +
                           "<br>").format(job.heart_beat["cpu_load"])
 
         body_text += "host: {}<br><br>\n\n".format(job.host_name)
 
         if isinstance(job.ret, Exception):
-            body_text += "job encountered exception: {}\n<br>".format(job.ret)
-            body_text += "stacktrace: {}\n<br>\n<br>".format(job.exception)
+            body_text += "job encountered exception: {0}\n<br>".format(job.ret)
+            body_text += "stacktrace: {0}\n<br>\n<br>".format(job.exception)
 
         # attach log file
         if job.heart_beat:
@@ -139,7 +139,6 @@ def _main():
                                 '%(message)s'))
 
     # Start server
-    this_dir = os.path.dirname(__file__)
     cherrypy.quickstart(WebMonitor(),
                         config={'global': {'server.socket_port': WEB_PORT,
                                            'server.socket_host': gethostname()}})
