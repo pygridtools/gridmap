@@ -407,8 +407,8 @@ class JobMonitor(object):
         checks for all jobs if they are done
         """
         # exceptions will be handled in check_if_alive
-        return all(lambda job: (job.ret is not None and
-                                not isinstance(job.ret, Exception)), self.jobs)
+        return all((job.ret is not None and not isinstance(job.ret, Exception))
+                   for job in self.jobs)
 
 
 def send_error_mail(job):
