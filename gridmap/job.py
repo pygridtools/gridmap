@@ -100,7 +100,7 @@ class Job(object):
     __slots__ = ('_f', 'args', 'jobid', 'kwlist', 'cleanup', 'ret', 'exception',
                  'num_slots', 'mem_free', 'white_list', 'path',
                  'uniq_id', 'name', 'queue', 'environment', 'working_dir',
-                 'cause_of_death', 'num_resubmits')
+                 'cause_of_death', 'num_resubmits', 'home_address')
 
     def __init__(self, f, args, kwlist=None, cleanup=True, mem_free="1G",
                  name='gridmap_job', num_slots=1, queue=DEFAULT_QUEUE):
@@ -125,6 +125,7 @@ class Job(object):
         :param queue: SGE queue to schedule job on.
         :type queue: str
         """
+        self.home_address = ''
         self.num_resubmits = 0
         self.cause_of_death = ''
         self.path = None

@@ -43,7 +43,7 @@ Requirements
 
 -  `drmaa <https://github.com/drmaa-python/drmaa-python>`__
 -  `pyzmq <https://github.com/zeromq/pyzmq>`__
--  Python 2.6+
+-  Python 2.7+
 
 License
 ~~~~~~~
