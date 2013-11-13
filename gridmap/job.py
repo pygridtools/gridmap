@@ -292,7 +292,7 @@ class JobMonitor(object):
             logger.debug('Waiting for message')
             msg_str = self.socket.recv()
             msg = zloads(msg_str)
-
+            logger.debug('Received message: {}'.format(msg))
             return_msg = ""
 
             job_id = msg["job_id"]
