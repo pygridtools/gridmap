@@ -19,7 +19,6 @@
 
 # You should have received a copy of the GNU General Public License
 # along with GridMap.  If not, see <http://www.gnu.org/licenses/>.
-
 """
 Global settings for GridMap. All of these settings can be overridden by
 specifying environment variables with the same name.
@@ -43,9 +42,9 @@ specifying environment variables with the same name.
                         (Default: error@gridmap.py)
 :var ERROR_MAIL_RECIPIENT: Recipient address for error emails.
                            (Default: $USER@$HOST, where $USER is the current
-                            user's username, and $HOST is the last two sections
-                            of the server's fully qualified domain name, or just
-                            the host's name if it does not contain periods.)
+                           user's username, and $HOST is the last two sections
+                           of the server's fully qualified domain name, or just
+                           the host's name if it does not contain periods.)
 :var MAX_MSG_LENGTH: Maximum length of any error email message.
                      (Default: 5000)
 :var MAX_TIME_BETWEEN_HEARTBEATS: How long should we wait (in seconds) for a
@@ -60,6 +59,7 @@ specifying environment variables with the same name.
                           (Default: 10)
 :var WEB_PORT: Port to use for CherryPy server when using web monitor.
                (Default: 8076)
+
 """
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
@@ -92,7 +92,7 @@ if CREATE_PLOTS:
 USE_CHERRYPY = 'TRUE' == os.getenv('USE_CHERRYPY', 'True').upper()
 if USE_CHERRYPY:
     try:
-        import cherypy
+        import cherrypy
     except ImportError:
         logger = logging.getLogger(__name__)
         logger.warning('Could not import cherrypy. Web-based monitoring will ' +

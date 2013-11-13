@@ -31,15 +31,6 @@ of submitted jobs and take appropriate action in case of failure.
 :author: Cheng Soon Ong
 :author: Dan Blanchard (dblanchard@ets.org)
 
-:var REDIS_DB: The index of the database to select on the Redis server; can be
-               overriden by setting the GRID_MAP_REDIS_DB environment variable.
-:var REDIS_PORT: The port of the Redis server to use; can be overriden by
-                 setting the GRID_MAP_REDIS_PORT environment variable.
-:var USE_MEM_FREE: Does your cluster support specifying how much memory a job
-                   will use via mem_free? Can be overriden by setting the
-                   GRID_MAP_USE_MEM_FREE environment variable.
-:var DEFAULT_QUEUE: The default job scheduling queue to use; can be overriden
-                    via the GRID_MAP_DEFAULT_QUEUE environment variable.
 """
 
 from __future__ import (absolute_import, division, print_function,
@@ -93,8 +84,10 @@ class Job(object):
     of a function, its argument list, its keyword list and a field "ret" which
     is filled, when the execute method gets called.
 
-    :note: This can only be used to wrap picklable functions (i.e., those that
-    are defined at the module or class level).
+    .. note::
+
+       This can only be used to wrap picklable functions (i.e., those that
+       are defined at the module or class level).
     """
 
     __slots__ = ('_f', 'args', 'jobid', 'kwlist', 'cleanup', 'ret', 'exception',
@@ -125,6 +118,7 @@ class Job(object):
         :type num_slots: int
         :param queue: SGE queue to schedule job on.
         :type queue: str
+
         """
         self.timestamp = None
         self.log_stdout_fn = ''
@@ -587,6 +581,8 @@ def _submit_jobs(jobs, home_address, temp_dir='/scratch', white_list=None,
     :param quiet: When true, do not output information about the jobs that have
                   been submitted.
     :type quiet: bool
+
+    :returns: Session ID, list of job IDs
     """
     with Session() as session:
         jobids = []
@@ -621,6 +617,8 @@ def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
     :param quiet: When true, do not output information about the jobs that have
                   been submitted.
     :type quiet: bool
+
+    :returns: Job ID
     """
 
     jt = session.createJobTemplate()
@@ -685,6 +683,8 @@ def process_jobs(jobs, temp_dir='/scratch/', white_list=None, quiet=True,
     :param local: Should we execute the jobs locally in separate processes
                   instead of on the the cluster?
     :type local: bool
+
+    :returns: List of Job results
     """
     if (not local and not DRMAA_PRESENT):
         logger = logging.getLogger(__name__)
@@ -743,8 +743,11 @@ def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
              queue=DEFAULT_QUEUE, quiet=True):
     """
     Maps a function onto the cluster.
-    :note: This can only be used with picklable functions (i.e., those that are
-           defined at the module or class level).
+
+    .. note::
+
+       This can only be used with picklable functions (i.e., those that are
+       defined at the module or class level).
 
     :param f: The function to map on args_list
     :type f: function
@@ -772,6 +775,8 @@ def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
     :param quiet: When true, do not output information about the jobs that have
                   been submitted.
     :type quiet: bool
+
+    :returns: List of Job results
     """
 
     # construct jobs
@@ -792,7 +797,8 @@ def pg_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
            num_slots=1, temp_dir='/scratch/', white_list=None,
            queue=DEFAULT_QUEUE, quiet=True):
     """
-    :deprecated: This function has been renamed grid_map.
+    .. deprecated:: 0.9
+       This function has been renamed grid_map.
 
     :param f: The function to map on args_list
     :type f: function
@@ -820,6 +826,8 @@ def pg_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
     :param quiet: When true, do not output information about the jobs that have
                   been submitted.
     :type quiet: bool
+
+    :returns: List of Job results
     """
     return grid_map(f, args_list, cleanup=cleanup, mem_free=mem_free, name=name,
                     num_slots=num_slots, temp_dir=temp_dir,

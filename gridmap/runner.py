@@ -23,9 +23,9 @@
 """
 This module executes pickled jobs on the cluster.
 
-@author: Christian Widmer
-@author: Cheng Soon Ong
-@author: Dan Blanchard (dblanchard@ets.org)
+:author: Christian Widmer
+:author: Cheng Soon Ong
+:author: Dan Blanchard (dblanchard@ets.org)
 """
 
 from __future__ import (absolute_import, division, print_function,
@@ -117,7 +117,10 @@ def _VmB(VmKey, pid):
 
 def get_memory_usage(pid):
     """
-    return memory usage of process in Mb.
+    :param pid: Process ID for job whose memory usage we'd like to check.
+    :type pid: int
+
+    :returns: Memory usage of process in Mb.
     """
 
     return _VmB('VmSize:', pid)
@@ -125,8 +128,12 @@ def get_memory_usage(pid):
 
 def get_cpu_load(pid):
     """
-    return cpu usage of process
+    :param pid: Process ID for job whose CPU load we'd like to check.
+    :type pid: int
+
+    :returns: CPU usage of process
     """
+
 
     command = ["ps", "h", "-o", "pcpu", "-p", "%d" % (pid)]
 
@@ -149,6 +156,12 @@ def get_job_status(parent_pid):
     """
     Determines the status of the current worker and its machine (currently not
     cross-platform)
+
+    :param parent_pid: Process ID for job whose status we'd like to check.
+    :type parent_pid: int
+
+    :returns: Memory and CPU load information for given PID.
+    :rtype: dict
     """
 
     status_container = {}
