@@ -45,7 +45,6 @@ of submitted jobs and take appropriate action in case of failure.
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 
-import datetime
 import inspect
 import logging
 import multiprocessing
@@ -53,6 +52,7 @@ import os
 import socket
 import sys
 import traceback
+from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
