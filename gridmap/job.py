@@ -624,8 +624,8 @@ def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
     """
 
     jt = session.createJobTemplate()
-
-    logging.debug('{0}'.format(job.environment))
+    logger = logging.getLogger(__name__)
+    logger.debug('{0}'.format(job.environment))
     jt.jobEnvironment = job.environment
 
     # Run module using python -m to avoid ImportErrors when unpickling jobs
@@ -643,9 +643,9 @@ def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
         try:
             os.makedirs(temp_dir)
         except OSError:
-            logging.warning(("Failed to create temporary directory " +
-                             "{0}.  Your jobs may not start " +
-                             "correctly.").format(temp_dir))
+            logger.warning(("Failed to create temporary directory " +
+                            "{0}.  Your jobs may not start " +
+                            "correctly.").format(temp_dir))
 
     jobid = session.runJob(jt)
 
