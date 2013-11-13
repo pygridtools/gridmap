@@ -255,10 +255,14 @@ def _main():
     # Make warnings from built-in warnings module get formatted more nicely
     logging.captureWarnings(True)
     logging.basicConfig(format=('%(asctime)s - %(name)s - %(levelname)s - ' +
-                                '%(message)s'))
+                                '%(message)s'), level=logging.DEBUG)
+    logger = logging.getLogger(__name__)
 
-    print("Appended {0} to PYTHONPATH".format(args.module_dir), file=sys.stderr)
+    logger.info("Appended {0} to PYTHONPATH".format(args.module_dir))
     sys.path.append(clean_path(args.module_dir))
+
+    logger.debug("Job ID: %s\nHome address: %s\nModule dir: %s", args.job_id,
+                 args.home_address, args.module_dir)
 
     # Process the database and get job started
     _run_job(args.job_id, args.home_address)

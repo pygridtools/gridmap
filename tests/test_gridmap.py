@@ -32,7 +32,7 @@ from nose.tools import eq_
 # Setup logging
 logging.captureWarnings(True)
 logging.basicConfig(format=('%(asctime)s - %(name)s - %(levelname)s - ' +
-                            '%(message)s'), level=logging.INFO)
+                            '%(message)s'), level=logging.DEBUG)
 
 
 def compute_factorial(n):

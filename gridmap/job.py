@@ -289,7 +289,7 @@ class JobMonitor(object):
         logger.info("Using ZMQ layer to keep track of jobs")
         # main loop
         while not self.all_jobs_done():
-
+            logger.debug('Waiting for message')
             msg_str = self.socket.recv()
             msg = zloads(msg_str)
 
@@ -406,12 +406,9 @@ class JobMonitor(object):
         """
         checks for all jobs if they are done
         """
-        for job in self.jobs:
-            # exceptions will be handled in check_if_alive
-            if job.ret == None or isinstance(job.ret, Exception):
-                return False
-
-        return True
+        # exceptions will be handled in check_if_alive
+        return all(lambda job: (job.ret is not None and
+                                not isinstance(job.ret, Exception)), self.jobs)
 
 
 def send_error_mail(job):
