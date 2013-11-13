@@ -22,9 +22,17 @@ Some simple unit tests for GridMap.
 
 from __future__ import print_function, unicode_literals
 
+import logging
+
 from gridmap import Job, process_jobs, grid_map
 
 from nose.tools import eq_
+
+
+# Setup logging
+logging.captureWarnings(True)
+logging.basicConfig(format=('%(asctime)s - %(name)s - %(levelname)s - ' +
+                            '%(message)s'), level=logging.INFO)
 
 
 def compute_factorial(n):

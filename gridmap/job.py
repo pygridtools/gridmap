@@ -263,7 +263,6 @@ class JobMonitor(object):
         """
         clean up open socket
         """
-
         self.socket.close()
 
 

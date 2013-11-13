@@ -25,7 +25,7 @@ install:
 
 # Run test
 script:
-  - nosetests -d -v --with-cov --cov gridmap --cov-config .coveragerc
+  - nosetests -d -v --with-cov --cov gridmap --cov-config .coveragerc -s --nologcapture
 
 # Calculate coverage
 after_success:
