@@ -48,14 +48,18 @@ from gridmap.conf import HEARTBEAT_FREQUENCY
 from gridmap.data import clean_path, zloads, zdumps
 
 
+# TODO: Refactor this so that there's a class that stores socket, since creating
+#       a new one each time is hugely wasteful.
+
 def _send_zmq_msg(job_id, command, data, address):
     """
     simple code to send messages back to host
     (and get a reply back)
     """
-
+    logger = logging.getLogger(__name__)
     context = zmq.Context()
     zsocket = context.socket(zmq.REQ)
+    logger.info('Connecting to JobMonitor (%s)', address)
     zsocket.connect(address)
 
     host_name = socket.gethostname()
@@ -261,7 +265,7 @@ def _main():
     logger.info("Appended {0} to PYTHONPATH".format(args.module_dir))
     sys.path.append(clean_path(args.module_dir))
 
-    logger.debug("Job ID: %s\nHome address: %s\nModule dir: %s", args.job_id,
+    logger.debug("Job ID: %s\tHome address: %s\tModule dir: %s", args.job_id,
                  args.home_address, args.module_dir)
 
     # Process the database and get job started

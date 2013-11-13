@@ -516,10 +516,11 @@ def handle_resubmit(session_id, job):
 
 
 def _execute(job):
-    """Cannot pickle method instances, so fake a function.
-    Used by _process_jobs_locally"""
-
-    return job.f(*job.args, **job.kwlist)
+    """
+    Cannot pickle method instances, so fake a function.
+    Used by _process_jobs_locally
+    """
+    job.execute()
 
 
 def _process_jobs_locally(jobs, max_processes=1):
@@ -558,8 +559,9 @@ def _submit_jobs(jobs, home_address, temp_dir='/scratch', white_list=None,
     Method used to send a list of jobs onto the cluster.
     :param jobs: list of jobs to be executed
     :type jobs: list of `Job`
-    :param home_address: IP address of submitting machine. Running jobs will
-                         communicate with the parent process at that IP via ZMQ.
+    :param home_address: Full address (including IP and port) of JobMonitor on
+                         submitting host. Running jobs will communicate with the
+                         parent process at that address via ZMQ.
     :type home_address: str
     :param temp_dir: Local temporary directory for storing output for an
                      individual job.
@@ -583,15 +585,15 @@ def _submit_jobs(jobs, home_address, temp_dir='/scratch', white_list=None,
             job.home_address = home_address
 
             # append jobs
-            jobid = _append_job_to_session(session, job, temp_dir=temp_dir,
-                                           quiet=quiet)
+            jobid = _append_job_to_session(session, job, home_address,
+                                           temp_dir=temp_dir, quiet=quiet)
             jobids.append(jobid)
 
         sid = session.contact
     return (sid, jobids)
 
 
-def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
+def _append_job_to_session(session, job, home_address, temp_dir='/scratch/', quiet=True):
     """
     For an active session, append new job based on information stored in job
     object. Also sets job.job_id to the ID of the job on the grid.
@@ -600,6 +602,10 @@ def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
     :type session: Session
     :param job: The Job to add to the queue.
     :type job: `Job`
+    :param home_address: Full address (including IP and port) of JobMonitor on
+                         submitting host. Running jobs will communicate with the
+                         parent process at that address via ZMQ.
+    :type home_address: str
     :param temp_dir: Local temporary directory for storing output for an
                     individual job.
     :type temp_dir: str
@@ -618,8 +624,8 @@ def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
     # Run module using python -m to avoid ImportErrors when unpickling jobs
     jt.remoteCommand = sys.executable
     ip = gethostbyname(gethostname())
-    jt.args = ['-m', 'gridmap.runner', '{0}'.format(job.name), '{0}'.format(ip),
-               job.path]
+    jt.args = ['-m', 'gridmap.runner', '{0}'.format(job.name), 
+               '{0}'.format(home_address), job.path]
     jt.nativeSpecification = job.native_specification
     jt.workingDirectory = job.working_dir
     jt.outputPath = ":{0}".format(temp_dir)
