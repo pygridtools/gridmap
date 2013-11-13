@@ -193,7 +193,7 @@ def _run_job(job_id, address):
     parent_pid = os.getpid()
     heart = multiprocessing.Process(target=_heart_beat,
                                     args=(job_id, address, parent_pid,
-                                          job.log_stdout_fn,
+                                          job.log_stderr_fn,
                                           HEARTBEAT_FREQUENCY))
     logger.info("starting heart beat")
     heart.start()

@@ -100,7 +100,8 @@ class Job(object):
     __slots__ = ('_f', 'args', 'jobid', 'kwlist', 'cleanup', 'ret', 'exception',
                  'num_slots', 'mem_free', 'white_list', 'path',
                  'uniq_id', 'name', 'queue', 'environment', 'working_dir',
-                 'cause_of_death', 'num_resubmits', 'home_address')
+                 'cause_of_death', 'num_resubmits', 'home_address',
+                 'log_stderr_fn', 'log_stdout_fn', 'timestamp')
 
     def __init__(self, f, args, kwlist=None, cleanup=True, mem_free="1G",
                  name='gridmap_job', num_slots=1, queue=DEFAULT_QUEUE):
@@ -125,6 +126,9 @@ class Job(object):
         :param queue: SGE queue to schedule job on.
         :type queue: str
         """
+        self.timestamp = ''
+        self.log_stdout_fn = ''
+        self.log_stderr_fn = ''
         self.home_address = ''
         self.num_resubmits = 0
         self.cause_of_death = ''
@@ -323,7 +327,6 @@ class JobMonitor(object):
 
                 if msg["command"] == "heart_beat":
                     job.heart_beat = msg["data"]
-                    job.log_file = msg["data"]["log_file"]
 
                     # keep track of mem and cpu
                     try:
@@ -648,6 +651,8 @@ def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
 
     # set job fields that depend on the jobid assigned by grid engine
     job.jobid = jobid
+    job.log_stdout_fn = os.path.join(temp_dir, '{}.o{}'.format(job.name), jobid)
+    job.log_stderr_fn = os.path.join(temp_dir, '{}.e{}'.format(job.name), jobid)
 
     if not quiet:
         print('Your job {0} has been submitted with id {1}'.format(job.name,
