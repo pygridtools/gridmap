@@ -394,7 +394,7 @@ class JobMonitor(object):
 
 
             # attempt to resubmit
-            if job.cause_of_death in frozenset("out_of_memory", "unknown"):
+            if job.cause_of_death in {"out_of_memory", "unknown"}:
                 logger.info("creating error report")
 
                 # send report
