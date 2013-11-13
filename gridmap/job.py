@@ -94,7 +94,7 @@ class Job(object):
                  'num_slots', 'mem_free', 'white_list', 'path',
                  'uniq_id', 'name', 'queue', 'environment', 'working_dir',
                  'cause_of_death', 'num_resubmits', 'home_address',
-                 'log_stderr_fn', 'log_stdout_fn', 'timestamp')
+                 'log_stderr_fn', 'log_stdout_fn', 'timestamp', 'host_name')
 
     def __init__(self, f, args, kwlist=None, cleanup=True, mem_free="1G",
                  name='gridmap_job', num_slots=1, queue=DEFAULT_QUEUE):
@@ -120,6 +120,7 @@ class Job(object):
         :type queue: str
 
         """
+        self.host_name = ''
         self.timestamp = None
         self.log_stdout_fn = ''
         self.log_stderr_fn = ''
@@ -585,15 +586,15 @@ def _submit_jobs(jobs, home_address, temp_dir='/scratch', white_list=None,
             job.home_address = home_address
 
             # append jobs
-            jobid = _append_job_to_session(session, job, home_address,
-                                           temp_dir=temp_dir, quiet=quiet)
+            jobid = _append_job_to_session(session, job, temp_dir=temp_dir, 
+                                           quiet=quiet)
             jobids.append(jobid)
 
         sid = session.contact
     return (sid, jobids)
 
 
-def _append_job_to_session(session, job, home_address, temp_dir='/scratch/', quiet=True):
+def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
     """
     For an active session, append new job based on information stored in job
     object. Also sets job.job_id to the ID of the job on the grid.
@@ -602,10 +603,6 @@ def _append_job_to_session(session, job, home_address, temp_dir='/scratch/', qui
     :type session: Session
     :param job: The Job to add to the queue.
     :type job: `Job`
-    :param home_address: Full address (including IP and port) of JobMonitor on
-                         submitting host. Running jobs will communicate with the
-                         parent process at that address via ZMQ.
-    :type home_address: str
     :param temp_dir: Local temporary directory for storing output for an
                     individual job.
     :type temp_dir: str
@@ -625,7 +622,7 @@ def _append_job_to_session(session, job, home_address, temp_dir='/scratch/', qui
     jt.remoteCommand = sys.executable
     ip = gethostbyname(gethostname())
     jt.args = ['-m', 'gridmap.runner', '{0}'.format(job.name), 
-               '{0}'.format(home_address), job.path]
+               '{0}'.format(job.home_address), job.path]
     jt.nativeSpecification = job.native_specification
     jt.workingDirectory = job.working_dir
     jt.outputPath = ":{0}".format(temp_dir)
