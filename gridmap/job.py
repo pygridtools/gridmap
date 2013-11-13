@@ -120,6 +120,7 @@ class Job(object):
         :type queue: str
 
         """
+        self.exception = None
         self.host_name = ''
         self.timestamp = None
         self.log_stdout_fn = ''

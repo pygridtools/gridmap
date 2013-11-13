@@ -142,12 +142,7 @@ def get_cpu_load(pid):
     command = ["ps", "h", "-o", "pcpu", "-p", "%d" % (pid)]
 
     try:
-        info = check_output()
-        ps_pseudofile = os.popen(command)
-        info = ps_pseudofile.read()
-        ps_pseudofile.close()
-
-        cpu_load = info.strip()
+        cpu_load = check_output(command).strip()
     except:
         logger = logging.getLogger(__name__)
         logger.warning('Getting CPU info failed.', exc_info=True)
