@@ -139,9 +139,12 @@ def _main():
                                 '%(message)s'))
 
     # Start server
+    hostname = gethostname()
+    if isinstance(hostname, bytes):
+        hostname = hostname.decode()
     cherrypy.quickstart(WebMonitor(),
                         config={'global': {'server.socket_port': WEB_PORT,
-                                           'server.socket_host': gethostname()}})
+                                           'server.socket_host': hostname}})
 
 
 if __name__ == "__main__":
