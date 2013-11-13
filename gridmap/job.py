@@ -126,7 +126,7 @@ class Job(object):
         :param queue: SGE queue to schedule job on.
         :type queue: str
         """
-        self.timestamp = ''
+        self.timestamp = None
         self.log_stdout_fn = ''
         self.log_stderr_fn = ''
         self.home_address = ''
