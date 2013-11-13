@@ -651,8 +651,8 @@ def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
 
     # set job fields that depend on the jobid assigned by grid engine
     job.jobid = jobid
-    job.log_stdout_fn = os.path.join(temp_dir, '{}.o{}'.format(job.name), jobid)
-    job.log_stderr_fn = os.path.join(temp_dir, '{}.e{}'.format(job.name), jobid)
+    job.log_stdout_fn = os.path.join(temp_dir, '{}.o{}'.format(job.name, jobid))
+    job.log_stderr_fn = os.path.join(temp_dir, '{}.e{}'.format(job.name, jobid))
 
     if not quiet:
         print('Your job {0} has been submitted with id {1}'.format(job.name,
