@@ -359,10 +359,10 @@ class JobMonitor(object):
         for job in self.jobs:
 
             # noting was returned yet
-            if job.ret == None:
+            if job.ret is None:
 
                 # exclude first-timers
-                if job.timestamp != None:
+                if job.timestamp is not None:
 
                     # only check heart-beats if there was a long delay
                     current_time = datetime.now()
@@ -371,23 +371,16 @@ class JobMonitor(object):
                     if time_delta.seconds > MAX_TIME_BETWEEN_HEARTBEATS:
                         logger.error("job died for unknown reason")
                         job.cause_of_death = "unknown"
-            else:
-
-                # could have been an exception, we check right away
-                if job.is_out_of_memory():
-                    logger.error("job was out of memory")
-                    job.cause_of_death = "out_of_memory"
-                    job.ret = None
-
-                elif isinstance(job.ret, Exception):
-                    logger.error("job encountered exception, will not resubmit")
-                    job.cause_of_death = "exception"
-                    send_error_mail(job)
-                    job.ret = "job dead (with non-memory related exception)"
-
+            
+            # could have been an exception, we check right away
+            elif isinstance(job.ret, Exception):
+                logger.error("Job encountered exception; will not resubmit.")
+                job.cause_of_death = "exception"
+                send_error_mail(job)
+                job.ret = "Job dead. Exception: {}".format(job.ret)
 
             # attempt to resubmit
-            if job.cause_of_death in {"out_of_memory", "unknown"}:
+            if job.cause_of_death == "unknown":
                 logger.info("creating error report")
 
                 # send report

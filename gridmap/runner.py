@@ -45,7 +45,7 @@ from subprocess import check_output
 import zmq
 
 from gridmap.conf import HEARTBEAT_FREQUENCY
-from gridmap.data import zloads, zdumps
+from gridmap.data import clean_path, zloads, zdumps
 
 
 def _send_zmq_msg(job_id, command, data, address):

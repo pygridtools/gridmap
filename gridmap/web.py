@@ -20,7 +20,7 @@
 # You should have received a copy of the GNU General Public License
 # along with GridMap.  If not, see <http://www.gnu.org/licenses/>.
 """
-Simple web front-end for pythongrid
+Simple web front-end for GridMap
 
 :author: Christian Widmer
 :author: Cheng Soon Ong
@@ -45,7 +45,7 @@ class WebMonitor(object):
     def index(self):
         return '''
                <form action="list_jobs" method="GET">
-               Address of pythongrid session: <br />
+               Address of GridMap session: <br />
                <input type="text" name="address" /><br /><br />
                <input type="submit" />
                </form>
@@ -61,7 +61,7 @@ class WebMonitor(object):
 
         out_html = '''
             <form action="list_jobs" method="GET">
-            Address of pythongrid session: <br />
+            Address of GridMap session: <br />
             <input type="text" name="address" /><br /><br />
             <input type="submit" /><br><br><br>
             </form>
