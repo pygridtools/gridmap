@@ -31,12 +31,14 @@ from __future__ import (absolute_import, division, print_function,
 
 import argparse
 import logging
+import sys
 from io import open
 from socket import gethostname
 
 import cherrypy
 
 from gridmap.conf import WEB_PORT
+from gridmap.data import clean_path
 from gridmap.runner import _send_zmq_msg
 
 
@@ -49,7 +51,7 @@ class WebMonitor(object):
                <input type="text" name="address" /><br /><br />
                <input type="submit" />
                </form>
-               '''
+               '''.encode()
 
     @cherrypy.expose
     def list_jobs(self, address):
@@ -87,10 +89,7 @@ class WebMonitor(object):
         display individual job details
         """
         job = _send_zmq_msg(job_id, "get_job", "", address)
-        out_html = ""
-        details = self.job_to_html(job)
-        out_html += details
-        return out_html
+        return self.job_to_html(job)
 
     @staticmethod
     def job_to_html(job):
@@ -121,7 +120,7 @@ class WebMonitor(object):
             with open(job.heart_beat["log_file"], "r") as log_file:
                 log_file_attachement = log_file.read().replace("\n", "<br>\n")
             body_text += "<br><br><br>" + log_file_attachement
-        return body_text
+        return body_text.encode()
 
 
 def _main():
@@ -131,20 +130,30 @@ def _main():
     # Get command line arguments
     parser = argparse.ArgumentParser(description="Provides a web interface to \
                                                   0MQ job monitor.")
-    parser.parse_args()
+    parser.add_argument('module_dir',
+                        help='Directory that contains module containing pickled\
+                              function. This will get added to PYTHONPATH \
+                              temporarily.', nargs='+')                                                                                       
+    args = parser.parse_args()
 
     # Make warnings from built-in warnings module get formatted more nicely
     logging.captureWarnings(True)
     logging.basicConfig(format=('%(asctime)s - %(name)s - %(levelname)s - ' +
                                 '%(message)s'))
-
+    logger = logging.getLogger(__name__)
+    
+    # Append module directories to path
+    for module_dir in args.module_dir:    
+        logger.info("Appended {0} to PYTHONPATH".format(module_dir))
+        sys.path.append(clean_path(module_dir))
+                
     # Start server
     hostname = gethostname()
-    if isinstance(hostname, bytes):
-        hostname = hostname.decode()
+    if not isinstance(hostname, bytes):
+        hostname = hostname.encode()
     cherrypy.quickstart(WebMonitor(),
-                        config={'global': {'server.socket_port': WEB_PORT,
-                                           'server.socket_host': hostname}})
+                        config={b'global': {b'server.socket_port': WEB_PORT,
+                                            b'server.socket_host': hostname}})
 
 
 if __name__ == "__main__":
