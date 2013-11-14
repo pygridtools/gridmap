@@ -363,7 +363,7 @@ class JobMonitor(object):
                     return_msg = self.jobs
 
             # send back compressed response
-            logging.debug('Sending reply: %s', return_msg)
+            logger.debug('Sending reply: %s', return_msg)
             self.socket.send(zdumps(return_msg))
 
         local_heart.terminate()
