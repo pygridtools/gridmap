@@ -647,8 +647,7 @@ def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
     # Run module using python -m to avoid ImportErrors when unpickling jobs
     jt.remoteCommand = sys.executable
     ip = gethostbyname(gethostname())
-    jt.args = ['-m', 'gridmap.runner', '{0}'.format(job.jobid), 
-               '{0}'.format(job.home_address), job.path]
+    jt.args = ['-m', 'gridmap.runner', '{0}'.format(job.home_address), job.path]
     jt.nativeSpecification = job.native_specification
     jt.workingDirectory = job.working_dir
     jt.outputPath = ":{0}".format(temp_dir)
