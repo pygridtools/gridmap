@@ -71,11 +71,13 @@ def _send_zmq_msg(job_id, command, data, address):
     msg_container["ip_address"] = ip_address
     msg_container["command"] = command
     msg_container["data"] = data
+
+    # Send request
     logger.debug('Sending message: %s', msg_container)
-
     msg_string = zdumps(msg_container)
-
     zsocket.send(msg_string)
+    
+    # Get reply
     msg = zloads(zsocket.recv())
 
     return msg

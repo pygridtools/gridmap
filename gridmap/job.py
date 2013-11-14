@@ -94,7 +94,8 @@ class Job(object):
                  'num_slots', 'mem_free', 'white_list', 'path',
                  'uniq_id', 'name', 'queue', 'environment', 'working_dir',
                  'cause_of_death', 'num_resubmits', 'home_address',
-                 'log_stderr_fn', 'log_stdout_fn', 'timestamp', 'host_name')
+                 'log_stderr_fn', 'log_stdout_fn', 'timestamp', 'host_name',
+                 'heart_beat')
 
     def __init__(self, f, args, kwlist=None, cleanup=True, mem_free="1G",
                  name='gridmap_job', num_slots=1, queue=DEFAULT_QUEUE):
@@ -120,6 +121,7 @@ class Job(object):
         :type queue: str
 
         """
+        self.heart_beat = None
         self.exception = None
         self.host_name = ''
         self.timestamp = None
@@ -142,8 +144,16 @@ class Job(object):
         self.name = name.replace(' ', '_')
         self.queue = queue
         # Save copy of environment variables
-        self.environment = {env_var: value for env_var, value in
-                            os.environ.items()}
+        self.environment = {}
+        for env_var, value in os.environ.items():
+            try:
+                env_var = env_var.decode()
+                value = value.decode()
+            except UnicodeDecodeError:
+                logger = logging.getLogger(__name__)
+                logger.warning('Skipping non-ASCII environment variable.')
+            else:
+                self.environment[env_var] = value
         self.working_dir = clean_path(os.getcwd())
 
     @property
@@ -249,10 +259,7 @@ class JobMonitor(object):
 
         logger.info("setting up connection on %s", self.home_address)
 
-        if USE_CHERRYPY:
-            logger.info("starting web interface")
-            # TODO: Check that it isn't already running
-            Popen([sys.executable, "-m", "gridmap.web"])
+        self.started_cherrypy = not USE_CHERRYPY
 
         # uninitialized field (set in check method)
         self.jobs = []
@@ -282,6 +289,14 @@ class JobMonitor(object):
 
         # save useful mapping
         self.jobid_to_job = {job.jobid: job for job in jobs}
+
+        # start web interface
+        if not self.started_cherrypy:
+            job_paths = list({job.path for job in self.jobs})
+            logger.info("starting web interface")
+            # TODO: Check that it isn't already running
+            Popen([sys.executable, "-m", "gridmap.web"] + job_paths)
+            self.started_cherrypy = True
 
         # determines in which interval to check if jobs are alive
         local_heart = multiprocessing.Process(target=_heart_beat,
