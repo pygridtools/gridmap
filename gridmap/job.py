@@ -149,7 +149,7 @@ class Job(object):
             try:
                 if not isinstance(env_var, bytes):
                     env_var = env_var.encode()
-                if not isisntance(value, bytes):
+                if not isinstance(value, bytes):
                     value = value.encode()
             except UnicodeEncodeError:
                 logger = logging.getLogger(__name__)
