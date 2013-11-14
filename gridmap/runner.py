@@ -201,8 +201,8 @@ def _run_job(job_id, address):
         thank_you_note = _send_zmq_msg(job_id, "store_output", e, address)
         logger.info('Sending reply: {0}'.format(thank_you_note))
         return
-
-    logger.info("input arguments loaded, starting computation %s", job.args)
+    else:
+        logger.info("input arguments loaded, starting computation %s", job.args)
 
     # create heart beat process
     parent_pid = os.getpid()

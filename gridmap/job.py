@@ -318,7 +318,7 @@ class JobMonitor(object):
             if job_id != -1:
 
                 job = self.jobid_to_job[job_id]
-                logger.info('Received message: %s', msg)
+                logger.debug('Received message: %s', msg)
 
                 if msg["command"] == "fetch_input":
                     return_msg = self.jobid_to_job[job_id]
@@ -363,6 +363,7 @@ class JobMonitor(object):
                     return_msg = self.jobs
 
             # send back compressed response
+            logging.debug('Sending reply: %s', return_msg)
             self.socket.send(zdumps(return_msg))
 
         local_heart.terminate()
