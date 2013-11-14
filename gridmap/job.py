@@ -95,7 +95,7 @@ class Job(object):
                  'uniq_id', 'name', 'queue', 'environment', 'working_dir',
                  'cause_of_death', 'num_resubmits', 'home_address',
                  'log_stderr_fn', 'log_stdout_fn', 'timestamp', 'host_name',
-                 'heart_beat')
+                 'heart_beat', 'track_mem', 'track_cpu')
 
     def __init__(self, f, args, kwlist=None, cleanup=True, mem_free="1G",
                  name='gridmap_job', num_slots=1, queue=DEFAULT_QUEUE):
@@ -121,6 +121,8 @@ class Job(object):
         :type queue: str
 
         """
+        self.track_mem = []
+        self.track_cpu = []
         self.heart_beat = None
         self.exception = None
         self.host_name = ''
