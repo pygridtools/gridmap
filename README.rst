@@ -1,4 +1,4 @@
-Grid Map
+GridMap
 -----------
 
 .. image:: https://travis-ci.org/EducationalTestingService/gridmap.png
@@ -23,24 +23,19 @@ Grid Map
    :alt: Bitdeli badge
 
 
-A module to allow you to easily create jobs on the cluster directly from Python.
+A package to allow you to easily create jobs on the cluster directly from Python.
 You can directly map Python functions onto the cluster without needing to write
 any wrapper code yourself.
 
-This is the ETS fork of an older project called Python Grid. It's a lot simpler
-than the original version, because we use a Redis database for storing the
-inputs/outputs for each job instead of the ZeroMQ-based method they were using.
-The main benefit of this approach is you never run into issues with exceeding
-the message length when you're parallelizing a huge job.
+This is the ETS fork of an older project called Python Grid. Unlike the older version, it is Python 2/3 compatible.
 
 For some examples of how to use it, check out ``map_reduce.py`` (for a simple
 example of how you can map a function onto the cluster) and ``manual.py`` (for
 an example of how you can create list of jobs yourself) in the examples folder.
 
-For complete documentation go
-`here <http://htmlpreview.github.io/?http://github.com/EducationalTestingService/gridmap/blob/master/doc/index.html>`__.
+For complete documentation `read the docs <http://gridmap.readthedocs.org>`__.
 
-*NOTE*: You cannot use Grid Map on a machine that is not allowed to submit jobs
+*NOTE*: You cannot use GridMap on a machine that is not allowed to submit jobs
 (e.g., slave nodes).
 
 Requirements
@@ -48,12 +43,7 @@ Requirements
 
 -  `redis-py <https://github.com/andymccurdy/redis-py>`__
 -  `drmaa-python <http://drmaa-python.github.io/>`__
--  Python 2.6+
-
-Recommended
-~~~~~~~~~~~
-
--  `hiredis <https://pypi.python.org/pypi/hiredis>`__
+-  Python 2.7+
 
 License
 ~~~~~~~
