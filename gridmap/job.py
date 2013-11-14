@@ -281,7 +281,7 @@ class JobMonitor(object):
         self.session_id = session_id
 
         # save useful mapping
-        self.jobid_to_job = {job.name: job for job in jobs}
+        self.jobid_to_job = {job.jobid: job for job in jobs}
 
         # determines in which interval to check if jobs are alive
         local_heart = multiprocessing.Process(target=_heart_beat,
@@ -401,6 +401,12 @@ class JobMonitor(object):
         """
         checks for all jobs if they are done
         """
+        logger = logging.getLogger(__name__)
+        if logger.getEffectiveLevel() == logging.DEBUG:
+            num_jobs = len(self.jobs)
+            num_completed = sum((job.ret is not None and 
+                                 not isinstance(job.ret, Exception))
+                                for job in self.jobs)
         # exceptions will be handled in check_if_alive
         return all((job.ret is not None and not isinstance(job.ret, Exception))
                    for job in self.jobs)
@@ -622,7 +628,7 @@ def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
     # Run module using python -m to avoid ImportErrors when unpickling jobs
     jt.remoteCommand = sys.executable
     ip = gethostbyname(gethostname())
-    jt.args = ['-m', 'gridmap.runner', '{0}'.format(job.name), 
+    jt.args = ['-m', 'gridmap.runner', '{0}'.format(job.jobid), 
                '{0}'.format(job.home_address), job.path]
     jt.nativeSpecification = job.native_specification
     jt.workingDirectory = job.working_dir
