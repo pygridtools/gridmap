@@ -201,8 +201,8 @@ def _run_job(job_id, address):
         thank_you_note = _send_zmq_msg(job_id, "store_output", e, address)
         logger.info('Sending reply: {0}'.format(thank_you_note))
         return
-    else:
-        logger.info("input arguments loaded, starting computation %s", job.args)
+
+    logger.debug("input arguments loaded, starting computation %s", job)
 
     # create heart beat process
     parent_pid = os.getpid()
@@ -244,8 +244,6 @@ def _main():
                                                   some pickled retrieved data \
                                                   via 0MQ. You almost never \
                                                   want to run this yourself.")
-    parser.add_argument('job_id',
-                        help='Which job should be run.', type=int)
     parser.add_argument('home_address',
                         help='IP address of submitting host.')
     parser.add_argument('module_dir',
@@ -263,11 +261,12 @@ def _main():
     logger.info("Appended {0} to PYTHONPATH".format(args.module_dir))
     sys.path.append(clean_path(args.module_dir))
 
-    logger.debug("Job ID: %i\tHome address: %s\tModule dir: %s", args.job_id,
+    logger.debug("Job ID: %i\tHome address: %s\tModule dir: %s", 
+                 os.environ['JOB_ID'],
                  args.home_address, args.module_dir)
 
     # Process the database and get job started
-    _run_job(args.job_id, args.home_address)
+    _run_job(os.environ['JOB_ID'], args.home_address)
 
 
 if __name__ == "__main__":
