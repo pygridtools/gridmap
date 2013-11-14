@@ -71,10 +71,13 @@ def _send_zmq_msg(job_id, command, data, address):
     msg_container["ip_address"] = ip_address
     msg_container["command"] = command
     msg_container["data"] = data
+
+    # Send request
     logger.debug('Sending message: %s', msg_container)
     msg_string = zdumps(msg_container)
-
     zsocket.send(msg_string)
+    
+    # Get reply
     msg = zloads(zsocket.recv())
 
     return msg
@@ -177,7 +180,7 @@ def _run_job(job_id, address):
     Execute the pickled job and produce pickled output.
 
     :param job_id: Unique ID of job
-    :type job_id: str
+    :type job_id: int
     :param address: IP address of submitting host.
     :type address: str
     """
@@ -242,7 +245,7 @@ def _main():
                                                   via 0MQ. You almost never \
                                                   want to run this yourself.")
     parser.add_argument('job_id',
-                        help='Which job should be run.')
+                        help='Which job should be run.', type=int)
     parser.add_argument('home_address',
                         help='IP address of submitting host.')
     parser.add_argument('module_dir',
@@ -260,7 +263,7 @@ def _main():
     logger.info("Appended {0} to PYTHONPATH".format(args.module_dir))
     sys.path.append(clean_path(args.module_dir))
 
-    logger.debug("Job ID: %s\tHome address: %s\tModule dir: %s", args.job_id,
+    logger.debug("Job ID: %i\tHome address: %s\tModule dir: %s", args.job_id,
                  args.home_address, args.module_dir)
 
     # Process the database and get job started

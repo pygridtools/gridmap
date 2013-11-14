@@ -288,7 +288,7 @@ class JobMonitor(object):
         self.session_id = session_id
 
         # save useful mapping
-        self.jobid_to_job = {job.name: job for job in jobs}
+        self.jobid_to_job = {job.jobid: job for job in jobs}
 
         # start web interface
         if not self.started_cherrypy:
@@ -424,6 +424,7 @@ class JobMonitor(object):
                                 for job in self.jobs)
             logger.debug('%i out of %i jobs completed', num_completed,
                          num_jobs)
+
         # exceptions will be handled in check_if_alive
         return all((job.ret is not None and not isinstance(job.ret, Exception))
                    for job in self.jobs)
@@ -645,7 +646,7 @@ def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
     # Run module using python -m to avoid ImportErrors when unpickling jobs
     jt.remoteCommand = sys.executable
     ip = gethostbyname(gethostname())
-    jt.args = ['-m', 'gridmap.runner', '{0}'.format(job.name), 
+    jt.args = ['-m', 'gridmap.runner', '{0}'.format(job.jobid), 
                '{0}'.format(job.home_address), job.path]
     jt.nativeSpecification = job.native_specification
     jt.workingDirectory = job.working_dir
