@@ -147,8 +147,10 @@ class Job(object):
         self.environment = {}
         for env_var, value in os.environ.items():
             try:
-                env_var = env_var.decode()
-                value = value.decode()
+                if not isinstance(env_var, bytes):
+                    env_var = env_var.decode()
+                if not isisntance(value, bytes):
+                    value = value.decode()
             except UnicodeDecodeError:
                 logger = logging.getLogger(__name__)
                 logger.warning('Skipping non-ASCII environment variable.')
