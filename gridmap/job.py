@@ -416,6 +416,14 @@ class JobMonitor(object):
         """
         checks for all jobs if they are done
         """
+        logger = logging.getLogger(__name__)
+        if logger.getEffectiveLevel() == logging.DEBUG:
+            num_jobs = len(self.jobs)
+            num_completed = sum((job.ret is not None and 
+                                 not isinstance(job.ret, Exception))
+                                for job in self.jobs)
+            logger.debug('%i out of %i jobs completed', num_completed,
+                         num_jobs)
         # exceptions will be handled in check_if_alive
         return all((job.ret is not None and not isinstance(job.ret, Exception))
                    for job in self.jobs)
@@ -631,7 +639,7 @@ def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
 
     jt = session.createJobTemplate()
     logger = logging.getLogger(__name__)
-    logger.debug('{0}'.format(job.environment))
+    # logger.debug('{0}'.format(job.environment))
     jt.jobEnvironment = job.environment
 
     # Run module using python -m to avoid ImportErrors when unpickling jobs
