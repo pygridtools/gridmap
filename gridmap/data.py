@@ -55,8 +55,11 @@ def clean_path(path):
 def zdumps(obj):
     """
     dumps pickleable object into bz2 compressed string
+
     :param obj: The object/function to store.
     :type obj: object or function
+
+    :returns: An bz2-compressed pickle of the given object.
     """
     return bz2.compress(pickle.dumps(obj, pickle.HIGHEST_PROTOCOL), 9)
 
@@ -64,8 +67,11 @@ def zdumps(obj):
 def zloads(pickled_data):
     """
     loads pickleable object from bz2 compressed string
+
     :param pickled_data: BZ2 compressed byte sequence
     :type pickled_data: bytes
+
+    :returns: An unpickled version of the compressed byte sequence.
     """
     return pickle.loads(bz2.decompress(pickled_data))
 
