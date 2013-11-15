@@ -1,13 +1,13 @@
 Installation
 ============
-SKLL can easily be installed via pip::
+GridMap can easily be installed via pip::
 
-	pip install skll
+	pip install gridmap
 
 It can also be downloaded directly from
-`Github <http://github.com/EducationalTestingService/skll>`_.
+`Github <http://github.com/EducationalTestingService/gridmap>`_.
 
 
 License
 =======
-SKLL is distributed under version 3 of the GNU Public License (GPLv3).
+GridMap is distributed under version 3 of the GNU Public License (GPLv3).

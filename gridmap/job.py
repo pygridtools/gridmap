@@ -307,7 +307,7 @@ class JobMonitor(object):
                                               args=(-1, self.home_address, -1,
                                                     "", CHECK_FREQUENCY))
         local_heart.start()
-        logger.info("Using ZMQ layer to keep track of jobs")
+        logger.info("Starting ZMQ event loop")
         # main loop
         while not self.all_jobs_done():
             logger.debug('Waiting for message')
@@ -508,10 +508,15 @@ def send_error_mail(job):
 
     if SEND_ERROR_MAILS:
         import smtplib
-        s = smtplib.SMTP(SMTP_SERVER)
-        s.sendmail(ERROR_MAIL_SENDER, ERROR_MAIL_RECIPIENT,
-                   msg.as_string()[0:MAX_MSG_LENGTH])
-        s.quit()
+        try:
+            s = smtplib.SMTP(SMTP_SERVER)
+        except smtplib.SMTPConnectError:
+            logger.error('Failed to connect to SMTP server to send error ' + 
+                         'email.', exc_info=True)
+        else:
+            s.sendmail(ERROR_MAIL_SENDER, ERROR_MAIL_RECIPIENT,
+                       msg.as_string()[0:MAX_MSG_LENGTH])
+            s.quit()
 
 
 def handle_resubmit(session_id, job):
