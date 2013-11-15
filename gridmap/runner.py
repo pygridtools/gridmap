@@ -251,7 +251,7 @@ def _main():
     # Make warnings from built-in warnings module get formatted more nicely
     logging.captureWarnings(True)
     logging.basicConfig(format=('%(asctime)s - %(name)s - %(levelname)s - ' +
-                                '%(message)s'), level=logging.DEBUG)
+                                '%(message)s'), level=logging.INFO)
     logger = logging.getLogger(__name__)
 
     logger.info("Appended {0} to PYTHONPATH".format(args.module_dir))
