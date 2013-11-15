@@ -37,19 +37,21 @@ specifying environment variables with the same name.
                    (Default: ``True``)
 :var SEND_ERROR_MAILS: Should we send error emails?
                        (Default: ``False``)
-:var SMTP_SERVER: SMTP server for sending error emails.
+:var SMTP_SERVER: SMTP server for sending error emails. 
+                  (Default: last three sections of the current machine's fully 
+                  qualified domain name)
 :var ERROR_MAIL_SENDER: Sender address to use for error emails.
                         (Default: error@gridmap.py)
 :var ERROR_MAIL_RECIPIENT: Recipient address for error emails.
                            (Default: $USER@$HOST, where $USER is the current
                            user's username, and $HOST is the last two sections
-                           of the server's fully qualified domain name, or just
-                           the host's name if it does not contain periods.)
+                           of the current machine's fully qualified domain name,
+                           or just the hostname if it does not contain periods.)
 :var MAX_MSG_LENGTH: Maximum length of any error email message.
                      (Default: 5000)
 :var MAX_TIME_BETWEEN_HEARTBEATS: How long should we wait (in seconds) for a
                                   heartbeat before we consider a job dead?
-                                  (Default: 45)
+                                  (Default: 90)
 :var NUM_RESUBMITS: How many times can a particular job can die, before we give
                     up. (Default: 3)
 :var CHECK_FREQUENCY: How many seconds pass before we check on the status of a
@@ -66,6 +68,8 @@ from __future__ import (absolute_import, division, print_function,
 
 import logging
 import os
+from socket import gethostname
+
 
 # Check if certain libraries are present
 try:
@@ -102,9 +106,11 @@ if USE_CHERRYPY:
 # Global settings ####
 # email settings
 SEND_ERROR_MAILS = 'TRUE' == os.getenv('SEND_ERROR_MAILS', 'True').upper()
-SMTP_SERVER = os.getenv('SMTP_SERVER', '')
+SMTP_SERVER = os.getenv('SMTP_SERVER', '.'.join(gethostname().split('.')[-3:]))
 ERROR_MAIL_SENDER = os.getenv('ERROR_MAIL_SENDER', 'error@gridmap.py')
-ERROR_MAIL_RECIPIENT = os.getenv('ERROR_MAIL_RECIPIENT', 'error@gridmap.py')
+ERROR_MAIL_RECIPIENT = os.getenv('ERROR_MAIL_RECIPIENT', 
+                                 '{}@{}'.format(os.getenv('USER'),
+                                                '.'.join(gethostname().split('.')[-2:])))
 MAX_MSG_LENGTH = int(os.getenv('MAX_MSG_LENGTH', '5000'))
 
 

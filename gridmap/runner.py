@@ -113,12 +113,12 @@ def _VmB(VmKey, pid):
             v = t.read()
     except:
         return 0.0  # non-Linux?
-     # get VmKey line e.g. 'VmRSS:  9999  kB\n ...'
+    # get VmKey line e.g. 'VmRSS:  9999  kB\n ...'
     i = v.index(VmKey)
     v = v[i:].split(None, 3)  # whitespace
     if len(v) < 3:
         return 0.0  # invalid format?
-     # convert Vm value to bytes
+    # convert Vm value to bytes
     return float(v[1]) * _scale[v[2]]
 
 
@@ -199,7 +199,6 @@ def _run_job(job_id, address):
 
         # send back exception
         thank_you_note = _send_zmq_msg(job_id, "store_output", e, address)
-        logger.info('Sending reply: {0}'.format(thank_you_note))
         return
 
     logger.debug("input arguments loaded, starting computation %s", job)
@@ -214,12 +213,9 @@ def _run_job(job_id, address):
     heart.start()
 
     # change working directory
-    logger.info("changing working directory")
-    if 1:
-        if job.working_dir is not None:
-            logger.info("Changing working directory: %s", job.working_dir)
-            os.chdir(job.working_dir)
-
+    if job.working_dir is not None:
+        logger.info("Changing working directory: %s", job.working_dir)
+        os.chdir(job.working_dir)
 
     # run job
     logger.info("executing job")
