@@ -75,7 +75,7 @@ class WebMonitor(object):
 
         for job in jobs:
             out_html += ("<tr><td><a href='/view_job?address={}" +
-                         "&job_id={}'>{}</td>").format(address, job.name,
+                         "&job_id={}'>{}</td>").format(address, job.jobid,
                                                        job.jobid)
             out_html += "<td>{}</td>".format(job.ret is not None)
             out_html += "<td>{}</td>".format(job.cause_of_death)
@@ -133,7 +133,7 @@ def _main():
     parser.add_argument('module_dir',
                         help='Directory that contains module containing pickled\
                               function. This will get added to PYTHONPATH \
-                              temporarily.', nargs='+')                                                                                       
+                              temporarily.', nargs='+')
     args = parser.parse_args()
 
     # Make warnings from built-in warnings module get formatted more nicely
@@ -141,12 +141,12 @@ def _main():
     logging.basicConfig(format=('%(asctime)s - %(name)s - %(levelname)s - ' +
                                 '%(message)s'))
     logger = logging.getLogger(__name__)
-    
+
     # Append module directories to path
-    for module_dir in args.module_dir:    
+    for module_dir in args.module_dir:
         logger.info("Appended {0} to PYTHONPATH".format(module_dir))
         sys.path.append(clean_path(module_dir))
-                
+
     # Start server
     hostname = gethostname()
     if not isinstance(hostname, bytes):
