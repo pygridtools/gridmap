@@ -424,9 +424,15 @@ class JobMonitor(object):
                 send_error_mail(job)
 
                 # try to resubmit
-                if not handle_resubmit(self.session_id, job):
+                new_id = handle_resubmit(self.session_id, job)
+                if new_id is None:
                     logger.error("giving up on job")
                     job.ret = "job dead"
+                # Update job ID if successfully resubmitted
+                else:
+                    del self.jobid_to_job[job.jobid]
+                    job.jobid = new_id
+                    self.jobid_to_job[new_id] = job
 
                 # break out of loop to avoid too long delay
                 break
@@ -574,11 +580,9 @@ def handle_resubmit(session_id, job):
         job.num_resubmits += 1
         job.cause_of_death = ""
 
-        _resubmit(session_id, job)
-
-        return True
+        return _resubmit(session_id, job)
     else:
-        return False
+        return None
 
 
 def _execute(job):
@@ -769,6 +773,8 @@ def process_jobs(jobs, temp_dir='/scratch/', white_list=None, quiet=True,
 def _resubmit(session_id, job):
     """
     Resubmit a failed job.
+
+    :returns: ID of new job
     """
     logger = logging.getLogger(__name__)
     logger.info("starting resubmission process")
@@ -778,15 +784,13 @@ def _resubmit(session_id, job):
         with Session(session_id) as session:
             # try to kill off old job
             try:
-                # TODO: ask SGE more questions about job status etc
-                # TODO: write unit test for this
                 session.control(job.jobid, JobControlAction.TERMINATE)
                 logger.info("zombie job killed")
             except Exception:
                 logger.error("Could not kill job with SGE id %s", job.jobid,
                              exc_info=True)
             # create new job
-            _append_job_to_session(session, job)
+            return _append_job_to_session(session, job)
     else:
         logger.error("Could not restart job because we're in local mode.")
 
