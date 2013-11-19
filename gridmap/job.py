@@ -244,7 +244,6 @@ class JobMonitor(object):
     """
     Job monitor that communicates with other nodes via 0MQ.
     """
-
     def __init__(self):
         """
         set up socket
@@ -272,13 +271,11 @@ class JobMonitor(object):
         self.session_id = -1
         self.jobid_to_job = {}
 
-
     def __del__(self):
         """
         clean up open socket
         """
         self.socket.close()
-
 
     def check(self, session_id, jobs):
         """
@@ -300,8 +297,11 @@ class JobMonitor(object):
             job_paths = list({job.path for job in self.jobs})
             logger.info("starting web interface")
             # TODO: Check that it isn't already running
-            Popen([sys.executable, "-m", "gridmap.web"] + job_paths)
+            cherrypy_proc = Popen([sys.executable, "-m", "gridmap.web"] +
+                                  job_paths)
             self.started_cherrypy = True
+        else:
+            cherrypy_proc = None
 
         # determines in which interval to check if jobs are alive
         local_heart = multiprocessing.Process(target=_heart_beat,
@@ -371,8 +371,10 @@ class JobMonitor(object):
             logger.debug('Sending reply: %s', return_msg)
             self.socket.send(zdumps(return_msg))
 
+        # Kill child processes that we don't need anymore
         local_heart.terminate()
-
+        if cherrypy_proc is not None:
+            cherrypy_proc.terminate()
 
     def check_if_alive(self):
         """
@@ -421,7 +423,6 @@ class JobMonitor(object):
 
                 # break out of loop to avoid too long delay
                 break
-
 
     def all_jobs_done(self):
         """
