@@ -92,7 +92,7 @@ except ImportError:
 CREATE_PLOTS = 'TRUE' == os.getenv('CREATE_PLOTS', 'True').upper()
 if CREATE_PLOTS:
     try:
-        import matplotlib.pyplot
+        import matplotlib
     except ImportError:
         logger = logging.getLogger(__name__)
         logger.warning('Could not import matplotlib. No plots will be created' +
