@@ -37,8 +37,8 @@ specifying environment variables with the same name.
                    (Default: ``True``)
 :var SEND_ERROR_MAILS: Should we send error emails?
                        (Default: ``False``)
-:var SMTP_SERVER: SMTP server for sending error emails. 
-                  (Default: last three sections of the current machine's fully 
+:var SMTP_SERVER: SMTP server for sending error emails.
+                  (Default: last three sections of the current machine's fully
                   qualified domain name)
 :var ERROR_MAIL_SENDER: Sender address to use for error emails.
                         (Default: error@gridmap.py)
@@ -52,6 +52,9 @@ specifying environment variables with the same name.
 :var MAX_TIME_BETWEEN_HEARTBEATS: How long should we wait (in seconds) for a
                                   heartbeat before we consider a job dead?
                                   (Default: 90)
+:var MAX_IDLE_HEARTBEATS: Number of heartbeats we can receive where the process
+                          has >= 0.1 CPU utilization and is sleeping before we
+                          consider the process dead. (Default: 3)
 :var NUM_RESUBMITS: How many times can a particular job can die, before we give
                     up. (Default: 3)
 :var CHECK_FREQUENCY: How many seconds pass before we check on the status of a
@@ -108,7 +111,7 @@ if USE_CHERRYPY:
 SEND_ERROR_MAILS = 'TRUE' == os.getenv('SEND_ERROR_MAILS', 'True').upper()
 SMTP_SERVER = os.getenv('SMTP_SERVER', '.'.join(gethostname().split('.')[-3:]))
 ERROR_MAIL_SENDER = os.getenv('ERROR_MAIL_SENDER', 'error@gridmap.py')
-ERROR_MAIL_RECIPIENT = os.getenv('ERROR_MAIL_RECIPIENT', 
+ERROR_MAIL_RECIPIENT = os.getenv('ERROR_MAIL_RECIPIENT',
                                  '{}@{}'.format(os.getenv('USER'),
                                                 '.'.join(gethostname().split('.')[-2:])))
 MAX_MSG_LENGTH = int(os.getenv('MAX_MSG_LENGTH', '5000'))
@@ -118,6 +121,8 @@ MAX_MSG_LENGTH = int(os.getenv('MAX_MSG_LENGTH', '5000'))
 # job is assummed to be dead in seconds
 MAX_TIME_BETWEEN_HEARTBEATS = int(os.getenv('MAX_TIME_BETWEEN_HEARTBEATS',
                                             '90'))
+
+MAX_IDLE_HEARTBEATS = int(os.getenv('MAX_IDLE_HEARTBEATS', '3'))
 
 # defines how many times can a particular job can die,
 # before we give up

@@ -56,10 +56,10 @@ import zmq
 
 from gridmap.conf import (CHECK_FREQUENCY, CREATE_PLOTS, DEFAULT_QUEUE,
                           DRMAA_PRESENT, ERROR_MAIL_RECIPIENT,
-                          ERROR_MAIL_SENDER, MAX_MSG_LENGTH,
-                          MAX_TIME_BETWEEN_HEARTBEATS, NUM_RESUBMITS,
-                          SEND_ERROR_MAILS, SMTP_SERVER, USE_CHERRYPY,
-                          USE_MEM_FREE)
+                          ERROR_MAIL_SENDER, MAX_IDLE_HEARTBEATS,
+                          MAX_MSG_LENGTH, MAX_TIME_BETWEEN_HEARTBEATS,
+                          NUM_RESUBMITS, SEND_ERROR_MAILS, SMTP_SERVER,
+                          USE_CHERRYPY, USE_MEM_FREE)
 from gridmap.data import clean_path, zdumps, zloads
 from gridmap.runner import _heart_beat
 
@@ -344,8 +344,8 @@ class JobMonitor(object):
 
                     # keep track of mem and cpu
                     try:
-                        job.track_mem.append(float(job.heart_beat["memory"]))
-                        job.track_cpu.append(float(job.heart_beat["cpu_load"]))
+                        job.track_mem.append(job.heart_beat["memory"])
+                        job.track_cpu.append(job.heart_beat["cpu_load"])
                     except (ValueError, TypeError):
                         logger.error("error decoding heart-beat", exc_info=True)
                     return_msg = "all good"
@@ -386,14 +386,19 @@ class JobMonitor(object):
                 # exclude first-timers
                 if job.timestamp is not None:
 
-                    # only check heart-beats if there was a long delay
+                    # check heart-beats if there was a long delay
                     current_time = datetime.now()
                     time_delta = current_time - job.timestamp
-
                     if time_delta.seconds > MAX_TIME_BETWEEN_HEARTBEATS:
                         logger.error("job died for unknown reason")
                         job.cause_of_death = "unknown"
-            
+                    elif (len(job.track_cpu) > MAX_IDLE_HEARTBEATS and
+                          all(cpu_load <= 0.1 and state == 'S'
+                              for cpu_load, state in
+                              job.track_cpu[-MAX_IDLE_HEARTBEATS:])):
+                        logger.error('Job stalled for unknown reason.')
+                        job.cause_of_death = 'stalled'
+
             # could have been an exception, we check right away
             elif isinstance(job.ret, Exception):
                 logger.error("Job encountered exception; will not resubmit.")
@@ -402,7 +407,7 @@ class JobMonitor(object):
                 job.ret = "Job dead. Exception: {}".format(job.ret)
 
             # attempt to resubmit
-            if job.cause_of_death == "unknown":
+            if job.cause_of_death:
                 logger.info("creating error report")
 
                 # send report
@@ -424,7 +429,7 @@ class JobMonitor(object):
         logger = logging.getLogger(__name__)
         if logger.getEffectiveLevel() == logging.DEBUG:
             num_jobs = len(self.jobs)
-            num_completed = sum((job.ret is not None and 
+            num_completed = sum((job.ret is not None and
                                  not isinstance(job.ret, Exception))
                                 for job in self.jobs)
             logger.debug('%i out of %i jobs completed', num_completed,
@@ -499,7 +504,8 @@ def send_error_mail(job):
         # attach cpu plot
         img_cpu_fn = "/tmp/" + job.name + "_cpu.png"
         plt.figure()
-        plt.plot(job.track_cpu, "-o")
+        cpu_loads = [cpu_load for cpu_load, _ in job.track_cpu]
+        plt.plot(cpu_loads, "-o")
         plt.title("cpu load")
         plt.savefig(img_cpu_fn)
         with open(img_cpu_fn, "rb") as img_cpu:
@@ -511,11 +517,15 @@ def send_error_mail(job):
         try:
             s = smtplib.SMTP(SMTP_SERVER)
         except smtplib.SMTPConnectError:
-            logger.error('Failed to connect to SMTP server to send error ' + 
+            logger.error('Failed to connect to SMTP server to send error ' +
                          'email.', exc_info=True)
         else:
             s.sendmail(ERROR_MAIL_SENDER, ERROR_MAIL_RECIPIENT,
                        msg.as_string()[0:MAX_MSG_LENGTH])
+            # Clean up plot temporary files
+            if CREATE_PLOTS:
+                os.unlink(img_cpu_fn)
+                os.unlink(img_mem_fn)
             s.quit()
 
 
@@ -621,7 +631,7 @@ def _submit_jobs(jobs, home_address, temp_dir='/scratch', white_list=None,
             job.home_address = home_address
 
             # append jobs
-            jobid = _append_job_to_session(session, job, temp_dir=temp_dir, 
+            jobid = _append_job_to_session(session, job, temp_dir=temp_dir,
                                            quiet=quiet)
             jobids.append(jobid)
 

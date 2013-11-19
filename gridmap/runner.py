@@ -76,7 +76,7 @@ def _send_zmq_msg(job_id, command, data, address):
     logger.debug('Sending message: %s', msg_container)
     msg_string = zdumps(msg_container)
     zsocket.send(msg_string)
-    
+
     # Get reply
     msg = zloads(zsocket.recv())
 
@@ -138,20 +138,24 @@ def get_cpu_load(pid):
     :param pid: Process ID for job whose CPU load we'd like to check.
     :type pid: int
 
-    :returns: CPU usage of process
+    :returns: CPU usage of process as ratio of cpu time to real time, and
+              process state.
+    :rtype: (float, str)
     """
 
 
-    command = ["ps", "h", "-o", "pcpu", "-p", "%d" % (pid)]
+    command = ["ps", "h", "-o", "pcpu,state", "-p", "%d" % (pid)]
 
     try:
-        cpu_load = check_output(command).strip()
+        cpu_load, state = check_output(command).strip().split()
+        cpu_load = float(cpu_load)
     except:
         logger = logging.getLogger(__name__)
         logger.warning('Getting CPU info failed.', exc_info=True)
-        cpu_load = "Unknown"
+        cpu_load = float('NaN')
+        state = '?'
 
-    return cpu_load
+    return cpu_load, state
 
 
 def get_job_status(parent_pid):
@@ -257,7 +261,7 @@ def _main():
     logger.info("Appended {0} to PYTHONPATH".format(args.module_dir))
     sys.path.append(clean_path(args.module_dir))
 
-    logger.debug("Job ID: %i\tHome address: %s\tModule dir: %s", 
+    logger.debug("Job ID: %i\tHome address: %s\tModule dir: %s",
                  os.environ['JOB_ID'],
                  args.home_address, args.module_dir)
 
