@@ -126,6 +126,7 @@ MAX_MSG_LENGTH = int(os.getenv('MAX_MSG_LENGTH', '5000'))
 MAX_TIME_BETWEEN_HEARTBEATS = int(os.getenv('MAX_TIME_BETWEEN_HEARTBEATS',
                                             '90'))
 
+IDLE_THRESHOLD = float(os.getenv('IDLE_THRESHOLD', '1.0'))
 MAX_IDLE_HEARTBEATS = int(os.getenv('MAX_IDLE_HEARTBEATS', '3'))
 
 # defines how many times can a particular job can die,
