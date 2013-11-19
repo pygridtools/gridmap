@@ -52,9 +52,13 @@ specifying environment variables with the same name.
 :var MAX_TIME_BETWEEN_HEARTBEATS: How long should we wait (in seconds) for a
                                   heartbeat before we consider a job dead?
                                   (Default: 90)
+:var IDLE_THRESHOLD: Percent CPU utilization (ratio of CPU time to real time
+                     * 100) that a process must drop below to be considered not
+                     running.
+                     (Default: 1.0)
 :var MAX_IDLE_HEARTBEATS: Number of heartbeats we can receive where the process
-                          has >= 0.1 CPU utilization and is sleeping before we
-                          consider the process dead. (Default: 3)
+                          has >= IDLE_THRESHOLD CPU utilization and is sleeping
+                          before we consider the process dead. (Default: 3)
 :var NUM_RESUBMITS: How many times can a particular job can die, before we give
                     up. (Default: 3)
 :var CHECK_FREQUENCY: How many seconds pass before we check on the status of a
