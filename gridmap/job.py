@@ -56,8 +56,8 @@ import zmq
 
 from gridmap.conf import (CHECK_FREQUENCY, CREATE_PLOTS, DEFAULT_QUEUE,
                           DRMAA_PRESENT, ERROR_MAIL_RECIPIENT,
-                          ERROR_MAIL_SENDER, IDLE_THRESHOLD,
-                          MAX_IDLE_HEARTBEATS, MAX_MSG_LENGTH,
+                          ERROR_MAIL_SENDER, HEARTBEAT_FREQUENCY,
+                          IDLE_THRESHOLD, MAX_IDLE_HEARTBEATS, MAX_MSG_LENGTH,
                           MAX_TIME_BETWEEN_HEARTBEATS, NUM_RESUBMITS,
                           SEND_ERROR_MAILS, SMTP_SERVER, USE_CHERRYPY,
                           USE_MEM_FREE)
@@ -223,15 +223,15 @@ class Job(object):
         ret = "-shell yes -b yes"
 
         if self.name:
-            ret += " -N {0}".format(self.name)
+            ret += " -N {}".format(self.name)
         if self.mem_free and USE_MEM_FREE:
-            ret += " -l mem_free={0}".format(self.mem_free)
+            ret += " -l mem_free={}".format(self.mem_free)
         if self.num_slots and self.num_slots > 1:
-            ret += " -pe smp {0}".format(self.num_slots)
+            ret += " -pe smp {}".format(self.num_slots)
         if self.white_list:
-            ret += " -l h={0}".format('|'.join(self.white_list))
+            ret += " -l h={}".format('|'.join(self.white_list))
         if self.queue:
-            ret += " -q {0}".format(self.queue)
+            ret += " -q {}".format(self.queue)
 
         return ret
 
@@ -450,26 +450,28 @@ def send_error_mail(job):
 
     # create message
     msg = MIMEMultipart()
-    msg["subject"] = "GridMap error {0}".format(job.name)
+    msg["subject"] = "GridMap error {}".format(job.name)
     msg["From"] = ERROR_MAIL_SENDER
     msg["To"] = ERROR_MAIL_RECIPIENT
 
     # compose error message
     body_text = ""
-    body_text += "job {0}\n".format(job.name)
-    body_text += "last timestamp: {0}\n".format(job.timestamp)
-    body_text += "num_resubmits: {0}\n".format(job.num_resubmits)
-    body_text += "cause_of_death: {0}\n".format(job.cause_of_death)
+    body_text += "job {}\n".format(job.name)
+    body_text += "last timestamp: {}\n".format(job.timestamp)
+    body_text += "num_resubmits: {}\n".format(job.num_resubmits)
+    body_text += "cause_of_death: {}\n".format(job.cause_of_death)
 
     if job.heart_beat:
-        body_text += "last memory usage: {0}\n".format(job.heart_beat["memory"])
-        body_text += "last cpu load: {0}\n\n".format(job.heart_beat["cpu_load"])
+        body_text += "last memory usage: {}\n".format(job.heart_beat["memory"])
+        body_text += "last cpu load: {}\n".format(job.heart_beat["cpu_load"][0])
+        body_text += ("last process state: " +
+                      "{}\n\n").format(job.heart_beat["cpu_load"][1])
 
-    body_text += "host: {0}\n\n".format(job.host_name)
+    body_text += "host: {}\n\n".format(job.host_name)
 
     if isinstance(job.ret, Exception):
-        body_text += "job encountered exception: {0}\n".format(job.ret)
-        body_text += "stacktrace: {0}\n\n".format(job.exception)
+        body_text += "job encountered exception: {}\n".format(job.ret)
+        body_text += "stacktrace: {}\n\n".format(job.exception)
 
     logger.info('Email body: %s', body_text)
 
@@ -495,25 +497,32 @@ def send_error_mail(job):
         #imgData.seek(0)
         #plt.savefig(imgData, format="png")
 
+        time = [HEARTBEAT_FREQUENCY * i for i in range(len(job.track_mem))]
+
         # attack mem plot
         img_mem_fn = "/tmp/" + job.name + "_mem.png"
         plt.figure()
-        plt.plot(job.track_mem, "-o")
-        plt.title("memory usage")
+        plt.plot(time, job.track_mem, "-o")
+        plt.xlabel("time (s)")
+        plt.ylabel("memory usage")
         plt.savefig(img_mem_fn)
         with open(img_mem_fn, "rb") as img_mem:
             img_mem_attachement = MIMEImage(img_mem.read())
+        img_mem_attachement.add_header('Content-Disposition', 'attachment',
+                                       filename=img_mem_fn)
         msg.attach(img_mem_attachement)
 
         # attach cpu plot
         img_cpu_fn = "/tmp/" + job.name + "_cpu.png"
         plt.figure()
-        cpu_loads = [cpu_load for cpu_load, _ in job.track_cpu]
-        plt.plot(cpu_loads, "-o")
-        plt.title("cpu load")
+        plt.plot(time, [cpu_load for cpu_load, _ in job.track_cpu], "-o")
+        plt.xlabel("time (s)")
+        plt.ylabel("cpu load")
         plt.savefig(img_cpu_fn)
         with open(img_cpu_fn, "rb") as img_cpu:
             img_cpu_attachement = MIMEImage(img_cpu.read())
+        img_cpu_attachement.add_header('Content-Disposition', 'attachment',
+                                       filename=img_cpu_fn)
         msg.attach(img_cpu_attachement)
 
     if SEND_ERROR_MAILS:
@@ -550,8 +559,8 @@ def handle_resubmit(session_id, job):
                        "(previous resubmits = %i)", job.num_resubmits)
 
         # remove node from white_list
-        node_name = '{0}@{1}'.format(job.queue, job.host_name)
-        if job.white_list.count(node_name) > 0:
+        node_name = '{}@{}'.format(job.queue, job.host_name)
+        if job.white_list:
             job.white_list.remove(node_name)
 
         # increment number of resubmits
@@ -664,17 +673,17 @@ def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
 
     jt = session.createJobTemplate()
     logger = logging.getLogger(__name__)
-    # logger.debug('{0}'.format(job.environment))
+    # logger.debug('{}'.format(job.environment))
     jt.jobEnvironment = job.environment
 
     # Run module using python -m to avoid ImportErrors when unpickling jobs
     jt.remoteCommand = sys.executable
     ip = gethostbyname(gethostname())
-    jt.args = ['-m', 'gridmap.runner', '{0}'.format(job.home_address), job.path]
+    jt.args = ['-m', 'gridmap.runner', '{}'.format(job.home_address), job.path]
     jt.nativeSpecification = job.native_specification
     jt.workingDirectory = job.working_dir
-    jt.outputPath = ":{0}".format(temp_dir)
-    jt.errorPath = ":{0}".format(temp_dir)
+    jt.outputPath = ":{}".format(temp_dir)
+    jt.errorPath = ":{}".format(temp_dir)
 
     # Create temp directory if necessary
     if not os.path.exists(temp_dir):
@@ -682,7 +691,7 @@ def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
             os.makedirs(temp_dir)
         except OSError:
             logger.warning(("Failed to create temporary directory " +
-                            "{0}.  Your jobs may not start " +
+                            "{}.  Your jobs may not start " +
                             "correctly.").format(temp_dir))
 
     jobid = session.runJob(jt)
@@ -693,7 +702,7 @@ def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
     job.log_stderr_fn = os.path.join(temp_dir, '{}.e{}'.format(job.name, jobid))
 
     if not quiet:
-        print('Your job {0} has been submitted with id {1}'.format(job.name,
+        print('Your job {} has been submitted with id {}'.format(job.name,
                                                                    jobid),
               file=sys.stderr)
 
@@ -822,7 +831,7 @@ def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
     # construct jobs
     jobs = [Job(f, [args] if not isinstance(args, list) else args,
                 cleanup=cleanup, mem_free=mem_free,
-                name='{0}{1}'.format(name, job_num), num_slots=num_slots,
+                name='{}{}'.format(name, job_num), num_slots=num_slots,
                 queue=queue)
             for job_num, args in enumerate(args_list)]
 
