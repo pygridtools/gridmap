@@ -513,12 +513,13 @@ def send_error_mail(job):
         time = [HEARTBEAT_FREQUENCY * i for i in range(len(job.track_mem))]
 
         # attack mem plot
-        img_mem_fn = "/tmp/" + job.name + "_mem.png"
-        plt.figure()
+        img_mem_fn = "/tmp/" + job.jobid + "_mem.png"
+        plt.figure(1)
         plt.plot(time, job.track_mem, "-o")
         plt.xlabel("time (s)")
         plt.ylabel("memory usage")
         plt.savefig(img_mem_fn)
+        plt.close()
         with open(img_mem_fn, "rb") as img_mem:
             img_mem_attachement = MIMEImage(img_mem.read())
         img_mem_attachement.add_header('Content-Disposition', 'attachment',
@@ -526,12 +527,13 @@ def send_error_mail(job):
         msg.attach(img_mem_attachement)
 
         # attach cpu plot
-        img_cpu_fn = "/tmp/" + job.name + "_cpu.png"
-        plt.figure()
+        img_cpu_fn = "/tmp/" + job.jobid + "_cpu.png"
+        plt.figure(2)
         plt.plot(time, [cpu_load for cpu_load, _ in job.track_cpu], "-o")
         plt.xlabel("time (s)")
         plt.ylabel("cpu load")
         plt.savefig(img_cpu_fn)
+        plt.close()
         with open(img_cpu_fn, "rb") as img_cpu:
             img_cpu_attachement = MIMEImage(img_cpu.read())
         img_cpu_attachement.add_header('Content-Disposition', 'attachment',
@@ -549,9 +551,9 @@ def send_error_mail(job):
             s.sendmail(ERROR_MAIL_SENDER, ERROR_MAIL_RECIPIENT,
                        msg.as_string()[0:MAX_MSG_LENGTH])
             # Clean up plot temporary files
-            if CREATE_PLOTS:
-                os.unlink(img_cpu_fn)
-                os.unlink(img_mem_fn)
+            # if CREATE_PLOTS:
+            #     os.unlink(img_cpu_fn)
+            #     os.unlink(img_mem_fn)
             s.quit()
 
 
