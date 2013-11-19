@@ -56,10 +56,11 @@ import zmq
 
 from gridmap.conf import (CHECK_FREQUENCY, CREATE_PLOTS, DEFAULT_QUEUE,
                           DRMAA_PRESENT, ERROR_MAIL_RECIPIENT,
-                          ERROR_MAIL_SENDER, MAX_IDLE_HEARTBEATS,
-                          MAX_MSG_LENGTH, MAX_TIME_BETWEEN_HEARTBEATS,
-                          NUM_RESUBMITS, SEND_ERROR_MAILS, SMTP_SERVER,
-                          USE_CHERRYPY, USE_MEM_FREE)
+                          ERROR_MAIL_SENDER, IDLE_THRESHOLD,
+                          MAX_IDLE_HEARTBEATS, MAX_MSG_LENGTH,
+                          MAX_TIME_BETWEEN_HEARTBEATS, NUM_RESUBMITS,
+                          SEND_ERROR_MAILS, SMTP_SERVER, USE_CHERRYPY,
+                          USE_MEM_FREE)
 from gridmap.data import clean_path, zdumps, zloads
 from gridmap.runner import _heart_beat
 
@@ -393,7 +394,7 @@ class JobMonitor(object):
                         logger.error("job died for unknown reason")
                         job.cause_of_death = "unknown"
                     elif (len(job.track_cpu) > MAX_IDLE_HEARTBEATS and
-                          all(cpu_load <= 0.1 and state == 'S'
+                          all(cpu_load <= IDLE_THRESHOLD and state == 'S'
                               for cpu_load, state in
                               job.track_cpu[-MAX_IDLE_HEARTBEATS:])):
                         logger.error('Job stalled for unknown reason.')
@@ -482,6 +483,8 @@ def send_error_mail(job):
 
     # if matplotlib is installed
     if CREATE_PLOTS:
+        import matplotlib
+        matplotlib.use('AGG')
         import matplotlib.pyplot as plt
         #TODO: plot to cstring directly (some code is there)
         #imgData = cStringIO.StringIO()
