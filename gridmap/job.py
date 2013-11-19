@@ -321,9 +321,16 @@ class JobMonitor(object):
 
             # only if its not the local beat
             if job_id != -1:
-
-                job = self.jobid_to_job[job_id]
                 logger.debug('Received message: %s', msg)
+
+                try:
+                    job = self.jobid_to_job[job_id]
+                except KeyError:
+                    logger.error(('Received message from unknown job with ID ' +
+                                  '%s. Known job IDs are: %s'),
+                                 job_id,
+                                 list(self.jobid_to_job.keys()))
+                    continue
 
                 if msg["command"] == "fetch_input":
                     return_msg = self.jobid_to_job[job_id]
