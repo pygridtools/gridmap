@@ -23,11 +23,15 @@ GridMap
    :alt: Bitdeli badge
 
 
-A package to allow you to easily create jobs on the cluster directly from Python.
-You can directly map Python functions onto the cluster without needing to write
-any wrapper code yourself.
+A package to allow you to easily create jobs on the cluster directly from
+Python. You can directly map Python functions onto the cluster without needing
+to write any wrapper code yourself.
 
-This is the ETS fork of an older project called Python Grid. Unlike the older version, it is Python 2/3 compatible.
+This is the ETS fork of an older project called Python Grid. Unlike the older
+version,  it is Python 2/3 compatible. Another major difference is that you can
+change the  configuration via environment variables instead of having to modify
+a Python file in your ``site-packages`` directory. We've also removed some cruft
+and improved the reliability of some of the features.
 
 For some examples of how to use it, check out ``map_reduce.py`` (for a simple
 example of how you can map a function onto the cluster) and ``manual.py`` (for
@@ -41,8 +45,8 @@ For complete documentation `read the docs <http://gridmap.readthedocs.org>`__.
 Requirements
 ~~~~~~~~~~~~
 
--  `redis-py <https://github.com/andymccurdy/redis-py>`__
--  `drmaa-python <http://drmaa-python.github.io/>`__
+-  `drmaa <https://github.com/drmaa-python/drmaa-python>`__
+-  `pyzmq <https://github.com/zeromq/pyzmq>`__
 -  Python 2.7+
 
 License

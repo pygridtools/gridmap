@@ -5,52 +5,38 @@
 # Written (W) 2012-2013 Daniel Blanchard, dblanchard@ets.org
 # Copyright (C) 2008-2012 Max-Planck-Society, 2012-2013 ETS
 
-# This file is part of Grid Map.
+# This file is part of GridMap.
 
-# Grid Map is free software: you can redistribute it and/or modify
+# GridMap is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 
-# Grid Map is distributed in the hope that it will be useful,
+# GridMap is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 
 # You should have received a copy of the GNU General Public License
-# along with Grid Map.  If not, see <http://www.gnu.org/licenses/>.
+# along with GridMap.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 This modules provides all of the data-related function for gridmap.
 
-@author: Christian Widmer
-@author: Cheng Soon Ong
-@author: Dan Blanchard (dblanchard@ets.org)
+:author: Christian Widmer
+:author: Cheng Soon Ong
+:author: Dan Blanchard (dblanchard@ets.org)
 
-@var MAX_TRIES: Maximum number of times to try to get the output of a job from
-                the Redis database before giving up and assuming the job died
-                before writing its output; can be overriden by setting the
-                GRID_MAP_MAX_TRIES environment variable.
-@var SLEEP_TIME: Number of seconds to sleep between attempts to retrieve job
-                 output from the Redis database; can be overriden by setting the
-                 GRID_MAP_SLEEP_TIME environment variable.
 """
-
-from __future__ import absolute_import, print_function, unicode_literals
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals)
 
 import bz2
-import os
 try:
     import cPickle as pickle  # For Python 2.x
 except ImportError:
     import pickle
 import re
-from time import sleep
-
-
-#### Global settings ####
-MAX_TRIES = int(os.getenv('GRID_MAP_MAX_TRIES', '10'))
-SLEEP_TIME = int(os.getenv('GRID_MAP_SLEEP_TIME', '3'))
 
 
 def clean_path(path):
@@ -66,42 +52,26 @@ def clean_path(path):
     return path
 
 
-def zsave_db(obj, redis_server, prefix, job_num):
+def zdumps(obj):
     """
-    Saves an object/function as bz2-compressed pickled data in a Redis database
+    dumps pickleable object into bz2 compressed string
 
-    @param obj: The object/function to store.
-    @type obj: C{object} or C{function}
-    @param redis_server: An open connection to the database
-    @type redis_server: C{StrictRedis}
-    @param prefix: The prefix to use for the key for this data.
-    @type prefix: C{basestring}
-    @param job_num: The ID of the job this data is for.
-    @type job_num: C{int}
+    :param obj: The object/function to store.
+    :type obj: object or function
+
+    :returns: An bz2-compressed pickle of the given object.
     """
-
-    # Pickle the obj
-    pickled_data = bz2.compress(pickle.dumps(obj, pickle.HIGHEST_PROTOCOL), 9)
-
-    # Insert the pickled data into the database
-    redis_server.set('{0}_{1}'.format(prefix, job_num), pickled_data)
+    return bz2.compress(pickle.dumps(obj, pickle.HIGHEST_PROTOCOL), 9)
 
 
-def zload_db(redis_server, prefix, job_num):
+def zloads(pickled_data):
     """
-    Loads bz2-compressed pickled object from a Redis database
+    loads pickleable object from bz2 compressed string
 
-    @param redis_server: An open connection to the database
-    @type redis_server: C{StrictRedis}
-    @param prefix: The prefix to use for the key for this data.
-    @type prefix: C{basestring}
-    @param job_num: The ID of the job this data is for.
-    @type job_num: C{int}
+    :param pickled_data: BZ2 compressed byte sequence
+    :type pickled_data: bytes
+
+    :returns: An unpickled version of the compressed byte sequence.
     """
-    attempt = 0
-    pickled_data = None
-    while pickled_data is None and attempt < MAX_TRIES:
-        pickled_data = redis_server.get('{0}_{1}'.format(prefix, job_num))
-        attempt += 1
-        sleep(SLEEP_TIME)
     return pickle.loads(bz2.decompress(pickled_data))
+
