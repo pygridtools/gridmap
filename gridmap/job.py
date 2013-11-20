@@ -425,21 +425,15 @@ class JobMonitor(object):
                 send_error_mail(job)
 
                 # try to resubmit
-                new_id = handle_resubmit(self.session_id, job, 
-                                         temp_dir=self.temp_dir)
-                if new_id is None:
+                old_id = job.jobid
+                handle_resubmit(self.session_id, job, temp_dir=self.temp_dir)
+                if job.jobid is None:
                     logger.error("giving up on job")
                     job.ret = "job dead"
                 # Update job ID if successfully resubmitted
                 else:
-                    if job.jobid in self.jobid_to_job:
-                        del self.jobid_to_job[job.jobid]
-                    else:
-                        logger.error("Killed job had ID (%s) that was not " + 
-                                     "in in job ID dict (%s).", job.jobid, 
-                                     list(self.jobid_to_job.keys()))
-                    job.jobid = new_id
-                    self.jobid_to_job[new_id] = job
+                    del self.jobid_to_job[old_id]
+                    self.jobid_to_job[job.jobid] = job
 
                 # break out of loop to avoid too long delay
                 break
@@ -803,7 +797,7 @@ def _resubmit(session_id, job, temp_dir):
                 logger.error("Could not kill job with SGE id %s", job.jobid,
                              exc_info=True)
             # create new job
-            return _append_job_to_session(session, job, temp_dir=temp_dir)
+            _append_job_to_session(session, job, temp_dir=temp_dir)
     else:
         logger.error("Could not restart job because we're in local mode.")
 
