@@ -244,13 +244,14 @@ class JobMonitor(object):
     """
     Job monitor that communicates with other nodes via 0MQ.
     """
-    def __init__(self):
+    def __init__(self, temp_dir='/scratch'):
         """
         set up socket
         """
         logger = logging.getLogger(__name__)
 
         context = zmq.Context()
+        self.temp_dir = temp_dir
         self.socket = context.socket(zmq.REP)
 
         self.host_name = socket.gethostname()
@@ -424,7 +425,8 @@ class JobMonitor(object):
                 send_error_mail(job)
 
                 # try to resubmit
-                new_id = handle_resubmit(self.session_id, job)
+                new_id = handle_resubmit(self.session_id, job, 
+                                         temp_dir=self.temp_dir)
                 if new_id is None:
                     logger.error("giving up on job")
                     job.ret = "job dead"
@@ -567,7 +569,7 @@ def send_error_mail(job):
             s.quit()
 
 
-def handle_resubmit(session_id, job):
+def handle_resubmit(session_id, job, temp_dir='/scratch/'):
     """
     heuristic to determine if the job should be resubmitted
 
@@ -592,7 +594,7 @@ def handle_resubmit(session_id, job):
         job.num_resubmits += 1
         job.cause_of_death = ""
 
-        return _resubmit(session_id, job)
+        return _resubmit(session_id, job, temp_dir)
     else:
         return None
 
@@ -765,7 +767,7 @@ def process_jobs(jobs, temp_dir='/scratch/', white_list=None, quiet=True,
 
     if not local:
         # initialize monitor to get port number
-        monitor = JobMonitor()
+        monitor = JobMonitor(temp_dir=temp_dir)
 
         # get interface and port
         home_address = monitor.home_address
@@ -782,7 +784,7 @@ def process_jobs(jobs, temp_dir='/scratch/', white_list=None, quiet=True,
     return [job.ret for job in jobs]
 
 
-def _resubmit(session_id, job):
+def _resubmit(session_id, job, temp_dir):
     """
     Resubmit a failed job.
 
@@ -802,7 +804,7 @@ def _resubmit(session_id, job):
                 logger.error("Could not kill job with SGE id %s", job.jobid,
                              exc_info=True)
             # create new job
-            return _append_job_to_session(session, job)
+            return _append_job_to_session(session, job, temp_dir=temp_dir)
     else:
         logger.error("Could not restart job because we're in local mode.")
 
