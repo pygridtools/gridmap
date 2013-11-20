@@ -497,7 +497,7 @@ def send_error_mail(job):
     msg.attach(body_msg)
 
     # attach log file
-    if job.heart_beat:
+    if job.heart_beat and os.path.exists(job.heart_beat["log_file"]):
         with open(job.heart_beat["log_file"], "r") as log_file:
             log_file_attachement = MIMEText(log_file.read())
         msg.attach(log_file_attachement)
