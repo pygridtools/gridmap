@@ -498,8 +498,11 @@ def send_error_mail(job):
 
     # attach log file
     if job.heart_beat and os.path.exists(job.heart_beat["log_file"]):
-        with open(job.heart_beat["log_file"], "r") as log_file:
+        log_file_fn = job.heart_beat['log_file']
+        with open(log_file_fn, "rb") as log_file:
             log_file_attachement = MIMEText(log_file.read())
+        log_file_attachement.add_header('Content-Disposition', 'attachment',
+                                        filename='{}_log.txt'.format(job.jobid))
         msg.attach(log_file_attachement)
 
     # if matplotlib is installed
@@ -518,7 +521,7 @@ def send_error_mail(job):
         time = [HEARTBEAT_FREQUENCY * i for i in range(len(job.track_mem))]
 
         # attack mem plot
-        img_mem_fn = os.path.join('/tmp', job.jobid + "_mem.png")
+        img_mem_fn = os.path.join('/tmp', "{}_mem.png".format(job.jobid))
         plt.figure(1)
         plt.plot(time, job.track_mem, "-o")
         plt.xlabel("time (s)")
@@ -533,7 +536,7 @@ def send_error_mail(job):
         msg.attach(img_mem_attachement)
 
         # attach cpu plot
-        img_cpu_fn = os.path.join("/tmp", job.jobid + "_cpu.png")
+        img_cpu_fn = os.path.join("/tmp", "{}_cpu.png".format(job.jobid))
         plt.figure(2)
         plt.plot(time, [cpu_load for cpu_load, _ in job.track_cpu], "-o")
         plt.xlabel("time (s)")
