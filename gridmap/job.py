@@ -57,7 +57,7 @@ import zmq
 from gridmap.conf import (CHECK_FREQUENCY, CREATE_PLOTS, DEFAULT_QUEUE,
                           DRMAA_PRESENT, ERROR_MAIL_RECIPIENT,
                           ERROR_MAIL_SENDER, HEARTBEAT_FREQUENCY,
-                          IDLE_THRESHOLD, MAX_IDLE_HEARTBEATS, MAX_MSG_LENGTH,
+                          IDLE_THRESHOLD, MAX_IDLE_HEARTBEATS,
                           MAX_TIME_BETWEEN_HEARTBEATS, NUM_RESUBMITS,
                           SEND_ERROR_MAILS, SMTP_SERVER, USE_CHERRYPY,
                           USE_MEM_FREE)
@@ -560,12 +560,11 @@ def send_error_mail(job):
             logger.error('Failed to connect to SMTP server to send error ' +
                          'email.', exc_info=True)
         else:
-            s.sendmail(ERROR_MAIL_SENDER, ERROR_MAIL_RECIPIENT,
-                       msg.as_string()[0:MAX_MSG_LENGTH])
+            s.sendmail(ERROR_MAIL_SENDER, ERROR_MAIL_RECIPIENT, msg.as_string())
             # Clean up plot temporary files
-            # if CREATE_PLOTS:
-            #     os.unlink(img_cpu_fn)
-            #     os.unlink(img_mem_fn)
+            if CREATE_PLOTS:
+                os.unlink(img_cpu_fn)
+                os.unlink(img_mem_fn)
             s.quit()
 
 
