@@ -430,7 +430,12 @@ class JobMonitor(object):
                     job.ret = "job dead"
                 # Update job ID if successfully resubmitted
                 else:
-                    del self.jobid_to_job[job.jobid]
+                    if job.jobid in self.jobid_to_job:
+                        del self.jobid_to_job[job.jobid]
+                    else:
+                        logger.error("Killed job had ID (%s) that was not " + 
+                                     "in in job ID dict (%s).", job.jobid, 
+                                     list(self.jobid_to_job.keys()))
                     job.jobid = new_id
                     self.jobid_to_job[new_id] = job
 
