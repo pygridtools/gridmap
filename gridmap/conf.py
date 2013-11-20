@@ -47,8 +47,6 @@ specifying environment variables with the same name.
                            user's username, and $HOST is the last two sections
                            of the current machine's fully qualified domain name,
                            or just the hostname if it does not contain periods.)
-:var MAX_MSG_LENGTH: Maximum length of any error email message.
-                     (Default: 5000)
 :var MAX_TIME_BETWEEN_HEARTBEATS: How long should we wait (in seconds) for a
                                   heartbeat before we consider a job dead?
                                   (Default: 90)
@@ -118,8 +116,6 @@ ERROR_MAIL_SENDER = os.getenv('ERROR_MAIL_SENDER', 'error@gridmap.py')
 ERROR_MAIL_RECIPIENT = os.getenv('ERROR_MAIL_RECIPIENT',
                                  '{}@{}'.format(os.getenv('USER'),
                                                 '.'.join(gethostname().split('.')[-2:])))
-MAX_MSG_LENGTH = int(os.getenv('MAX_MSG_LENGTH', '5000'))
-
 
 # how much time can pass between heartbeats, before
 # job is assummed to be dead in seconds
