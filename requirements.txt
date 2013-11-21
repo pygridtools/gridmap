@@ -1,3 +1,2 @@
-drmaa
-redis
-hiredis
+git+git://github.com/dan-blanchard/drmaa-python#egg=drmaa
+pyzmq

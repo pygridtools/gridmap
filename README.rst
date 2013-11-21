@@ -1,5 +1,14 @@
-Grid Map
+GridMap
 -----------
+
+.. image:: https://travis-ci.org/EducationalTestingService/gridmap.png
+   :target: https://travis-ci.org/EducationalTestingService/gridmap
+   :alt: Travis build status
+
+
+.. image:: https://coveralls.io/repos/EducationalTestingService/gridmap/badge.png
+  :target: https://coveralls.io/r/EducationalTestingService/gridmap
+  :alt: Test coverage
 
 .. image:: https://pypip.in/d/gridmap/badge.png
    :target: https://crate.io/packages/gridmap
@@ -10,41 +19,35 @@ Grid Map
    :alt: Latest version on PyPI
 
 .. image:: https://d2weczhvl823v0.cloudfront.net/EducationalTestingService/gridmap/trend.png
-   :alt: Bitdeli badge
    :target: https://bitdeli.com/free
+   :alt: Bitdeli badge
 
 
-A module to allow you to easily create jobs on the cluster directly from Python.
-You can directly map Python functions onto the cluster without needing to write
-any wrapper code yourself.
+A package to allow you to easily create jobs on the cluster directly from
+Python. You can directly map Python functions onto the cluster without needing
+to write any wrapper code yourself.
 
-This is the ETS fork of an older project called Python Grid. It's a lot simpler
-than the original version, because we use a Redis database for storing the
-inputs/outputs for each job instead of the ZeroMQ-based method they were using.
-The main benefit of this approach is you never run into issues with exceeding
-the message length when you're parallelizing a huge job.
+This is the ETS fork of an older project called Python Grid. Unlike the older
+version,  it is Python 2/3 compatible. Another major difference is that you can
+change the  configuration via environment variables instead of having to modify
+a Python file in your ``site-packages`` directory. We've also removed some cruft
+and improved the reliability of some of the features.
 
 For some examples of how to use it, check out ``map_reduce.py`` (for a simple
 example of how you can map a function onto the cluster) and ``manual.py`` (for
 an example of how you can create list of jobs yourself) in the examples folder.
 
-For complete documentation go
-`here <http://htmlpreview.github.io/?http://github.com/EducationalTestingService/gridmap/blob/master/doc/index.html>`__.
+For complete documentation `read the docs <http://gridmap.readthedocs.org>`__.
 
-*NOTE*: You cannot use Grid Map on a machine that is not allowed to submit jobs
+*NOTE*: You cannot use GridMap on a machine that is not allowed to submit jobs
 (e.g., slave nodes).
 
 Requirements
 ~~~~~~~~~~~~
 
--  `redis-py <https://github.com/andymccurdy/redis-py>`__
--  `drmaa-python <http://drmaa-python.github.io/>`__
--  Python 2.6+
-
-Recommended
-~~~~~~~~~~~
-
--  `hiredis <https://pypi.python.org/pypi/hiredis>`__
+-  `drmaa <https://github.com/drmaa-python/drmaa-python>`__
+-  `pyzmq <https://github.com/zeromq/pyzmq>`__
+-  Python 2.7+
 
 License
 ~~~~~~~
@@ -53,6 +56,24 @@ License
 
 Changelog
 ~~~~~~~~~
+
+-  0.11.0
+   
+   + Vastly more reliable job completion information thanks to switch back to
+     using 0MQ for communication with worker nodes. No more unpickling
+     exceptions because the SGE DRMAA implementation frequently liked to say
+     jobs were finished when they were not.
+   + Add back web monitor to report basic job status.
+   + Switch to using custom fork of drmaa-python until 
+     drmaa-python/drmaa-python#4, which fixes Python 3 compatibility issues,
+     gets merged.
+   + Now creates temporary directory for storing log files if it doesn't 
+     exist.
+   + Travis-CI SGE installation has been streamlined.
+   + Switch to using sphinx and readthedocs for documentation.
+   + Added detection of stalled jobs. GridMap will also automatically restart
+     any jobs that appear stuck (up to 3 times by default), and email you a
+     report describing their CPU and memory usage over time.
 
 -  0.10.3
 
