@@ -59,7 +59,21 @@ Changelog
 
 -  0.11.0
    
-   + 
+   + Vastly more reliable job completion information thanks to switch back to
+     using 0MQ for communication with worker nodes. No more unpickling
+     exceptions because the SGE DRMAA implementation frequently liked to say
+     jobs were finished when they were not.
+   + Add back web monitor to report basic job status.
+   + Switch to using custom fork of drmaa-python until 
+     drmaa-python/drmaa-python#4, which fixes Python 3 compatibility issues,
+     gets merged.
+   + Now creates temporary directory for storing log files if it doesn't 
+     exist.
+   + Travis-CI SGE installation has been streamlined.
+   + Switch to using sphinx and readthedocs for documentation.
+   + Added detection of stalled jobs. GridMap will also automatically restart
+     any jobs that appear stuck (up to 3 times by default), and email you a
+     report describing their CPU and memory usage over time.
 
 -  0.10.3
 
