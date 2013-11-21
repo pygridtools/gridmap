@@ -57,6 +57,10 @@ License
 Changelog
 ~~~~~~~~~
 
+-  0.11.0
+   
+   + 
+
 -  0.10.3
 
    + Fix issue where ``clean_path`` wasn't being called on the working

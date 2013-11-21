@@ -45,8 +45,6 @@ in a more 'pythonic' fashion.
                             user's username, and $HOST is the last two sections
                             of the server's fully qualified domain name, or just
                             the host's name if it does not contain periods.)
-:var MAX_MSG_LENGTH: Maximum length of any error email message.
-                     (Default: 5000)
 :var MAX_TIME_BETWEEN_HEARTBEATS: How long should we wait (in seconds) for a
                                   heartbeat before we consider a job dead?
                                   (Default: 45)
@@ -65,7 +63,7 @@ from __future__ import absolute_import, print_function, unicode_literals
 
 from gridmap.conf import (CHECK_FREQUENCY, CREATE_PLOTS, DEFAULT_QUEUE,
                           ERROR_MAIL_RECIPIENT, ERROR_MAIL_SENDER,
-                          HEARTBEAT_FREQUENCY, MAX_MSG_LENGTH,
+                          HEARTBEAT_FREQUENCY, 
                           MAX_TIME_BETWEEN_HEARTBEATS, NUM_RESUBMITS,
                           SEND_ERROR_MAILS, SMTP_SERVER, USE_CHERRYPY,
                           USE_MEM_FREE, WEB_PORT)
@@ -76,6 +74,6 @@ from gridmap.version import __version__, VERSION
 __all__ = ['Job', 'JobException', 'process_jobs', 'grid_map', 'pg_map',
            'CHECK_FREQUENCY', 'CREATE_PLOTS', 'DEFAULT_QUEUE',
            'ERROR_MAIL_RECIPIENT', 'ERROR_MAIL_SENDER', 'HEARTBEAT_FREQUENCY',
-           'MAX_MSG_LENGTH', 'MAX_TIME_BETWEEN_HEARTBEATS', 'NUM_RESUBMITS',
+           'MAX_TIME_BETWEEN_HEARTBEATS', 'NUM_RESUBMITS',
            'SEND_ERROR_MAILS', 'SMTP_SERVER', 'USE_CHERRYPY', 'USE_MEM_FREE',
            'WEB_PORT']
