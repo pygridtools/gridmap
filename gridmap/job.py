@@ -71,6 +71,12 @@ if DRMAA_PRESENT:
 if sys.version_info < (3, 0):
     range = xrange
 
+# Setup back-end if we're using matplotlib
+if CREATE_PLOTS:
+    import matplotlib
+    matplotlib.use('AGG')
+    import matplotlib.pyplot as plt
+
 
 class JobException(Exception):
     '''
@@ -505,9 +511,6 @@ def send_error_mail(job):
 
     # if matplotlib is installed
     if CREATE_PLOTS:
-        import matplotlib
-        matplotlib.use('AGG')
-        import matplotlib.pyplot as plt
         #TODO: plot to cstring directly (some code is there)
         #imgData = cStringIO.StringIO()
         #plt.savefig(imgData, format='png')
