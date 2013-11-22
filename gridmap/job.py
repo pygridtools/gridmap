@@ -40,6 +40,7 @@ import inspect
 import logging
 import multiprocessing
 import os
+import smtplib
 import socket
 import sys
 import traceback
@@ -552,7 +553,6 @@ def send_error_mail(job):
         msg.attach(img_cpu_attachement)
 
     if SEND_ERROR_MAILS:
-        import smtplib
         try:
             s = smtplib.SMTP(SMTP_SERVER)
         except smtplib.SMTPConnectError:
