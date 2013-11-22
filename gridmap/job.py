@@ -324,49 +324,51 @@ class JobMonitor(object):
             if job_id != -1:
                 logger.debug('Received message: %s', msg)
 
-                try:
+                # If message is from a valid job, process that message
+                if job_id in self.jobid_to_job:
                     job = self.jobid_to_job[job_id]
-                except KeyError:
+
+                    if msg["command"] == "fetch_input":
+                        return_msg = self.jobid_to_job[job_id]
+
+                    if msg["command"] == "store_output":
+                        # be nice
+                        return_msg = "thanks"
+                        # store tmp job object
+                        tmp_job = msg["data"]
+                        # copy relevant fields
+                        job.ret = tmp_job.ret
+                        job.exception = tmp_job.exception
+                        # is assigned in submission process and not written back
+                        # server-side
+                        job.timestamp = datetime.now()
+
+                    if msg["command"] == "heart_beat":
+                        job.heart_beat = msg["data"]
+
+                        # keep track of mem and cpu
+                        try:
+                            job.track_mem.append(job.heart_beat["memory"])
+                            job.track_cpu.append(job.heart_beat["cpu_load"])
+                        except (ValueError, TypeError):
+                            logger.error("error decoding heart-beat",
+                                         exc_info=True)
+                        return_msg = "all good"
+                        job.timestamp = datetime.now()
+
+                    if msg["command"] == "get_job":
+                        # serve job for display
+                        return_msg = job
+                    else:
+                        # update host name
+                        job.host_name = msg["host_name"]
+                # If this is an unknown job, report it and reply
+                else:
                     logger.error(('Received message from unknown job with ID ' +
                                   '%s. Known job IDs are: %s'),
                                  job_id,
                                  list(self.jobid_to_job.keys()))
-                    continue
-
-                if msg["command"] == "fetch_input":
-                    return_msg = self.jobid_to_job[job_id]
-
-                if msg["command"] == "store_output":
-                    # be nice
-                    return_msg = "thanks"
-                    # store tmp job object
-                    tmp_job = msg["data"]
-                    # copy relevant fields
-                    job.ret = tmp_job.ret
-                    job.exception = tmp_job.exception
-                    # is assigned in submission process and not written back
-                    # server-side
-                    job.timestamp = datetime.now()
-
-                if msg["command"] == "heart_beat":
-                    job.heart_beat = msg["data"]
-
-                    # keep track of mem and cpu
-                    try:
-                        job.track_mem.append(job.heart_beat["memory"])
-                        job.track_cpu.append(job.heart_beat["cpu_load"])
-                    except (ValueError, TypeError):
-                        logger.error("error decoding heart-beat", exc_info=True)
-                    return_msg = "all good"
-                    job.timestamp = datetime.now()
-
-                if msg["command"] == "get_job":
-                    # serve job for display
-                    return_msg = job
-                else:
-                    # update host name
-                    job.host_name = msg["host_name"]
-
+                    return_msg = 'thanks, but no thanks'
             else:
                 # run check
                 self.check_if_alive()
