@@ -134,6 +134,9 @@ def _main():
                         help='Directory that contains module containing pickled\
                               function. This will get added to PYTHONPATH \
                               temporarily.', nargs='+')
+    parser.add_argument('-p', '--port',
+                        help='Port for server to listen on.', type=int,
+                        default=8076)
     args = parser.parse_args()
 
     # Make warnings from built-in warnings module get formatted more nicely
@@ -152,7 +155,7 @@ def _main():
     if not isinstance(hostname, bytes):
         hostname = hostname.encode()
     cherrypy.quickstart(WebMonitor(),
-                        config={b'global': {b'server.socket_port': WEB_PORT,
+                        config={b'global': {b'server.socket_port': args.port,
                                             b'server.socket_host': hostname}})
 
 

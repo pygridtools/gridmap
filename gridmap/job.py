@@ -269,9 +269,7 @@ class JobMonitor(object):
         self.port = self.socket.bind_to_random_port(self.interface)
         self.home_address = "%s:%i" % (self.interface, self.port)
 
-        logger.info("setting up connection on %s", self.home_address)
-
-        self.started_cherrypy = not USE_CHERRYPY
+        logger.info("Setting up JobMonitor on %s", self.home_address)
 
         # uninitialized field (set in check method)
         self.jobs = []
@@ -297,26 +295,12 @@ class JobMonitor(object):
         # keep track of DRMAA session_id (for resubmissions)
         self.session_id = session_id
 
-        # save useful mapping
-        self.jobid_to_job = {job.jobid: job for job in jobs}
-
-        # start web interface
-        if not self.started_cherrypy:
-            job_paths = list({job.path for job in self.jobs})
-            logger.info("starting web interface")
-            # TODO: Check that it isn't already running
-            cherrypy_proc = Popen([sys.executable, "-m", "gridmap.web"] +
-                                  job_paths)
-            self.started_cherrypy = True
-        else:
-            cherrypy_proc = None
-
         # determines in which interval to check if jobs are alive
         local_heart = multiprocessing.Process(target=_heart_beat,
                                               args=(-1, self.home_address, -1,
                                                     "", CHECK_FREQUENCY))
         local_heart.start()
-        logger.info("Starting ZMQ event loop")
+        logger.debug("Starting ZMQ event loop")
         # main loop
         while not self.all_jobs_done():
             logger.debug('Waiting for message')
