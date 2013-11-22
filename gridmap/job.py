@@ -582,7 +582,7 @@ def handle_resubmit(session_id, job, temp_dir='/scratch/'):
 
         # remove node from white_list
         node_name = '{}@{}'.format(job.queue, job.host_name)
-        if job.white_list:
+        if job.white_list and node_name in job.white_list:
             job.white_list.remove(node_name)
 
         # increment number of resubmits
