@@ -50,8 +50,7 @@ from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from io import open
 from multiprocessing import Pool
-from socket import gethostbyname, gethostname
-from subprocess import Popen
+from socket import gethostname
 
 import zmq
 
@@ -60,8 +59,7 @@ from gridmap.conf import (CHECK_FREQUENCY, CREATE_PLOTS, DEFAULT_QUEUE,
                           ERROR_MAIL_SENDER, HEARTBEAT_FREQUENCY,
                           IDLE_THRESHOLD, MAX_IDLE_HEARTBEATS,
                           MAX_TIME_BETWEEN_HEARTBEATS, NUM_RESUBMITS,
-                          SEND_ERROR_MAILS, SMTP_SERVER, USE_CHERRYPY,
-                          USE_MEM_FREE)
+                          SEND_ERROR_MAILS, SMTP_SERVER, USE_MEM_FREE)
 from gridmap.data import clean_path, zdumps, zloads
 from gridmap.runner import _heart_beat
 
@@ -374,8 +372,6 @@ class JobMonitor(object):
 
         # Kill child processes that we don't need anymore
         local_heart.terminate()
-        if cherrypy_proc is not None:
-            cherrypy_proc.terminate()
 
     def check_if_alive(self):
         """

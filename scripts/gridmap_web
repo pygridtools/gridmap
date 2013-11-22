@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 # -*- coding: utf-8 -*-
 
 # Written (W) 2008-2012 Christian Widmer
@@ -37,7 +39,6 @@ from socket import gethostname
 
 import cherrypy
 
-from gridmap.conf import WEB_PORT
 from gridmap.data import clean_path
 from gridmap.runner import _send_zmq_msg
 
