@@ -289,6 +289,7 @@ class JobMonitor(object):
 
         # save list of jobs
         self.jobs = jobs
+        self.jobid_to_job = {job.jobid: job for job in self.jobs}
 
         # keep track of DRMAA session_id (for resubmissions)
         self.session_id = session_id
@@ -635,10 +636,9 @@ def _submit_jobs(jobs, home_address, temp_dir='/scratch', white_list=None,
                   been submitted.
     :type quiet: bool
 
-    :returns: Session ID, list of job IDs
+    :returns: Session ID
     """
     with Session() as session:
-        jobids = []
         for job in jobs:
             # set job white list
             job.white_list = white_list
@@ -647,12 +647,10 @@ def _submit_jobs(jobs, home_address, temp_dir='/scratch', white_list=None,
             job.home_address = home_address
 
             # append jobs
-            jobid = _append_job_to_session(session, job, temp_dir=temp_dir,
-                                           quiet=quiet)
-            jobids.append(jobid)
+            _append_job_to_session(session, job, temp_dir=temp_dir, quiet=quiet)
 
         sid = session.contact
-    return (sid, jobids)
+    return sid
 
 
 def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
@@ -670,8 +668,6 @@ def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
     :param quiet: When true, do not output information about the jobs that have
                   been submitted.
     :type quiet: bool
-
-    :returns: Job ID
     """
 
     jt = session.createJobTemplate()
@@ -709,8 +705,6 @@ def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
               file=sys.stderr)
 
     session.deleteJobTemplate(jt)
-
-    return jobid
 
 
 def process_jobs(jobs, temp_dir='/scratch/', white_list=None, quiet=True,
@@ -751,7 +745,7 @@ def process_jobs(jobs, temp_dir='/scratch/', white_list=None, quiet=True,
 
         # jobid field is attached to each job object
         sid = _submit_jobs(jobs, home_address, temp_dir=temp_dir,
-                           white_list=white_list, quiet=quiet)[0]
+                           white_list=white_list, quiet=quiet)
 
         # handling of inputs, outputs and heartbeats
         monitor.check(sid, jobs)
