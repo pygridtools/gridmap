@@ -50,8 +50,7 @@ from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from io import open
 from multiprocessing import Pool
-from socket import gethostbyname, gethostname
-from subprocess import Popen
+from socket import gethostname
 
 import zmq
 
@@ -60,8 +59,7 @@ from gridmap.conf import (CHECK_FREQUENCY, CREATE_PLOTS, DEFAULT_QUEUE,
                           ERROR_MAIL_SENDER, HEARTBEAT_FREQUENCY,
                           IDLE_THRESHOLD, MAX_IDLE_HEARTBEATS,
                           MAX_TIME_BETWEEN_HEARTBEATS, NUM_RESUBMITS,
-                          SEND_ERROR_MAILS, SMTP_SERVER, USE_CHERRYPY,
-                          USE_MEM_FREE)
+                          SEND_ERROR_MAILS, SMTP_SERVER, USE_MEM_FREE)
 from gridmap.data import clean_path, zdumps, zloads
 from gridmap.runner import _heart_beat
 
@@ -291,6 +289,7 @@ class JobMonitor(object):
 
         # save list of jobs
         self.jobs = jobs
+        self.jobid_to_job = {job.jobid: job for job in self.jobs}
 
         # keep track of DRMAA session_id (for resubmissions)
         self.session_id = session_id
@@ -374,8 +373,6 @@ class JobMonitor(object):
 
         # Kill child processes that we don't need anymore
         local_heart.terminate()
-        if cherrypy_proc is not None:
-            cherrypy_proc.terminate()
 
     def check_if_alive(self):
         """
@@ -639,10 +636,9 @@ def _submit_jobs(jobs, home_address, temp_dir='/scratch', white_list=None,
                   been submitted.
     :type quiet: bool
 
-    :returns: Session ID, list of job IDs
+    :returns: Session ID
     """
     with Session() as session:
-        jobids = []
         for job in jobs:
             # set job white list
             job.white_list = white_list
@@ -651,12 +647,10 @@ def _submit_jobs(jobs, home_address, temp_dir='/scratch', white_list=None,
             job.home_address = home_address
 
             # append jobs
-            jobid = _append_job_to_session(session, job, temp_dir=temp_dir,
-                                           quiet=quiet)
-            jobids.append(jobid)
+            _append_job_to_session(session, job, temp_dir=temp_dir, quiet=quiet)
 
         sid = session.contact
-    return (sid, jobids)
+    return sid
 
 
 def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
@@ -674,8 +668,6 @@ def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
     :param quiet: When true, do not output information about the jobs that have
                   been submitted.
     :type quiet: bool
-
-    :returns: Job ID
     """
 
     jt = session.createJobTemplate()
@@ -713,8 +705,6 @@ def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
               file=sys.stderr)
 
     session.deleteJobTemplate(jt)
-
-    return jobid
 
 
 def process_jobs(jobs, temp_dir='/scratch/', white_list=None, quiet=True,
@@ -755,7 +745,7 @@ def process_jobs(jobs, temp_dir='/scratch/', white_list=None, quiet=True,
 
         # jobid field is attached to each job object
         sid = _submit_jobs(jobs, home_address, temp_dir=temp_dir,
-                           white_list=white_list, quiet=quiet)[0]
+                           white_list=white_list, quiet=quiet)
 
         # handling of inputs, outputs and heartbeats
         monitor.check(sid, jobs)
