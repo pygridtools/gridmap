@@ -33,15 +33,13 @@ specifying environment variables with the same name.
                     (Default: ``all.q``)
 :var CREATE_PLOTS: Should we plot cpu and mem usage and send via email?
                    (Default: ``True``)
-:var USE_CHERRYPY: Should we start web monitoring interface?
-                   (Default: ``True``)
 :var SEND_ERROR_MAILS: Should we send error emails?
-                       (Default: ``False``)
+                       (Default: ``True``)
 :var SMTP_SERVER: SMTP server for sending error emails.
                   (Default: last three sections of the current machine's fully
                   qualified domain name)
 :var ERROR_MAIL_SENDER: Sender address to use for error emails.
-                        (Default: error@gridmap.py)
+                        (Default: ``error@gridmap.py``)
 :var ERROR_MAIL_RECIPIENT: Recipient address for error emails.
                            (Default: $USER@$HOST, where $USER is the current
                            user's username, and $HOST is the last two sections
@@ -64,9 +62,6 @@ specifying environment variables with the same name.
 :var HEARTBEAT_FREQUENCY: How many seconds pass before jobs on the cluster send
                           back heart beats to the submission host.
                           (Default: 10)
-:var WEB_PORT: Port to use for CherryPy server when using web monitor.
-               (Default: 8076)
-
 """
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
@@ -96,17 +91,6 @@ if CREATE_PLOTS:
         logger.warning('Could not import matplotlib. No plots will be created' +
                        ' in debug emails.')
         CREATE_PLOTS = False
-
-# enable web-interface to monitor jobs
-USE_CHERRYPY = 'TRUE' == os.getenv('USE_CHERRYPY', 'True').upper()
-if USE_CHERRYPY:
-    try:
-        import cherrypy
-    except ImportError:
-        logger = logging.getLogger(__name__)
-        logger.warning('Could not import cherrypy. Web-based monitoring will ' +
-                       'be disabled.')
-        USE_CHERRYPY = False
 
 # Global settings ####
 # email settings
@@ -143,6 +127,3 @@ USE_MEM_FREE = 'TRUE' == os.getenv('USE_MEM_FREE', 'False').upper()
 
 # Which queue should we use by default
 DEFAULT_QUEUE = os.getenv('DEFAULT_QUEUE', 'all.q')
-
-# Port to use for web server
-WEB_PORT = 8076

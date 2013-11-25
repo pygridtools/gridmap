@@ -40,6 +40,7 @@ import inspect
 import logging
 import multiprocessing
 import os
+import smtplib
 import socket
 import sys
 import traceback
@@ -49,8 +50,7 @@ from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from io import open
 from multiprocessing import Pool
-from socket import gethostbyname, gethostname
-from subprocess import Popen
+from socket import gethostname
 
 import zmq
 
@@ -59,8 +59,7 @@ from gridmap.conf import (CHECK_FREQUENCY, CREATE_PLOTS, DEFAULT_QUEUE,
                           ERROR_MAIL_SENDER, HEARTBEAT_FREQUENCY,
                           IDLE_THRESHOLD, MAX_IDLE_HEARTBEATS,
                           MAX_TIME_BETWEEN_HEARTBEATS, NUM_RESUBMITS,
-                          SEND_ERROR_MAILS, SMTP_SERVER, USE_CHERRYPY,
-                          USE_MEM_FREE)
+                          SEND_ERROR_MAILS, SMTP_SERVER, USE_MEM_FREE)
 from gridmap.data import clean_path, zdumps, zloads
 from gridmap.runner import _heart_beat
 
@@ -70,6 +69,12 @@ if DRMAA_PRESENT:
 # Python 2.x backward compatibility
 if sys.version_info < (3, 0):
     range = xrange
+
+# Setup back-end if we're using matplotlib
+if CREATE_PLOTS:
+    import matplotlib
+    matplotlib.use('AGG')
+    import matplotlib.pyplot as plt
 
 
 class JobException(Exception):
@@ -262,9 +267,7 @@ class JobMonitor(object):
         self.port = self.socket.bind_to_random_port(self.interface)
         self.home_address = "%s:%i" % (self.interface, self.port)
 
-        logger.info("setting up connection on %s", self.home_address)
-
-        self.started_cherrypy = not USE_CHERRYPY
+        logger.info("Setting up JobMonitor on %s", self.home_address)
 
         # uninitialized field (set in check method)
         self.jobs = []
@@ -286,30 +289,17 @@ class JobMonitor(object):
 
         # save list of jobs
         self.jobs = jobs
+        self.jobid_to_job = {job.jobid: job for job in self.jobs}
 
         # keep track of DRMAA session_id (for resubmissions)
         self.session_id = session_id
-
-        # save useful mapping
-        self.jobid_to_job = {job.jobid: job for job in jobs}
-
-        # start web interface
-        if not self.started_cherrypy:
-            job_paths = list({job.path for job in self.jobs})
-            logger.info("starting web interface")
-            # TODO: Check that it isn't already running
-            cherrypy_proc = Popen([sys.executable, "-m", "gridmap.web"] +
-                                  job_paths)
-            self.started_cherrypy = True
-        else:
-            cherrypy_proc = None
 
         # determines in which interval to check if jobs are alive
         local_heart = multiprocessing.Process(target=_heart_beat,
                                               args=(-1, self.home_address, -1,
                                                     "", CHECK_FREQUENCY))
         local_heart.start()
-        logger.info("Starting ZMQ event loop")
+        logger.debug("Starting ZMQ event loop")
         # main loop
         while not self.all_jobs_done():
             logger.debug('Waiting for message')
@@ -324,49 +314,51 @@ class JobMonitor(object):
             if job_id != -1:
                 logger.debug('Received message: %s', msg)
 
-                try:
+                # If message is from a valid job, process that message
+                if job_id in self.jobid_to_job:
                     job = self.jobid_to_job[job_id]
-                except KeyError:
+
+                    if msg["command"] == "fetch_input":
+                        return_msg = self.jobid_to_job[job_id]
+
+                    if msg["command"] == "store_output":
+                        # be nice
+                        return_msg = "thanks"
+                        # store tmp job object
+                        tmp_job = msg["data"]
+                        # copy relevant fields
+                        job.ret = tmp_job.ret
+                        job.exception = tmp_job.exception
+                        # is assigned in submission process and not written back
+                        # server-side
+                        job.timestamp = datetime.now()
+
+                    if msg["command"] == "heart_beat":
+                        job.heart_beat = msg["data"]
+
+                        # keep track of mem and cpu
+                        try:
+                            job.track_mem.append(job.heart_beat["memory"])
+                            job.track_cpu.append(job.heart_beat["cpu_load"])
+                        except (ValueError, TypeError):
+                            logger.error("error decoding heart-beat",
+                                         exc_info=True)
+                        return_msg = "all good"
+                        job.timestamp = datetime.now()
+
+                    if msg["command"] == "get_job":
+                        # serve job for display
+                        return_msg = job
+                    else:
+                        # update host name
+                        job.host_name = msg["host_name"]
+                # If this is an unknown job, report it and reply
+                else:
                     logger.error(('Received message from unknown job with ID ' +
                                   '%s. Known job IDs are: %s'),
                                  job_id,
                                  list(self.jobid_to_job.keys()))
-                    continue
-
-                if msg["command"] == "fetch_input":
-                    return_msg = self.jobid_to_job[job_id]
-
-                if msg["command"] == "store_output":
-                    # be nice
-                    return_msg = "thanks"
-                    # store tmp job object
-                    tmp_job = msg["data"]
-                    # copy relevant fields
-                    job.ret = tmp_job.ret
-                    job.exception = tmp_job.exception
-                    # is assigned in submission process and not written back
-                    # server-side
-                    job.timestamp = datetime.now()
-
-                if msg["command"] == "heart_beat":
-                    job.heart_beat = msg["data"]
-
-                    # keep track of mem and cpu
-                    try:
-                        job.track_mem.append(job.heart_beat["memory"])
-                        job.track_cpu.append(job.heart_beat["cpu_load"])
-                    except (ValueError, TypeError):
-                        logger.error("error decoding heart-beat", exc_info=True)
-                    return_msg = "all good"
-                    job.timestamp = datetime.now()
-
-                if msg["command"] == "get_job":
-                    # serve job for display
-                    return_msg = job
-                else:
-                    # update host name
-                    job.host_name = msg["host_name"]
-
+                    return_msg = 'thanks, but no thanks'
             else:
                 # run check
                 self.check_if_alive()
@@ -381,8 +373,6 @@ class JobMonitor(object):
 
         # Kill child processes that we don't need anymore
         local_heart.terminate()
-        if cherrypy_proc is not None:
-            cherrypy_proc.terminate()
 
     def check_if_alive(self):
         """
@@ -503,9 +493,6 @@ def send_error_mail(job):
 
     # if matplotlib is installed
     if CREATE_PLOTS:
-        import matplotlib
-        matplotlib.use('AGG')
-        import matplotlib.pyplot as plt
         #TODO: plot to cstring directly (some code is there)
         #imgData = cStringIO.StringIO()
         #plt.savefig(imgData, format='png')
@@ -547,7 +534,6 @@ def send_error_mail(job):
         msg.attach(img_cpu_attachement)
 
     if SEND_ERROR_MAILS:
-        import smtplib
         try:
             s = smtplib.SMTP(SMTP_SERVER)
         except smtplib.SMTPConnectError:
@@ -580,7 +566,7 @@ def handle_resubmit(session_id, job, temp_dir='/scratch/'):
 
         # remove node from white_list
         node_name = '{}@{}'.format(job.queue, job.host_name)
-        if job.white_list:
+        if job.white_list and node_name in job.white_list:
             job.white_list.remove(node_name)
 
         # increment number of resubmits
@@ -650,10 +636,9 @@ def _submit_jobs(jobs, home_address, temp_dir='/scratch', white_list=None,
                   been submitted.
     :type quiet: bool
 
-    :returns: Session ID, list of job IDs
+    :returns: Session ID
     """
     with Session() as session:
-        jobids = []
         for job in jobs:
             # set job white list
             job.white_list = white_list
@@ -662,12 +647,10 @@ def _submit_jobs(jobs, home_address, temp_dir='/scratch', white_list=None,
             job.home_address = home_address
 
             # append jobs
-            jobid = _append_job_to_session(session, job, temp_dir=temp_dir,
-                                           quiet=quiet)
-            jobids.append(jobid)
+            _append_job_to_session(session, job, temp_dir=temp_dir, quiet=quiet)
 
         sid = session.contact
-    return (sid, jobids)
+    return sid
 
 
 def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
@@ -685,8 +668,6 @@ def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
     :param quiet: When true, do not output information about the jobs that have
                   been submitted.
     :type quiet: bool
-
-    :returns: Job ID
     """
 
     jt = session.createJobTemplate()
@@ -696,7 +677,6 @@ def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
 
     # Run module using python -m to avoid ImportErrors when unpickling jobs
     jt.remoteCommand = sys.executable
-    ip = gethostbyname(gethostname())
     jt.args = ['-m', 'gridmap.runner', '{}'.format(job.home_address), job.path]
     jt.nativeSpecification = job.native_specification
     jt.workingDirectory = job.working_dir
@@ -725,8 +705,6 @@ def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
               file=sys.stderr)
 
     session.deleteJobTemplate(jt)
-
-    return jobid
 
 
 def process_jobs(jobs, temp_dir='/scratch/', white_list=None, quiet=True,
@@ -767,7 +745,7 @@ def process_jobs(jobs, temp_dir='/scratch/', white_list=None, quiet=True,
 
         # jobid field is attached to each job object
         sid = _submit_jobs(jobs, home_address, temp_dir=temp_dir,
-                           white_list=white_list, quiet=quiet)[0]
+                           white_list=white_list, quiet=quiet)
 
         # handling of inputs, outputs and heartbeats
         monitor.check(sid, jobs)
