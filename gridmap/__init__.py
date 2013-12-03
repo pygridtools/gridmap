@@ -33,21 +33,28 @@ in a more 'pythonic' fashion.
                     (Default: ``all.q``)
 :var CREATE_PLOTS: Should we plot cpu and mem usage and send via email?
                    (Default: ``True``)
-:var USE_CHERRYPY: Should we start web monitoring interface?
-                   (Default: ``True``)
 :var SEND_ERROR_MAILS: Should we send error emails?
-                       (Default: ``False``)
+                       (Default: ``True``)
 :var SMTP_SERVER: SMTP server for sending error emails.
+                  (Default: last three sections of the current machine's fully
+                  qualified domain name)
 :var ERROR_MAIL_SENDER: Sender address to use for error emails.
-                        (Default: error@gridmap.py)
+                        (Default: ``error@gridmap.py``)
 :var ERROR_MAIL_RECIPIENT: Recipient address for error emails.
                            (Default: $USER@$HOST, where $USER is the current
-                            user's username, and $HOST is the last two sections
-                            of the server's fully qualified domain name, or just
-                            the host's name if it does not contain periods.)
+                           user's username, and $HOST is the last two sections
+                           of the current machine's fully qualified domain name,
+                           or just the hostname if it does not contain periods.)
 :var MAX_TIME_BETWEEN_HEARTBEATS: How long should we wait (in seconds) for a
                                   heartbeat before we consider a job dead?
-                                  (Default: 45)
+                                  (Default: 90)
+:var IDLE_THRESHOLD: Percent CPU utilization (ratio of CPU time to real time
+                     * 100) that a process must drop below to be considered not
+                     running.
+                     (Default: 1.0)
+:var MAX_IDLE_HEARTBEATS: Number of heartbeats we can receive where the process
+                          has >= IDLE_THRESHOLD CPU utilization and is sleeping
+                          before we consider the process dead. (Default: 3)
 :var NUM_RESUBMITS: How many times can a particular job can die, before we give
                     up. (Default: 3)
 :var CHECK_FREQUENCY: How many seconds pass before we check on the status of a
@@ -55,18 +62,16 @@ in a more 'pythonic' fashion.
 :var HEARTBEAT_FREQUENCY: How many seconds pass before jobs on the cluster send
                           back heart beats to the submission host.
                           (Default: 10)
-:var WEB_PORT: Port to use for CherryPy server when using web monitor.
-               (Default: 8076)
 '''
 
 from __future__ import absolute_import, print_function, unicode_literals
 
 from gridmap.conf import (CHECK_FREQUENCY, CREATE_PLOTS, DEFAULT_QUEUE,
                           ERROR_MAIL_RECIPIENT, ERROR_MAIL_SENDER,
-                          HEARTBEAT_FREQUENCY, 
-                          MAX_TIME_BETWEEN_HEARTBEATS, NUM_RESUBMITS,
-                          SEND_ERROR_MAILS, SMTP_SERVER, USE_CHERRYPY,
-                          USE_MEM_FREE, WEB_PORT)
+                          HEARTBEAT_FREQUENCY, IDLE_THRESHOLD,
+                          MAX_IDLE_HEARTBEATS, MAX_TIME_BETWEEN_HEARTBEATS,
+                          NUM_RESUBMITS, SEND_ERROR_MAILS, SMTP_SERVER,
+                          USE_MEM_FREE)
 from gridmap.job import Job, JobException, process_jobs, grid_map, pg_map
 from gridmap.version import __version__, VERSION
 
@@ -74,6 +79,6 @@ from gridmap.version import __version__, VERSION
 __all__ = ['Job', 'JobException', 'process_jobs', 'grid_map', 'pg_map',
            'CHECK_FREQUENCY', 'CREATE_PLOTS', 'DEFAULT_QUEUE',
            'ERROR_MAIL_RECIPIENT', 'ERROR_MAIL_SENDER', 'HEARTBEAT_FREQUENCY',
-           'MAX_TIME_BETWEEN_HEARTBEATS', 'NUM_RESUBMITS',
-           'SEND_ERROR_MAILS', 'SMTP_SERVER', 'USE_CHERRYPY', 'USE_MEM_FREE',
-           'WEB_PORT']
+           'IDLE_THRESHOLD', 'MAX_IDLE_HEARTBEATS',
+           'MAX_TIME_BETWEEN_HEARTBEATS', 'NUM_RESUBMITS', 'SEND_ERROR_MAILS',
+           'SMTP_SERVER', 'USE_MEM_FREE']

@@ -39,7 +39,7 @@ specifying environment variables with the same name.
                   (Default: last three sections of the current machine's fully
                   qualified domain name)
 :var ERROR_MAIL_SENDER: Sender address to use for error emails.
-                        (Default: error@gridmap.py)
+                        (Default: ``error@gridmap.py``)
 :var ERROR_MAIL_RECIPIENT: Recipient address for error emails.
                            (Default: $USER@$HOST, where $USER is the current
                            user's username, and $HOST is the last two sections
