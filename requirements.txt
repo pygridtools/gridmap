@@ -1,2 +1,2 @@
-drmaa-python
+drmaa
 pyzmq
