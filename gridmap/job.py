@@ -52,6 +52,7 @@ from io import open
 from multiprocessing import Pool
 from socket import gethostname
 
+import psutil
 import zmq
 
 from gridmap.conf import (CHECK_FREQUENCY, CREATE_PLOTS, DEFAULT_QUEUE,
@@ -75,6 +76,12 @@ if CREATE_PLOTS:
     import matplotlib
     matplotlib.use('AGG')
     import matplotlib.pyplot as plt
+
+
+# Set of "not running" job statuses
+SLEEP_STATUSES = {psutil.STATUS_SLEEPING, psutil.STATUS_DEAD,
+                  psutil.STATUS_IDLE, psutil.STATUS_STOPPED,
+                  psutil.STATUS_ZOMBIE}
 
 
 class JobException(Exception):
@@ -394,8 +401,8 @@ class JobMonitor(object):
                         logger.error("job died for unknown reason")
                         job.cause_of_death = "unknown"
                     elif (len(job.track_cpu) > MAX_IDLE_HEARTBEATS and
-                          all(cpu_load <= IDLE_THRESHOLD and state == 'S'
-                              for cpu_load, state in
+                          all((cpu_load <= IDLE_THRESHOLD and
+                               state in SLEEP_STATUSES) for cpu_load, state in
                               job.track_cpu[-MAX_IDLE_HEARTBEATS:])):
                         logger.error('Job stalled for unknown reason.')
                         job.cause_of_death = 'stalled'

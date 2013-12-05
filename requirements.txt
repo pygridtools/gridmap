@@ -1,2 +1,3 @@
 drmaa
+psutil
 pyzmq
