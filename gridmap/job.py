@@ -417,6 +417,8 @@ class JobMonitor(object):
                 # try to resubmit
                 old_id = job.jobid
                 handle_resubmit(self.session_id, job, temp_dir=self.temp_dir)
+                logging.info('Resubmitted job %s; it now has ID %s', old_id,
+                             job.jobid)
                 if job.jobid is None:
                     logger.error("giving up on job")
                     job.ret = "job dead"
@@ -573,9 +575,9 @@ def handle_resubmit(session_id, job, temp_dir='/scratch/'):
         job.num_resubmits += 1
         job.cause_of_death = ""
 
-        return _resubmit(session_id, job, temp_dir)
+        _resubmit(session_id, job, temp_dir)
     else:
-        return None
+        job.jobid = None
 
 
 def _execute(job):
@@ -701,7 +703,7 @@ def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
 
     if not quiet:
         print('Your job {} has been submitted with id {}'.format(job.name,
-                                                                   jobid),
+                                                                 jobid),
               file=sys.stderr)
 
     session.deleteJobTemplate(jt)
