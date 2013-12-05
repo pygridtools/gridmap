@@ -42,6 +42,7 @@ import time
 from io import open
 from subprocess import check_output
 
+from psutil import Process
 import zmq
 
 from gridmap.conf import HEARTBEAT_FREQUENCY
@@ -97,31 +98,6 @@ def _heart_beat(job_id, address, parent_pid=-1, log_file="", wait_sec=45):
         time.sleep(wait_sec)
 
 
-def _VmB(VmKey, pid):
-    """
-    get various mem usage properties of process with id pid in MB
-    """
-
-    _proc_status = '/proc/%d/status' % pid
-
-    _scale = {'kB': 1.0/1024.0, 'mB': 1.0,
-              'KB': 1.0/1024.0, 'MB': 1.0}
-
-     # get pseudo file  /proc/<pid>/status
-    try:
-        with open(_proc_status) as t:
-            v = t.read()
-    except:
-        return 0.0  # non-Linux?
-    # get VmKey line e.g. 'VmRSS:  9999  kB\n ...'
-    i = v.index(VmKey)
-    v = v[i:].split(None, 3)  # whitespace
-    if len(v) < 3:
-        return 0.0  # invalid format?
-    # convert Vm value to bytes
-    return float(v[1]) * _scale[v[2]]
-
-
 def get_memory_usage(pid):
     """
     :param pid: Process ID for job whose memory usage we'd like to check.
@@ -130,7 +106,8 @@ def get_memory_usage(pid):
     :returns: Memory usage of process in Mb.
     """
 
-    return _VmB('VmSize:', pid)
+    p = Process(pid)
+    return p.get_memory_usage()[0] / (1024.0 ** 2.0)
 
 
 def get_cpu_load(pid):
@@ -143,19 +120,8 @@ def get_cpu_load(pid):
     :rtype: (float, str)
     """
 
-
-    command = ["ps", "h", "-o", "pcpu,state", "-p", "%d" % (pid)]
-
-    try:
-        cpu_load, state = check_output(command).strip().split()
-        cpu_load = float(cpu_load)
-    except:
-        logger = logging.getLogger(__name__)
-        logger.warning('Getting CPU info failed.', exc_info=True)
-        cpu_load = float('NaN')
-        state = '?'
-
-    return cpu_load, state
+    p = Process(pid)
+    return p.get_cpu_percent(), p.status
 
 
 def get_job_status(parent_pid):
