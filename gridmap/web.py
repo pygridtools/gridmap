@@ -124,11 +124,17 @@ class WebMonitor(object):
         return body_text.encode()
 
 
-def _main():
+def main(argv=None):
     """
     Parse the command line inputs and start web monitor.
+
+    :param argv: List of arguments, as if specified on the command-line.
+                 If None, ``sys.argv`` is used instead.
+    :type argv: list of str
     """
     # Get command line arguments
+    if argv is None:
+        argv = sys.argv
     parser = argparse.ArgumentParser(description="Provides a web interface to \
                                                   0MQ job monitor.")
     parser.add_argument('module_dir',
@@ -138,7 +144,7 @@ def _main():
     parser.add_argument('-p', '--port',
                         help='Port for server to listen on.', type=int,
                         default=8076)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     # Make warnings from built-in warnings module get formatted more nicely
     logging.captureWarnings(True)
@@ -161,4 +167,4 @@ def _main():
 
 
 if __name__ == "__main__":
-    _main()
+    main()

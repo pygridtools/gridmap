@@ -75,7 +75,7 @@ from socket import gethostname
 try:
     import drmaa
     DRMAA_PRESENT = True
-except ImportError:
+except (ImportError, RuntimeError):
     logger = logging.getLogger(__name__)
     logger.warning('Could not import drmaa. Only local multiprocessing ' +
                    'supported.')

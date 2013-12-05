@@ -25,9 +25,16 @@ from setuptools import setup
 exec(compile(open('gridmap/version.py').read(), 'gridmap/version.py', 'exec'))
 # (we use the above instead of execfile for Python 3.x compatibility)
 
+
 def readme():
     with open('README.rst') as f:
         return f.read()
+
+
+def requirements():
+    with open('requirements.txt') as f:
+        reqs = f.read().splitlines()
+    return reqs
 
 
 setup(name='gridmap',
@@ -41,8 +48,8 @@ setup(name='gridmap',
       author_email='dblanchard@ets.org',
       license='GPL',
       packages=['gridmap'],
-      install_requires=['drmaa', 'pyzmq'],
-      scripts=['scripts/gridmap_web'],
+      install_requires=requirements(),
+      entry_points={'console_scripts': ['gridmap_web = gridmap.web:main']},
       classifiers=['Intended Audience :: Science/Research',
                    'Intended Audience :: Developers',
                    'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
