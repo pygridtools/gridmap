@@ -344,7 +344,11 @@ class JobMonitor(object):
                             job.ret = tmp_job.ret
                             job.traceback = tmp_job.traceback
                         # Return an exception instead of a job, so store that
+                        elif isinstance(msg["data"], tuple):
+                            job.ret, job.traceback = msg["data"]
                         else:
+                            logger.error(("Received message with invalid " +
+                                          "data: %s"), msg)
                             job.ret = msg["data"]
                         # is assigned in submission process and not written back
                         # server-side
@@ -419,10 +423,19 @@ class JobMonitor(object):
 
             # could have been an exception, we check right away
             elif isinstance(job.ret, Exception):
-                logger.error("Job encountered exception; will not resubmit.")
-                job.cause_of_death = "exception"
+                # Send error email, in addition to raising and logging exception
                 send_error_mail(job)
-                job.ret = "Job dead. Exception: {}".format(job.ret)
+
+                # Format traceback much like joblib does
+                logger.error("------------------------------------------------")
+                logger.error("GridMap job traceback for %s:", job.name)
+                logger.error("------------------------------------------------")
+                logger.error("Exception: %s", type(job.ret).__name__)
+                logger.error("Job ID: %s", job.jobid)
+                logger.error("Host: %s", job.host)
+                logger.error("................................................")
+                logger.error(job.traceback)
+                raise job.ret
 
             # attempt to resubmit
             if job.cause_of_death:
