@@ -140,7 +140,7 @@ class Job(object):
         self.track_mem = []
         self.track_cpu = []
         self.heart_beat = None
-        self.exception = None
+        self.traceback = None
         self.host_name = ''
         self.timestamp = None
         self.log_stdout_fn = ''
@@ -225,6 +225,7 @@ class Job(object):
             self.ret = self.function(*self.args, **self.kwlist)
         except Exception as exception:
             self.ret = exception
+            self.traceback = traceback.format_exc()
             traceback.print_exc()
         del self.args
         del self.kwlist
@@ -335,11 +336,16 @@ class JobMonitor(object):
                     if msg["command"] == "store_output":
                         # be nice
                         return_msg = "thanks"
+
                         # store tmp job object
-                        tmp_job = msg["data"]
-                        # copy relevant fields
-                        job.ret = tmp_job.ret
-                        job.exception = tmp_job.exception
+                        if isinstance(msg["data"], Job):
+                            tmp_job = msg["data"]
+                            # copy relevant fields
+                            job.ret = tmp_job.ret
+                            job.traceback = tmp_job.traceback
+                        # Return an exception instead of a job, so store that
+                        else:
+                            job.ret = msg["data"]
                         # is assigned in submission process and not written back
                         # server-side
                         job.timestamp = datetime.now()
@@ -488,7 +494,7 @@ def send_error_mail(job):
 
     if isinstance(job.ret, Exception):
         body_text += "job encountered exception: {}\n".format(job.ret)
-        body_text += "stacktrace: {}\n\n".format(job.exception)
+        body_text += "stacktrace: {}\n\n".format(job.traceback)
 
     logger.info('Email body: %s', body_text)
 
