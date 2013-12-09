@@ -310,8 +310,8 @@ class JobMonitor(object):
                     session.control(JOB_IDS_SESSION_ALL,
                                     JobControlAction.TERMINATE)
                 except InvalidJobException:
-                    self.logger.debug("Could not kill job with SGE " +
-                                      "id %s", job.jobid, exc_info=True)
+                    self.logger.debug("Could not kill all jobs for session.",
+                                      exc_info=True)
 
     def check(self, session_id, jobs):
         """
