@@ -331,88 +331,87 @@ class JobMonitor(object):
                                               args=(-1, self.home_address, -1,
                                                     "", CHECK_FREQUENCY))
         local_heart.start()
-        self.logger.debug("Starting ZMQ event loop")
-        # main loop
-        while not self.all_jobs_done():
-            self.logger.debug('Waiting for message')
-            msg_str = self.socket.recv()
-            msg = zloads(msg_str)
-            self.logger.debug('Received message: %s', msg)
-            return_msg = ""
+        try:
+            self.logger.debug("Starting ZMQ event loop")
+            # main loop
+            while not self.all_jobs_done():
+                self.logger.debug('Waiting for message')
+                msg_str = self.socket.recv()
+                msg = zloads(msg_str)
+                self.logger.debug('Received message: %s', msg)
+                return_msg = ""
 
-            job_id = msg["job_id"]
+                job_id = msg["job_id"]
 
-            # only if its not the local beat
-            if job_id != -1:
-                # If message is from a valid job, process that message
-                if job_id in self.jobid_to_job:
-                    job = self.jobid_to_job[job_id]
+                # only if its not the local beat
+                if job_id != -1:
+                    # If message is from a valid job, process that message
+                    if job_id in self.jobid_to_job:
+                        job = self.jobid_to_job[job_id]
 
-                    if msg["command"] == "fetch_input":
-                        return_msg = self.jobid_to_job[job_id]
-                        job.timestamp = datetime.now()
+                        if msg["command"] == "fetch_input":
+                            return_msg = self.jobid_to_job[job_id]
+                            job.timestamp = datetime.now()
 
-                    if msg["command"] == "store_output":
-                        # be nice
-                        return_msg = "thanks"
+                        if msg["command"] == "store_output":
+                            # be nice
+                            return_msg = "thanks"
 
-                        # store tmp job object
-                        if isinstance(msg["data"], Job):
-                            tmp_job = msg["data"]
-                            # copy relevant fields
-                            job.ret = tmp_job.ret
-                            job.traceback = tmp_job.traceback
-                        # Return an exception instead of a job, so store that
-                        elif isinstance(msg["data"], tuple):
-                            job.ret, job.traceback = msg["data"]
+                            # store tmp job object
+                            if isinstance(msg["data"], Job):
+                                tmp_job = msg["data"]
+                                # copy relevant fields
+                                job.ret = tmp_job.ret
+                                job.traceback = tmp_job.traceback
+                            # Returned exception instead of job, so store that
+                            elif isinstance(msg["data"], tuple):
+                                job.ret, job.traceback = msg["data"]
+                            else:
+                                self.logger.error(("Received message with " +
+                                                   "invalid data: %s"), msg)
+                                job.ret = msg["data"]
+                            job.timestamp = datetime.now()
+
+                        if msg["command"] == "heart_beat":
+                            job.heart_beat = msg["data"]
+
+                            # keep track of mem and cpu
+                            try:
+                                job.track_mem.append(job.heart_beat["memory"])
+                                job.track_cpu.append(job.heart_beat["cpu_load"])
+                            except (ValueError, TypeError):
+                                self.logger.error("Error decoding heart-beat",
+                                                  exc_info=True)
+                            return_msg = "all good"
+                            job.timestamp = datetime.now()
+
+                        if msg["command"] == "get_job":
+                            # serve job for display
+                            return_msg = job
                         else:
-                            self.logger.error(("Received message with invalid" +
-                                               " data: %s"), msg)
-                            job.ret = msg["data"]
-                        # is assigned in submission process and not written back
-                        # server-side
-                        job.timestamp = datetime.now()
-
-                    if msg["command"] == "heart_beat":
-                        job.heart_beat = msg["data"]
-
-                        # keep track of mem and cpu
-                        try:
-                            job.track_mem.append(job.heart_beat["memory"])
-                            job.track_cpu.append(job.heart_beat["cpu_load"])
-                        except (ValueError, TypeError):
-                            self.logger.error("Error decoding heart-beat",
-                                              exc_info=True)
-                        return_msg = "all good"
-                        job.timestamp = datetime.now()
-
-                    if msg["command"] == "get_job":
-                        # serve job for display
-                        return_msg = job
+                            # update host name
+                            job.host_name = msg["host_name"]
+                    # If this is an unknown job, report it and reply
                     else:
-                        # update host name
-                        job.host_name = msg["host_name"]
-                # If this is an unknown job, report it and reply
+                        self.logger.error(('Received message from unknown job' +
+                                           ' with ID %s. Known job IDs are: ' +
+                                           '%s'), job_id,
+                                          list(self.jobid_to_job.keys()))
+                        return_msg = 'thanks, but no thanks'
                 else:
-                    self.logger.error(('Received message from unknown job ' +
-                                       'with ID %s. Known job IDs are: %s'),
-                                      job_id,
-                                      list(self.jobid_to_job.keys()))
-                    return_msg = 'thanks, but no thanks'
-            else:
-                # run check
-                self.check_if_alive()
+                    # run check
+                    self.check_if_alive()
 
-                if msg["command"] == "get_jobs":
-                    # serve list of jobs for display
-                    return_msg = self.jobs
+                    if msg["command"] == "get_jobs":
+                        # serve list of jobs for display
+                        return_msg = self.jobs
 
-            # send back compressed response
-            self.logger.debug('Sending reply: %s', return_msg)
-            self.socket.send(zdumps(return_msg))
-
-        # Kill child processes that we don't need anymore
-        local_heart.terminate()
+                # send back compressed response
+                self.logger.debug('Sending reply: %s', return_msg)
+                self.socket.send(zdumps(return_msg))
+        finally:
+            # Kill child processes that we don't need anymore
+            local_heart.terminate()
 
     def check_if_alive(self):
         """
