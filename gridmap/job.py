@@ -461,7 +461,8 @@ class JobMonitor(object):
                          num_jobs)
 
         # exceptions will be handled in check_if_alive
-        return all((job.ret is not None and not isinstance(job.ret, Exception))
+        return all((job.ret != _JOB_NOT_FINISHED and not isinstance(job.ret,
+                                                                    Exception))
                    for job in self.jobs)
 
 
