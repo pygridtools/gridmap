@@ -305,7 +305,7 @@ class JobMonitor(object):
                              exc_type.__name__)
             for job in self.jobs:
                 # Only kill jobs that are still running
-                if job.ret != _JOB_NOT_FINISHED:
+                if job.ret == _JOB_NOT_FINISHED:
                     with Session(self.session_id) as session:
                         # try to kill off old job
                         try:
