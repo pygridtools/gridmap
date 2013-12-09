@@ -39,6 +39,7 @@ import random
 import socket
 import sys
 import time
+import traceback
 from io import open
 
 from psutil import Process
@@ -165,8 +166,10 @@ def _run_job(job_id, address):
         logger.error('Could not retrieve input for job {0}'.format(job_id),
                      exc_info=True)
 
-        # send back exception
-        thank_you_note = _send_zmq_msg(job_id, "store_output", e, address)
+        # send back exception and traceback string
+        thank_you_note = _send_zmq_msg(job_id, "store_output",
+                                       (e, traceback.format_exc()),
+                                       address)
         return
 
     logger.debug("input arguments loaded, starting computation %s", job)

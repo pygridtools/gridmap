@@ -41,7 +41,6 @@ import logging
 import multiprocessing
 import os
 import smtplib
-import socket
 import sys
 import traceback
 from datetime import datetime
@@ -50,7 +49,7 @@ from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from io import open
 from multiprocessing import Pool
-from socket import gethostname
+from socket import gethostname, gethostbyname
 
 import psutil
 import zmq
@@ -65,7 +64,8 @@ from gridmap.data import clean_path, zdumps, zloads
 from gridmap.runner import _heart_beat
 
 if DRMAA_PRESENT:
-    from drmaa import JobControlAction, Session
+    from drmaa import (InvalidJobException, JobControlAction,
+                       JOB_IDS_SESSION_ALL, Session)
 
 # Python 2.x backward compatibility
 if sys.version_info < (3, 0):
@@ -79,9 +79,12 @@ if CREATE_PLOTS:
 
 
 # Set of "not running" job statuses
-SLEEP_STATUSES = {psutil.STATUS_SLEEPING, psutil.STATUS_DEAD,
-                  psutil.STATUS_IDLE, psutil.STATUS_STOPPED,
-                  psutil.STATUS_ZOMBIE}
+_SLEEP_STATUSES = {psutil.STATUS_SLEEPING, psutil.STATUS_DEAD,
+                   psutil.STATUS_IDLE, psutil.STATUS_STOPPED,
+                   psutil.STATUS_ZOMBIE}
+
+# Placeholder string, since a job could potentially return None on purpose
+_JOB_NOT_FINISHED = '*@#%$*@#___GRIDMAP___NOT___DONE___@#%**#*$&*%'
 
 
 class JobException(Exception):
@@ -103,7 +106,7 @@ class Job(object):
        are defined at the module or class level).
     """
 
-    __slots__ = ('_f', 'args', 'jobid', 'kwlist', 'cleanup', 'ret', 'exception',
+    __slots__ = ('_f', 'args', 'jobid', 'kwlist', 'cleanup', 'ret', 'traceback',
                  'num_slots', 'mem_free', 'white_list', 'path',
                  'uniq_id', 'name', 'queue', 'environment', 'working_dir',
                  'cause_of_death', 'num_resubmits', 'home_address',
@@ -137,7 +140,7 @@ class Job(object):
         self.track_mem = []
         self.track_cpu = []
         self.heart_beat = None
-        self.exception = None
+        self.traceback = None
         self.host_name = ''
         self.timestamp = None
         self.log_stdout_fn = ''
@@ -152,7 +155,7 @@ class Job(object):
         self.jobid = -1
         self.kwlist = kwlist if kwlist is not None else {}
         self.cleanup = cleanup
-        self.ret = None
+        self.ret = _JOB_NOT_FINISHED
         self.num_slots = num_slots
         self.mem_free = mem_free
         self.white_list = []
@@ -222,6 +225,7 @@ class Job(object):
             self.ret = self.function(*self.args, **self.kwlist)
         except Exception as exception:
             self.ret = exception
+            self.traceback = traceback.format_exc()
             traceback.print_exc()
         del self.args
         del self.kwlist
@@ -260,21 +264,21 @@ class JobMonitor(object):
         """
         set up socket
         """
-        logger = logging.getLogger(__name__)
+        self.logger = logging.getLogger(__name__)
 
         context = zmq.Context()
         self.temp_dir = temp_dir
         self.socket = context.socket(zmq.REP)
 
-        self.host_name = socket.gethostname()
-        self.ip_address = socket.gethostbyname(self.host_name)
+        self.host_name = gethostname()
+        self.ip_address = gethostbyname(self.host_name)
         self.interface = "tcp://%s" % (self.ip_address)
 
         # bind to random port and remember it
         self.port = self.socket.bind_to_random_port(self.interface)
         self.home_address = "%s:%i" % (self.interface, self.port)
 
-        logger.info("Setting up JobMonitor on %s", self.home_address)
+        self.logger.info("Setting up JobMonitor on %s", self.home_address)
 
         # uninitialized field (set in check method)
         self.jobs = []
@@ -282,18 +286,37 @@ class JobMonitor(object):
         self.session_id = -1
         self.jobid_to_job = {}
 
-    def __del__(self):
-        """
-        clean up open socket
-        """
+    def __enter__(self):
+        '''
+        Enable JobMonitor to be used as a context manager.
+        '''
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        '''
+        Gracefully handle exceptions by terminating all jobs, and closing
+        sockets.
+        '''
+        # Always close socket
         self.socket.close()
+
+        # If we encounter an exception, try to kill all jobs
+        if exc_type is not None:
+            self.logger.info('Encountered %s, so killing all jobs.',
+                             exc_type.__name__)
+            with Session(self.session_id) as session:
+                # try to kill off all old jobs
+                try:
+                    session.control(JOB_IDS_SESSION_ALL,
+                                    JobControlAction.TERMINATE)
+                except InvalidJobException:
+                    self.logger.debug("Could not kill all jobs for session.",
+                                      exc_info=True)
 
     def check(self, session_id, jobs):
         """
         serves input and output data
         """
-        logger = logging.getLogger(__name__)
-
         # save list of jobs
         self.jobs = jobs
         self.jobid_to_job = {job.jobid: job for job in self.jobs}
@@ -306,117 +329,132 @@ class JobMonitor(object):
                                               args=(-1, self.home_address, -1,
                                                     "", CHECK_FREQUENCY))
         local_heart.start()
-        logger.debug("Starting ZMQ event loop")
-        # main loop
-        while not self.all_jobs_done():
-            logger.debug('Waiting for message')
-            msg_str = self.socket.recv()
-            msg = zloads(msg_str)
-            logger.debug('Received message: {}'.format(msg))
-            return_msg = ""
+        try:
+            self.logger.debug("Starting ZMQ event loop")
+            # main loop
+            while not self.all_jobs_done():
+                self.logger.debug('Waiting for message')
+                msg_str = self.socket.recv()
+                msg = zloads(msg_str)
+                self.logger.debug('Received message: %s', msg)
+                return_msg = ""
 
-            job_id = msg["job_id"]
+                job_id = msg["job_id"]
 
-            # only if its not the local beat
-            if job_id != -1:
-                logger.debug('Received message: %s', msg)
+                # only if its not the local beat
+                if job_id != -1:
+                    # If message is from a valid job, process that message
+                    if job_id in self.jobid_to_job:
+                        job = self.jobid_to_job[job_id]
 
-                # If message is from a valid job, process that message
-                if job_id in self.jobid_to_job:
-                    job = self.jobid_to_job[job_id]
+                        if msg["command"] == "fetch_input":
+                            return_msg = self.jobid_to_job[job_id]
+                            job.timestamp = datetime.now()
 
-                    if msg["command"] == "fetch_input":
-                        return_msg = self.jobid_to_job[job_id]
+                        if msg["command"] == "store_output":
+                            # be nice
+                            return_msg = "thanks"
 
-                    if msg["command"] == "store_output":
-                        # be nice
-                        return_msg = "thanks"
-                        # store tmp job object
-                        tmp_job = msg["data"]
-                        # copy relevant fields
-                        job.ret = tmp_job.ret
-                        job.exception = tmp_job.exception
-                        # is assigned in submission process and not written back
-                        # server-side
-                        job.timestamp = datetime.now()
+                            # store tmp job object
+                            if isinstance(msg["data"], Job):
+                                tmp_job = msg["data"]
+                                # copy relevant fields
+                                job.ret = tmp_job.ret
+                                job.traceback = tmp_job.traceback
+                            # Returned exception instead of job, so store that
+                            elif isinstance(msg["data"], tuple):
+                                job.ret, job.traceback = msg["data"]
+                            else:
+                                self.logger.error(("Received message with " +
+                                                   "invalid data: %s"), msg)
+                                job.ret = msg["data"]
+                            job.timestamp = datetime.now()
 
-                    if msg["command"] == "heart_beat":
-                        job.heart_beat = msg["data"]
+                        if msg["command"] == "heart_beat":
+                            job.heart_beat = msg["data"]
 
-                        # keep track of mem and cpu
-                        try:
-                            job.track_mem.append(job.heart_beat["memory"])
-                            job.track_cpu.append(job.heart_beat["cpu_load"])
-                        except (ValueError, TypeError):
-                            logger.error("error decoding heart-beat",
-                                         exc_info=True)
-                        return_msg = "all good"
-                        job.timestamp = datetime.now()
+                            # keep track of mem and cpu
+                            try:
+                                job.track_mem.append(job.heart_beat["memory"])
+                                job.track_cpu.append(job.heart_beat["cpu_load"])
+                            except (ValueError, TypeError):
+                                self.logger.error("Error decoding heart-beat",
+                                                  exc_info=True)
+                            return_msg = "all good"
+                            job.timestamp = datetime.now()
 
-                    if msg["command"] == "get_job":
-                        # serve job for display
-                        return_msg = job
+                        if msg["command"] == "get_job":
+                            # serve job for display
+                            return_msg = job
+                        else:
+                            # update host name
+                            job.host_name = msg["host_name"]
+                    # If this is an unknown job, report it and reply
                     else:
-                        # update host name
-                        job.host_name = msg["host_name"]
-                # If this is an unknown job, report it and reply
+                        self.logger.error(('Received message from unknown job' +
+                                           ' with ID %s. Known job IDs are: ' +
+                                           '%s'), job_id,
+                                          list(self.jobid_to_job.keys()))
+                        return_msg = 'thanks, but no thanks'
                 else:
-                    logger.error(('Received message from unknown job with ID ' +
-                                  '%s. Known job IDs are: %s'),
-                                 job_id,
-                                 list(self.jobid_to_job.keys()))
-                    return_msg = 'thanks, but no thanks'
-            else:
-                # run check
-                self.check_if_alive()
+                    # run check
+                    self.check_if_alive()
 
-                if msg["command"] == "get_jobs":
-                    # serve list of jobs for display
-                    return_msg = self.jobs
+                    if msg["command"] == "get_jobs":
+                        # serve list of jobs for display
+                        return_msg = self.jobs
 
-            # send back compressed response
-            logger.debug('Sending reply: %s', return_msg)
-            self.socket.send(zdumps(return_msg))
-
-        # Kill child processes that we don't need anymore
-        local_heart.terminate()
+                # send back compressed response
+                self.logger.debug('Sending reply: %s', return_msg)
+                self.socket.send(zdumps(return_msg))
+        finally:
+            # Kill child processes that we don't need anymore
+            local_heart.terminate()
 
     def check_if_alive(self):
         """
         check if jobs are alive and determine cause of death if not
         """
-        logger = logging.getLogger(__name__)
+        self.logger.debug('Checking if jobs are alive')
         for job in self.jobs:
 
             # noting was returned yet
-            if job.ret is None:
+            if job.ret == _JOB_NOT_FINISHED:
 
                 # exclude first-timers
                 if job.timestamp is not None:
-
                     # check heart-beats if there was a long delay
                     current_time = datetime.now()
                     time_delta = current_time - job.timestamp
                     if time_delta.seconds > MAX_TIME_BETWEEN_HEARTBEATS:
-                        logger.error("job died for unknown reason")
+                        self.logger.error("Job died for unknown reason")
                         job.cause_of_death = "unknown"
                     elif (len(job.track_cpu) > MAX_IDLE_HEARTBEATS and
                           all((cpu_load <= IDLE_THRESHOLD and
-                               state in SLEEP_STATUSES) for cpu_load, state in
+                               state in _SLEEP_STATUSES) for cpu_load, state in
                               job.track_cpu[-MAX_IDLE_HEARTBEATS:])):
-                        logger.error('Job stalled for unknown reason.')
+                        self.logger.error('Job stalled for unknown reason.')
                         job.cause_of_death = 'stalled'
 
             # could have been an exception, we check right away
             elif isinstance(job.ret, Exception):
-                logger.error("Job encountered exception; will not resubmit.")
-                job.cause_of_death = "exception"
+                # Send error email, in addition to raising and logging exception
                 send_error_mail(job)
-                job.ret = "Job dead. Exception: {}".format(job.ret)
+
+                # Format traceback much like joblib does
+                self.logger.error("-" * 80)
+                self.logger.error("GridMap job traceback for %s:", job.name)
+                self.logger.error("-" * 80)
+                self.logger.error("Exception: %s", type(job.ret).__name__)
+                self.logger.error("Job ID: %s", job.jobid)
+                self.logger.error("Host: %s", job.host_name)
+                self.logger.error("." * 80)
+                self.logger.error(job.traceback)
+                raise job.ret
 
             # attempt to resubmit
             if job.cause_of_death:
-                logger.info("creating error report")
+                self.logger.info("Creating error report")
 
                 # send report
                 send_error_mail(job)
@@ -427,7 +465,7 @@ class JobMonitor(object):
                 logging.info('Resubmitted job %s; it now has ID %s', old_id,
                              job.jobid)
                 if job.jobid is None:
-                    logger.error("giving up on job")
+                    self.logger.error("giving up on job")
                     job.ret = "job dead"
                 # Update job ID if successfully resubmitted
                 else:
@@ -441,17 +479,17 @@ class JobMonitor(object):
         """
         checks for all jobs if they are done
         """
-        logger = logging.getLogger(__name__)
-        if logger.getEffectiveLevel() == logging.DEBUG:
+        if self.logger.getEffectiveLevel() == logging.DEBUG:
             num_jobs = len(self.jobs)
-            num_completed = sum((job.ret is not None and
+            num_completed = sum((job.ret != _JOB_NOT_FINISHED and
                                  not isinstance(job.ret, Exception))
                                 for job in self.jobs)
-            logger.debug('%i out of %i jobs completed', num_completed,
-                         num_jobs)
+            self.logger.debug('%i out of %i jobs completed', num_completed,
+                              num_jobs)
 
         # exceptions will be handled in check_if_alive
-        return all((job.ret is not None and not isinstance(job.ret, Exception))
+        return all((job.ret != _JOB_NOT_FINISHED and not isinstance(job.ret,
+                                                                    Exception))
                    for job in self.jobs)
 
 
@@ -469,22 +507,22 @@ def send_error_mail(job):
 
     # compose error message
     body_text = ""
-    body_text += "job {}\n".format(job.name)
-    body_text += "last timestamp: {}\n".format(job.timestamp)
-    body_text += "num_resubmits: {}\n".format(job.num_resubmits)
-    body_text += "cause_of_death: {}\n".format(job.cause_of_death)
+    body_text += "Job {}\n".format(job.name)
+    body_text += "Last timestamp: {}\n".format(job.timestamp)
+    body_text += "Resubmissions: {}\n".format(job.num_resubmits)
+    body_text += "Cause of death: {}\n".format(job.cause_of_death)
 
     if job.heart_beat:
-        body_text += "last memory usage: {}\n".format(job.heart_beat["memory"])
-        body_text += "last cpu load: {}\n".format(job.heart_beat["cpu_load"][0])
-        body_text += ("last process state: " +
+        body_text += "Last memory usage: {}\n".format(job.heart_beat["memory"])
+        body_text += "Last cpu load: {}\n".format(job.heart_beat["cpu_load"][0])
+        body_text += ("Last process state: " +
                       "{}\n\n").format(job.heart_beat["cpu_load"][1])
 
-    body_text += "host: {}\n\n".format(job.host_name)
+    body_text += "Host: {}\n\n".format(job.host_name)
 
     if isinstance(job.ret, Exception):
-        body_text += "job encountered exception: {}\n".format(job.ret)
-        body_text += "stacktrace: {}\n\n".format(job.exception)
+        body_text += "Job encountered exception: {}\n".format(job.ret)
+        body_text += "Stacktrace: {}\n\n".format(job.traceback)
 
     logger.info('Email body: %s', body_text)
 
@@ -747,17 +785,16 @@ def process_jobs(jobs, temp_dir='/scratch/', white_list=None, quiet=True,
 
     if not local:
         # initialize monitor to get port number
-        monitor = JobMonitor(temp_dir=temp_dir)
+        with JobMonitor(temp_dir=temp_dir) as monitor:
+            # get interface and port
+            home_address = monitor.home_address
 
-        # get interface and port
-        home_address = monitor.home_address
+            # jobid field is attached to each job object
+            sid = _submit_jobs(jobs, home_address, temp_dir=temp_dir,
+                               white_list=white_list, quiet=quiet)
 
-        # jobid field is attached to each job object
-        sid = _submit_jobs(jobs, home_address, temp_dir=temp_dir,
-                           white_list=white_list, quiet=quiet)
-
-        # handling of inputs, outputs and heartbeats
-        monitor.check(sid, jobs)
+            # handling of inputs, outputs and heartbeats
+            monitor.check(sid, jobs)
     else:
         _process_jobs_locally(jobs, max_processes=max_processes)
 
