@@ -339,15 +339,13 @@ class JobMonitor(object):
             self.logger.debug('Waiting for message')
             msg_str = self.socket.recv()
             msg = zloads(msg_str)
-            self.logger.debug('Received message: {}'.format(msg))
+            self.logger.debug('Received message: %s', msg)
             return_msg = ""
 
             job_id = msg["job_id"]
 
             # only if its not the local beat
             if job_id != -1:
-                self.logger.debug('Received message: %s', msg)
-
                 # If message is from a valid job, process that message
                 if job_id in self.jobid_to_job:
                     job = self.jobid_to_job[job_id]
