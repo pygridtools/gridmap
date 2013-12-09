@@ -301,7 +301,8 @@ class JobMonitor(object):
 
         # If we encounter an exception, try to kill all jobs
         if exc_type is not None:
-            self.logger.info('Encountered %s, so killing all jobs.', exc_type)
+            self.logger.info('Encountered %s, so killing all jobs.',
+                             exc_type.__name__)
             for job in self.jobs:
                 # Only kill jobs that are still running
                 if job.ret != _JOB_NOT_FINISHED:
@@ -452,7 +453,7 @@ class JobMonitor(object):
                 self.logger.error("-" * 80)
                 self.logger.error("Exception: %s", type(job.ret).__name__)
                 self.logger.error("Job ID: %s", job.jobid)
-                self.logger.error("Host: %s", job.host)
+                self.logger.error("Host: %s", job.host_name)
                 self.logger.error("." * 80)
                 self.logger.error(job.traceback)
                 raise job.ret
