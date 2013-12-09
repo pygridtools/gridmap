@@ -454,7 +454,7 @@ class JobMonitor(object):
         logger = logging.getLogger(__name__)
         if logger.getEffectiveLevel() == logging.DEBUG:
             num_jobs = len(self.jobs)
-            num_completed = sum((job.ret is not None and
+            num_completed = sum((job.ret != _JOB_NOT_FINISHED and
                                  not isinstance(job.ret, Exception))
                                 for job in self.jobs)
             logger.debug('%i out of %i jobs completed', num_completed,
