@@ -315,9 +315,6 @@ class JobMonitor(object):
                             self.logger.debug("Could not kill job with SGE " +
                                               "id %s", job.jobid, exc_info=True)
 
-        # Did we exit without an exception?
-        return exc_type is None
-
     def check(self, session_id, jobs):
         """
         serves input and output data
