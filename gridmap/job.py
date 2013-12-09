@@ -41,7 +41,6 @@ import logging
 import multiprocessing
 import os
 import smtplib
-import socket
 import sys
 import traceback
 from datetime import datetime
@@ -50,7 +49,7 @@ from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from io import open
 from multiprocessing import Pool
-from socket import gethostname
+from socket import gethostname, gethostbyname
 
 import psutil
 import zmq
@@ -65,7 +64,7 @@ from gridmap.data import clean_path, zdumps, zloads
 from gridmap.runner import _heart_beat
 
 if DRMAA_PRESENT:
-    from drmaa import JobControlAction, Session
+    from drmaa import InvalidJobException, JobControlAction, Session
 
 # Python 2.x backward compatibility
 if sys.version_info < (3, 0):
@@ -264,21 +263,21 @@ class JobMonitor(object):
         """
         set up socket
         """
-        logger = logging.getLogger(__name__)
+        self.logger = logging.getLogger(__name__)
 
         context = zmq.Context()
         self.temp_dir = temp_dir
         self.socket = context.socket(zmq.REP)
 
-        self.host_name = socket.gethostname()
-        self.ip_address = socket.gethostbyname(self.host_name)
+        self.host_name = gethostname()
+        self.ip_address = gethostbyname(self.host_name)
         self.interface = "tcp://%s" % (self.ip_address)
 
         # bind to random port and remember it
         self.port = self.socket.bind_to_random_port(self.interface)
         self.home_address = "%s:%i" % (self.interface, self.port)
 
-        logger.info("Setting up JobMonitor on %s", self.home_address)
+        self.logger.info("Setting up JobMonitor on %s", self.home_address)
 
         # uninitialized field (set in check method)
         self.jobs = []
@@ -286,11 +285,37 @@ class JobMonitor(object):
         self.session_id = -1
         self.jobid_to_job = {}
 
-    def __del__(self):
-        """
-        clean up open socket
-        """
+    def __enter__(self):
+        '''
+        Enable JobMonitor to be used as a context manager.
+        '''
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        '''
+        Gracefully handle exceptions by terminating all jobs, and closing
+        sockets.
+        '''
+        # Always close socket
         self.socket.close()
+
+        # If we encounter an exception, try to kill all jobs
+        if exc_type is not None:
+            self.logger.debug('Encountered %s, so killing all jobs.', exc_type)
+            for job in self.jobs:
+                # Only kill jobs that are still running
+                if job.ret != _JOB_NOT_FINISHED:
+                    with Session(self.session_id) as session:
+                        # try to kill off old job
+                        try:
+                            session.control(job.jobid,
+                                            JobControlAction.TERMINATE)
+                        except InvalidJobException:
+                            self.logger.debug("Could not kill job with SGE " +
+                                              "id %s", job.jobid, exc_info=True)
+
+        # Did we exit without an exception?
+        return exc_type is None
 
     def check(self, session_id, jobs):
         """
@@ -771,17 +796,16 @@ def process_jobs(jobs, temp_dir='/scratch/', white_list=None, quiet=True,
 
     if not local:
         # initialize monitor to get port number
-        monitor = JobMonitor(temp_dir=temp_dir)
+        with JobMonitor(temp_dir=temp_dir) as monitor:
+            # get interface and port
+            home_address = monitor.home_address
 
-        # get interface and port
-        home_address = monitor.home_address
+            # jobid field is attached to each job object
+            sid = _submit_jobs(jobs, home_address, temp_dir=temp_dir,
+                               white_list=white_list, quiet=quiet)
 
-        # jobid field is attached to each job object
-        sid = _submit_jobs(jobs, home_address, temp_dir=temp_dir,
-                           white_list=white_list, quiet=quiet)
-
-        # handling of inputs, outputs and heartbeats
-        monitor.check(sid, jobs)
+            # handling of inputs, outputs and heartbeats
+            monitor.check(sid, jobs)
     else:
         _process_jobs_locally(jobs, max_processes=max_processes)
 
