@@ -358,7 +358,7 @@ class JobMonitor(object):
                             job.track_mem.append(job.heart_beat["memory"])
                             job.track_cpu.append(job.heart_beat["cpu_load"])
                         except (ValueError, TypeError):
-                            logger.error("error decoding heart-beat",
+                            logger.error("Error decoding heart-beat",
                                          exc_info=True)
                         return_msg = "all good"
                         job.timestamp = datetime.now()
@@ -408,7 +408,7 @@ class JobMonitor(object):
                     current_time = datetime.now()
                     time_delta = current_time - job.timestamp
                     if time_delta.seconds > MAX_TIME_BETWEEN_HEARTBEATS:
-                        logger.error("job died for unknown reason")
+                        logger.error("Job died for unknown reason")
                         job.cause_of_death = "unknown"
                     elif (len(job.track_cpu) > MAX_IDLE_HEARTBEATS and
                           all((cpu_load <= IDLE_THRESHOLD and
@@ -480,22 +480,22 @@ def send_error_mail(job):
 
     # compose error message
     body_text = ""
-    body_text += "job {}\n".format(job.name)
-    body_text += "last timestamp: {}\n".format(job.timestamp)
-    body_text += "num_resubmits: {}\n".format(job.num_resubmits)
-    body_text += "cause_of_death: {}\n".format(job.cause_of_death)
+    body_text += "Job {}\n".format(job.name)
+    body_text += "Last timestamp: {}\n".format(job.timestamp)
+    body_text += "Resubmissions: {}\n".format(job.num_resubmits)
+    body_text += "Cause of death: {}\n".format(job.cause_of_death)
 
     if job.heart_beat:
-        body_text += "last memory usage: {}\n".format(job.heart_beat["memory"])
-        body_text += "last cpu load: {}\n".format(job.heart_beat["cpu_load"][0])
-        body_text += ("last process state: " +
+        body_text += "Last memory usage: {}\n".format(job.heart_beat["memory"])
+        body_text += "Last cpu load: {}\n".format(job.heart_beat["cpu_load"][0])
+        body_text += ("Last process state: " +
                       "{}\n\n").format(job.heart_beat["cpu_load"][1])
 
-    body_text += "host: {}\n\n".format(job.host_name)
+    body_text += "Host: {}\n\n".format(job.host_name)
 
     if isinstance(job.ret, Exception):
-        body_text += "job encountered exception: {}\n".format(job.ret)
-        body_text += "stacktrace: {}\n\n".format(job.traceback)
+        body_text += "Job encountered exception: {}\n".format(job.ret)
+        body_text += "Stacktrace: {}\n\n".format(job.traceback)
 
     logger.info('Email body: %s', body_text)
 
