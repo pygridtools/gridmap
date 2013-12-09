@@ -44,6 +44,10 @@ from gridmap.runner import _send_zmq_msg
 
 
 class WebMonitor(object):
+    '''
+    A web front-end for the JobMonitor class.
+    '''
+
     @cherrypy.expose
     def index(self):
         return '''

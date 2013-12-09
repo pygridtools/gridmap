@@ -40,7 +40,6 @@ import socket
 import sys
 import time
 from io import open
-from subprocess import check_output
 
 from psutil import Process
 import zmq
@@ -51,7 +50,6 @@ from gridmap.data import clean_path, zloads, zdumps
 
 # TODO: Refactor this so that there's a class that stores socket, since creating
 #       a new one each time is hugely wasteful.
-
 def _send_zmq_msg(job_id, command, data, address):
     """
     simple code to send messages back to host
@@ -107,7 +105,7 @@ def get_memory_usage(pid):
     """
 
     p = Process(pid)
-    return p.get_memory_usage()[0] / (1024.0 ** 2.0)
+    return float(p.get_memory_usage()[0]) / (1024.0 ** 2.0)
 
 
 def get_cpu_load(pid):
@@ -121,7 +119,7 @@ def get_cpu_load(pid):
     """
 
     p = Process(pid)
-    return p.get_cpu_percent(), p.status
+    return float(p.get_cpu_percent()), p.status
 
 
 def get_job_status(parent_pid):

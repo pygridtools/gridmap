@@ -79,9 +79,12 @@ if CREATE_PLOTS:
 
 
 # Set of "not running" job statuses
-SLEEP_STATUSES = {psutil.STATUS_SLEEPING, psutil.STATUS_DEAD,
-                  psutil.STATUS_IDLE, psutil.STATUS_STOPPED,
-                  psutil.STATUS_ZOMBIE}
+_SLEEP_STATUSES = {psutil.STATUS_SLEEPING, psutil.STATUS_DEAD,
+                   psutil.STATUS_IDLE, psutil.STATUS_STOPPED,
+                   psutil.STATUS_ZOMBIE}
+
+# Placeholder string, since a job could potentially return None on purpose
+_JOB_NOT_FINISHED = '*@#%$*@#___GRIDMAP___NOT___DONE___@#%**#*$&*%'
 
 
 class JobException(Exception):
@@ -137,7 +140,7 @@ class Job(object):
         self.track_mem = []
         self.track_cpu = []
         self.heart_beat = None
-        self.exception = None
+        self.traceback = None
         self.host_name = ''
         self.timestamp = None
         self.log_stdout_fn = ''
@@ -152,7 +155,7 @@ class Job(object):
         self.jobid = -1
         self.kwlist = kwlist if kwlist is not None else {}
         self.cleanup = cleanup
-        self.ret = None
+        self.ret = _JOB_NOT_FINISHED
         self.num_slots = num_slots
         self.mem_free = mem_free
         self.white_list = []
@@ -222,6 +225,7 @@ class Job(object):
             self.ret = self.function(*self.args, **self.kwlist)
         except Exception as exception:
             self.ret = exception
+            self.traceback = traceback.format_exc()
             traceback.print_exc()
         del self.args
         del self.kwlist
@@ -327,15 +331,21 @@ class JobMonitor(object):
 
                     if msg["command"] == "fetch_input":
                         return_msg = self.jobid_to_job[job_id]
+                        job.timestamp = datetime.now()
 
                     if msg["command"] == "store_output":
                         # be nice
                         return_msg = "thanks"
+
                         # store tmp job object
-                        tmp_job = msg["data"]
-                        # copy relevant fields
-                        job.ret = tmp_job.ret
-                        job.exception = tmp_job.exception
+                        if isinstance(msg["data"], Job):
+                            tmp_job = msg["data"]
+                            # copy relevant fields
+                            job.ret = tmp_job.ret
+                            job.traceback = tmp_job.traceback
+                        # Return an exception instead of a job, so store that
+                        else:
+                            job.ret = msg["data"]
                         # is assigned in submission process and not written back
                         # server-side
                         job.timestamp = datetime.now()
@@ -386,14 +396,14 @@ class JobMonitor(object):
         check if jobs are alive and determine cause of death if not
         """
         logger = logging.getLogger(__name__)
+        logger.debug('Checking if jobs are alive')
         for job in self.jobs:
 
             # noting was returned yet
-            if job.ret is None:
+            if job.ret == _JOB_NOT_FINISHED:
 
                 # exclude first-timers
                 if job.timestamp is not None:
-
                     # check heart-beats if there was a long delay
                     current_time = datetime.now()
                     time_delta = current_time - job.timestamp
@@ -402,7 +412,7 @@ class JobMonitor(object):
                         job.cause_of_death = "unknown"
                     elif (len(job.track_cpu) > MAX_IDLE_HEARTBEATS and
                           all((cpu_load <= IDLE_THRESHOLD and
-                               state in SLEEP_STATUSES) for cpu_load, state in
+                               state in _SLEEP_STATUSES) for cpu_load, state in
                               job.track_cpu[-MAX_IDLE_HEARTBEATS:])):
                         logger.error('Job stalled for unknown reason.')
                         job.cause_of_death = 'stalled'
@@ -416,7 +426,7 @@ class JobMonitor(object):
 
             # attempt to resubmit
             if job.cause_of_death:
-                logger.info("creating error report")
+                logger.info("Creating error report")
 
                 # send report
                 send_error_mail(job)
@@ -484,7 +494,7 @@ def send_error_mail(job):
 
     if isinstance(job.ret, Exception):
         body_text += "job encountered exception: {}\n".format(job.ret)
-        body_text += "stacktrace: {}\n\n".format(job.exception)
+        body_text += "stacktrace: {}\n\n".format(job.traceback)
 
     logger.info('Email body: %s', body_text)
 
