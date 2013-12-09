@@ -64,7 +64,8 @@ from gridmap.data import clean_path, zdumps, zloads
 from gridmap.runner import _heart_beat
 
 if DRMAA_PRESENT:
-    from drmaa import InvalidJobException, JobControlAction, Session
+    from drmaa import (InvalidJobException, JobControlAction,
+                       JOB_IDS_SESSION_ALL, Session)
 
 # Python 2.x backward compatibility
 if sys.version_info < (3, 0):
@@ -303,17 +304,14 @@ class JobMonitor(object):
         if exc_type is not None:
             self.logger.info('Encountered %s, so killing all jobs.',
                              exc_type.__name__)
-            for job in self.jobs:
-                # Only kill jobs that are still running
-                if job.ret == _JOB_NOT_FINISHED:
-                    with Session(self.session_id) as session:
-                        # try to kill off old job
-                        try:
-                            session.control(job.jobid,
-                                            JobControlAction.TERMINATE)
-                        except InvalidJobException:
-                            self.logger.debug("Could not kill job with SGE " +
-                                              "id %s", job.jobid, exc_info=True)
+            with Session(self.session_id) as session:
+                # try to kill off all old jobs
+                try:
+                    session.control(JOB_IDS_SESSION_ALL,
+                                    JobControlAction.TERMINATE)
+                except InvalidJobException:
+                    self.logger.debug("Could not kill job with SGE " +
+                                      "id %s", job.jobid, exc_info=True)
 
     def check(self, session_id, jobs):
         """
