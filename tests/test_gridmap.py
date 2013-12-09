@@ -24,6 +24,7 @@ from __future__ import print_function, unicode_literals
 
 import logging
 
+import gridmap
 from gridmap import Job, process_jobs, grid_map
 
 from nose.tools import eq_
@@ -33,7 +34,8 @@ from nose.tools import eq_
 logging.captureWarnings(True)
 logging.basicConfig(format=('%(asctime)s - %(name)s - %(levelname)s - ' +
                             '%(message)s'), level=logging.DEBUG)
-
+logger = logging.getLogger(__name__)
+logger.debug('Path to gridmap: %s', gridmap)
 
 def compute_factorial(n):
     ret = 1
