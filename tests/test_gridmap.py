@@ -26,7 +26,7 @@ import logging
 from time import sleep
 
 import gridmap
-from gridmap import Job, process_jobs, grid_map
+from gridmap import Job, process_jobs, grid_map, HEARTBEAT_FREQUENCY
 
 from nose.tools import eq_
 
@@ -40,7 +40,7 @@ logger.debug('Path to gridmap: %s', gridmap)
 
 
 def compute_factorial_slow(n):
-    sleep(100)
+    sleep(HEARTBEAT_FREQUENCY + 1)
     ret = 1
     for i in range(n):
         ret = ret * (i + 1)
