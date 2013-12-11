@@ -99,8 +99,8 @@ class Job(object):
        are defined at the module or class level).
     """
 
-    __slots__ = ('_f', 'args', 'jobid', 'kwlist', 'cleanup', 'ret', 'traceback',
-                 'num_slots', 'mem_free', 'white_list', 'path',
+    __slots__ = ('_f', 'args', 'job_id', 'kwlist', 'cleanup', 'ret',
+                 'traceback', 'num_slots', 'mem_free', 'white_list', 'path',
                  'uniq_id', 'name', 'queue', 'environment', 'working_dir',
                  'cause_of_death', 'num_resubmits', 'home_address',
                  'log_stderr_fn', 'log_stdout_fn', 'timestamp', 'host_name',
@@ -145,7 +145,7 @@ class Job(object):
         self._f = None
         self.function = f
         self.args = args
-        self.jobid = -1
+        self.job_id = -1
         self.kwlist = kwlist if kwlist is not None else {}
         self.cleanup = cleanup
         self.ret = _JOB_NOT_FINISHED
@@ -273,9 +273,9 @@ class JobMonitor(object):
 
         # uninitialized field (set in check method)
         self.jobs = []
-        self.jobids = []
+        self.job_ids = []
         self.session_id = -1
-        self.jobid_to_job = {}
+        self.job_id_to_job = {}
 
     def __enter__(self):
         '''
@@ -310,7 +310,7 @@ class JobMonitor(object):
         """
         # save list of jobs
         self.jobs = jobs
-        self.jobid_to_job = {job.jobid: job for job in self.jobs}
+        self.job_id_to_job = {job.job_id: job for job in self.jobs}
 
         # keep track of DRMAA session_id (for resubmissions)
         self.session_id = session_id
@@ -335,11 +335,11 @@ class JobMonitor(object):
                 # only if its not the local beat
                 if job_id != -1:
                     # If message is from a valid job, process that message
-                    if job_id in self.jobid_to_job:
-                        job = self.jobid_to_job[job_id]
+                    if job_id in self.job_id_to_job:
+                        job = self.job_id_to_job[job_id]
 
                         if msg["command"] == "fetch_input":
-                            return_msg = self.jobid_to_job[job_id]
+                            return_msg = self.job_id_to_job[job_id]
                             job.timestamp = datetime.now()
 
                         if msg["command"] == "store_output":
@@ -385,7 +385,7 @@ class JobMonitor(object):
                         self.logger.error(('Received message from unknown job' +
                                            ' with ID %s. Known job IDs are: ' +
                                            '%s'), job_id,
-                                          list(self.jobid_to_job.keys()))
+                                          list(self.job_id_to_job.keys()))
                         return_msg = 'thanks, but no thanks'
                 else:
                     # run check
@@ -420,7 +420,7 @@ class JobMonitor(object):
                     if time_delta.seconds > MAX_TIME_BETWEEN_HEARTBEATS:
                         self.logger.debug("It has been %s seconds since we " +
                                           "received a message from job %s",
-                                          time_delta.seconds, job.jobid)
+                                          time_delta.seconds, job.job_id)
                         self.logger.error("Job died for unknown reason")
                         job.cause_of_death = "unknown"
                     elif (len(job.track_cpu) > MAX_IDLE_HEARTBEATS and
@@ -440,7 +440,7 @@ class JobMonitor(object):
                 self.logger.error("GridMap job traceback for %s:", job.name)
                 self.logger.error("-" * 80)
                 self.logger.error("Exception: %s", type(job.ret).__name__)
-                self.logger.error("Job ID: %s", job.jobid)
+                self.logger.error("Job ID: %s", job.job_id)
                 self.logger.error("Host: %s", job.host_name)
                 self.logger.error("." * 80)
                 self.logger.error(job.traceback)
@@ -454,16 +454,16 @@ class JobMonitor(object):
                 send_error_mail(job)
 
                 # try to resubmit
-                old_id = job.jobid
+                old_id = job.job_id
                 job.track_cpu = []
                 job.track_mem = []
                 handle_resubmit(self.session_id, job, temp_dir=self.temp_dir)
                 # Update job ID if successfully resubmitted
                 self.logger.info('Resubmitted job %s; it now has ID %s',
                                  old_id,
-                                 job.jobid)
-                del self.jobid_to_job[old_id]
-                self.jobid_to_job[job.jobid] = job
+                                 job.job_id)
+                del self.job_id_to_job[old_id]
+                self.job_id_to_job[job.job_id] = job
 
                 # break out of loop to avoid too long delay
                 break
@@ -528,7 +528,7 @@ def send_error_mail(job):
         with open(log_file_fn, "rb") as log_file:
             log_file_attachement = MIMEText(log_file.read())
         log_file_attachement.add_header('Content-Disposition', 'attachment',
-                                        filename='{}_log.txt'.format(job.jobid))
+                                        filename='{}_log.txt'.format(job.job_id))
         msg.attach(log_file_attachement)
 
     # if matplotlib is installed
@@ -544,7 +544,7 @@ def send_error_mail(job):
         time = [HEARTBEAT_FREQUENCY * i for i in range(len(job.track_mem))]
 
         # attack mem plot
-        img_mem_fn = os.path.join('/tmp', "{}_mem.png".format(job.jobid))
+        img_mem_fn = os.path.join('/tmp', "{}_mem.png".format(job.job_id))
         plt.figure(1)
         plt.plot(time, job.track_mem, "-o")
         plt.xlabel("time (s)")
@@ -559,7 +559,7 @@ def send_error_mail(job):
         msg.attach(img_mem_attachement)
 
         # attach cpu plot
-        img_cpu_fn = os.path.join("/tmp", "{}_cpu.png".format(job.jobid))
+        img_cpu_fn = os.path.join("/tmp", "{}_cpu.png".format(job.job_id))
         plt.figure(2)
         plt.plot(time, [cpu_load for cpu_load, _ in job.track_cpu], "-o")
         plt.xlabel("time (s)")
@@ -594,7 +594,7 @@ def handle_resubmit(session_id, job, temp_dir='/scratch/'):
 
     side-effect:
     job.num_resubmits incremented
-    job.jobid set to new ID
+    job.job_id set to new ID
     """
     # reset some fields
     job.timestamp = None
@@ -617,7 +617,7 @@ def handle_resubmit(session_id, job, temp_dir='/scratch/'):
         _resubmit(session_id, job, temp_dir)
     else:
         raise JobException(("Job {0} ({1}) failed after {2} " +
-                            "resubmissions").format(job.name, job.jobid,
+                            "resubmissions").format(job.name, job.job_id,
                                                     NUM_RESUBMITS))
 
 
@@ -735,16 +735,16 @@ def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
                             "{}.  Your jobs may not start " +
                             "correctly.").format(temp_dir))
 
-    jobid = session.runJob(jt)
+    job_id = session.runJob(jt)
 
-    # set job fields that depend on the jobid assigned by grid engine
-    job.jobid = jobid
-    job.log_stdout_fn = os.path.join(temp_dir, '{}.o{}'.format(job.name, jobid))
-    job.log_stderr_fn = os.path.join(temp_dir, '{}.e{}'.format(job.name, jobid))
+    # set job fields that depend on the job_id assigned by grid engine
+    job.job_id = job_id
+    job.log_stdout_fn = os.path.join(temp_dir, '{}.o{}'.format(job.name, job_id))
+    job.log_stderr_fn = os.path.join(temp_dir, '{}.e{}'.format(job.name, job_id))
 
     if not quiet:
         print('Your job {} has been submitted with id {}'.format(job.name,
-                                                                 jobid),
+                                                                 job_id),
               file=sys.stderr)
 
     session.deleteJobTemplate(jt)
@@ -785,7 +785,7 @@ def process_jobs(jobs, temp_dir='/scratch/', white_list=None, quiet=True,
             # get interface and port
             home_address = monitor.home_address
 
-            # jobid field is attached to each job object
+            # job_id field is attached to each job object
             sid = _submit_jobs(jobs, home_address, temp_dir=temp_dir,
                                white_list=white_list, quiet=quiet)
 
@@ -811,10 +811,10 @@ def _resubmit(session_id, job, temp_dir):
         with Session(session_id) as session:
             # try to kill off old job
             try:
-                session.control(job.jobid, JobControlAction.TERMINATE)
+                session.control(job.job_id, JobControlAction.TERMINATE)
                 logger.info("zombie job killed")
             except Exception:
-                logger.error("Could not kill job with SGE id %s", job.jobid,
+                logger.error("Could not kill job with SGE id %s", job.job_id,
                              exc_info=True)
             # create new job
             _append_job_to_session(session, job, temp_dir=temp_dir)
