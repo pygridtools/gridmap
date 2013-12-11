@@ -23,8 +23,10 @@ Some simple unit tests for GridMap.
 from __future__ import print_function, unicode_literals
 
 import logging
+from time import sleep
 
-from gridmap import Job, process_jobs, grid_map
+import gridmap
+from gridmap import Job, process_jobs, grid_map, HEARTBEAT_FREQUENCY
 
 from nose.tools import eq_
 
@@ -33,6 +35,16 @@ from nose.tools import eq_
 logging.captureWarnings(True)
 logging.basicConfig(format=('%(asctime)s - %(name)s - %(levelname)s - ' +
                             '%(message)s'), level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+logger.debug('Path to gridmap: %s', gridmap)
+
+
+def compute_factorial_slow(n):
+    sleep(HEARTBEAT_FREQUENCY + 1)
+    ret = 1
+    for i in range(n):
+        ret = ret * (i + 1)
+    return ret
 
 
 def compute_factorial(n):
@@ -46,6 +58,13 @@ def test_map():
     inputs = [1, 2, 4, 8, 16]
     expected = list(map(compute_factorial, inputs))
     outputs = grid_map(compute_factorial, inputs, quiet=False)
+    eq_(expected, outputs)
+
+
+def test_map_slow():
+    inputs = [1, 2, 4, 8, 16]
+    expected = list(map(compute_factorial_slow, inputs))
+    outputs = grid_map(compute_factorial_slow, inputs, quiet=False)
     eq_(expected, outputs)
 
 
@@ -67,5 +86,13 @@ def test_process_jobs():
     inputs = [1, 2, 4, 8, 16]
     expected = list(map(compute_factorial, inputs))
     function_jobs = make_jobs(inputs, compute_factorial)
+    outputs = process_jobs(function_jobs, quiet=False)
+    eq_(expected, outputs)
+
+
+def test_process_jobs_slow():
+    inputs = [1, 2, 4, 8, 16]
+    expected = list(map(compute_factorial_slow, inputs))
+    function_jobs = make_jobs(inputs, compute_factorial_slow)
     outputs = process_jobs(function_jobs, quiet=False)
     eq_(expected, outputs)
