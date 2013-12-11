@@ -95,7 +95,7 @@ def _heart_beat(job_id, address, parent_pid=-1, log_file="", wait_sec=45):
     to the ``JobMonitor``.
     """
     while True:
-        status = get_job_status(parent_pid)
+        status = get_job_status(parent_pid, os.getpid())
         if os.path.exists(log_file):
             with open(log_file) as f:
                 status["log_file"] = f.read()
@@ -103,24 +103,31 @@ def _heart_beat(job_id, address, parent_pid=-1, log_file="", wait_sec=45):
         time.sleep(wait_sec)
 
 
-def get_memory_usage(pid):
+def get_memory_usage(pid, heart_pid):
     """
     :param pid: Process ID for job whose memory usage we'd like to check.
     :type pid: int
+    :param heart_pid: ID of the heartbeat process, which will not be counted
+                      toward total.
+    :type heart_pid: int
 
     :returns: Total memory usage of process (and children) in Mb.
     """
     process = psutil.Process(pid)
     mem_total = float(process.get_memory_info()[0])
     mem_total += sum(float(p.get_memory_info()[0]) for p in
-                     process.get_children(recursive=True))
+                     process.get_children(recursive=True)
+                     if process.pid != heart_pid)
     return mem_total / (1024.0 ** 2.0)
 
 
-def get_cpu_load(pid):
+def get_cpu_load(pid, heart_pid):
     """
     :param pid: Process ID for job whose CPU load we'd like to check.
     :type pid: int
+    :param heart_pid: ID of the heartbeat process, which will not be counted
+                      toward total.
+    :type heart_pid: int
 
     :returns: Tuple of average ratio of CPU time to real time for process and
               its children (excluding heartbeat process), and whether at least
@@ -132,17 +139,21 @@ def get_cpu_load(pid):
     running = process.status in _SLEEP_STATUSES
     num_procs = 1
     for p in process.get_children(recursive=True):
-        cpu_sum += p.get_cpu_percent()
-        running = running or p.status in _SLEEP_STATUSES
+        if p.pid != heart_pid:
+            cpu_sum += p.get_cpu_percent()
+            running = running or p.status in _SLEEP_STATUSES
     return cpu_sum / num_procs, running
 
 
-def get_job_status(parent_pid):
+def get_job_status(parent_pid, heart_pid):
     """
     Determines the status of the current worker and its machine
 
     :param parent_pid: Process ID for job whose status we'd like to check.
     :type parent_pid: int
+    :param heart_pid: ID of the heartbeat process, which will not be counted
+                      toward total.
+    :type heart_pid: int
 
     :returns: Memory and CPU load information for given PID.
     :rtype: dict
@@ -151,8 +162,8 @@ def get_job_status(parent_pid):
     status_container = {}
 
     if parent_pid != -1:
-        status_container["memory"] = get_memory_usage(parent_pid)
-        status_container["cpu_load"] = get_cpu_load(parent_pid)
+        status_container["memory"] = get_memory_usage(parent_pid, heart_pid)
+        status_container["cpu_load"] = get_cpu_load(parent_pid, heart_pid)
 
     return status_container
 
