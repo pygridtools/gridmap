@@ -106,7 +106,7 @@ def get_memory_usage(pid):
     """
 
     p = Process(pid)
-    return float(p.get_memory_usage()[0]) / (1024.0 ** 2.0)
+    return float(p.get_memory_info()[0]) / (1024.0 ** 2.0)
 
 
 def get_cpu_load(pid):
