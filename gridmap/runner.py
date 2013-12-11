@@ -89,144 +89,136 @@ def _send_zmq_msg(job_id, command, data, address):
     return msg
 
 
-def _heart_beat(runner, address, wait_sec=45):
+def _heart_beat(job_id, address, parent_pid=-1, log_file="", wait_sec=45):
     """
     Infinitely loops and sends information about the currently running job back
     to the ``JobMonitor``.
-
-    :param runner: The ``Runner`` we're monitoring. If ``None``, this is assumed
-                   to be monitoring the ``JobMonitor`` itself.
-    :type runner: ``Runner`` or ``NoneType``
-    :param address: URL of ``JobMonitor``
-    :type address: str
-    :param wait_sec: The amount of time to wait between heartbeats.
-    :type wait_sec: int
     """
-
     while True:
-        if runner is not None:
-            job_id = runner.job_id
-            status = runner.status
-            if os.path.exists(runner.log_file):
-                with open(runner.log_file) as f:
-                    status["log_file"] = f.read()
-        else:
-            job_id = -1
-            status = {}
+        status = get_job_status(parent_pid)
+        if os.path.exists(log_file):
+            with open(log_file) as f:
+                status["log_file"] = f.read()
         _send_zmq_msg(job_id, "heart_beat", status, address)
         time.sleep(wait_sec)
 
 
-class Runner(object):
+def get_memory_usage(pid):
     """
-    Encapsulates a running ``Job`` that was retrieved from the
-    ``JobMonitor``.
+    :param pid: Process ID for job whose memory usage we'd like to check.
+    :type pid: int
+
+    :returns: Total memory usage of process (and children) in Mb.
     """
-    def __init__(self, job_id, monitor_url):
-        super(Runner, self).__init__()
-        self.job_id = job_id
-        self.monitor_url = monitor_url
-        self.process = psutil.Process(os.getpid())
-        self.logger = logging.getLogger(__name__)
-        self.job = None
-        self.log_file = ''
+    process = psutil.Process(pid)
+    mem_total = float(process.get_memory_info()[0])
+    mem_total += sum(float(p.get_memory_info()[0]) for p in
+                     process.get_children(recursive=True))
+    return mem_total / (1024.0 ** 2.0)
 
 
-    @property
-    def total_memory(self):
-        """
-        Total memory usage of process (and children) in Mb.
-        """
-        mem_total = float(self.process.get_memory_info()[0])
-        mem_total += sum(float(p.get_memory_info()[0]) for p in
-                         self.process.get_children(recursive=True))
-        return mem_total / (1024.0 ** 2.0)
+def get_cpu_load(pid):
+    """
+    :param pid: Process ID for job whose CPU load we'd like to check.
+    :type pid: int
 
-    @property
-    def cpu_info(self):
-        """
-        Tuple of average ratio of CPU time to real time for process and its
-        children (excluding heartbeat process), and whether at least one of the
-        processes is not sleeping.
-        """
-        cpu_sum = float(self.process.get_cpu_percent())
-        running = self.process.status in _SLEEP_STATUSES
-        num_procs = 1
-        for p in self.process.get_children(recursive=True):
-            cpu_sum += p.get_cpu_percent()
-            running = running or p.status in _SLEEP_STATUSES
-        return cpu_sum / num_procs, running
+    :returns: Tuple of average ratio of CPU time to real time for process and
+              its children (excluding heartbeat process), and whether at least
+              one of the processes is not sleeping.
+    :rtype: (float, bool)
+    """
+    process = psutil.Process(pid)
+    cpu_sum = float(process.get_cpu_percent())
+    running = process.status in _SLEEP_STATUSES
+    num_procs = 1
+    for p in process.get_children(recursive=True):
+        cpu_sum += p.get_cpu_percent()
+        running = running or p.status in _SLEEP_STATUSES
+    return cpu_sum / num_procs, running
 
-    @property
-    def status(self):
-        '''
-        Determines the status of the current worker and its machine.
 
-        :returns: Memory and CPU load information.
-        :rtype: dict
-        '''
-        return {'memory': self.total_memory, 'cpu_load': self.cpu_info}
+def get_job_status(parent_pid):
+    """
+    Determines the status of the current worker and its machine
 
-    def run(self):
-        """
-        Execute the pickled job and produce pickled output.
-        """
-        wait_sec = random.randint(0, 5)
-        self.logger.info("Waiting %i seconds before starting", wait_sec)
-        time.sleep(wait_sec)
+    :param parent_pid: Process ID for job whose status we'd like to check.
+    :type parent_pid: int
 
-        try:
-            self.job = _send_zmq_msg(self.job_id, "fetch_input", None,
-                                     self.monitor_url)
-        except Exception as e:
-            # here we will catch errors caused by pickled objects
-            # of classes defined in modules not in PYTHONPATH
-            self.logger.error('Could not retrieve input for job %s',
-                              self.job_id, exc_info=True)
+    :returns: Memory and CPU load information for given PID.
+    :rtype: dict
+    """
 
-            # send back exception and traceback string
-            thank_you_note = _send_zmq_msg(self.job_id, "store_output",
-                                           (e, traceback.format_exc()),
-                                           self.monitor_url)
-            return
+    status_container = {}
 
-        self.logger.debug("input arguments loaded, starting computation %s",
-                          self.job)
+    if parent_pid != -1:
+        status_container["memory"] = get_memory_usage(parent_pid)
+        status_container["cpu_load"] = get_cpu_load(parent_pid)
 
-        # create heart beat process
-        heart = multiprocessing.Process(target=_heart_beat,
-                                        args=(self.self.job_id,
-                                              self.monitor_url, self.pid,
-                                              self.job.log_stderr_fn,
-                                              HEARTBEAT_FREQUENCY))
-        self.logger.info("Starting heart beat")
-        heart.start()
+    return status_container
 
-        try:
-            # change working directory
-            if self.job.working_dir is not None:
-                self.logger.info("Changing working directory: %s",
-                                 self.job.working_dir)
-                os.chdir(self.job.working_dir)
 
-            # run job
-            self.logger.info("Executing job")
-            self.job.execute()
-            self.logger.info('Finished job')
+def _run_job(job_id, address):
+    """
+    Execute the pickled job and produce pickled output.
 
-            # send back result
-            thank_you_note = _send_zmq_msg(self.job_id, "store_output",
-                                           self.job, self.monitor_url)
-            self.logger.info(thank_you_note)
+    :param job_id: Unique ID of job
+    :type job_id: int
+    :param address: IP address of submitting host.
+    :type address: str
+    """
+    wait_sec = random.randint(0, 5)
+    logger = logging.getLogger(__name__)
+    logger.info("Waiting %i seconds before starting", wait_sec)
+    time.sleep(wait_sec)
 
-        finally:
-            # stop heartbeat
-            heart.terminate()
+    try:
+        job = _send_zmq_msg(job_id, "fetch_input", None, address)
+    except Exception as e:
+        # here we will catch errors caused by pickled objects
+        # of classes defined in modules not in PYTHONPATH
+        logger.error('Could not retrieve input for job {0}'.format(job_id),
+                     exc_info=True)
+
+        # send back exception and traceback string
+        thank_you_note = _send_zmq_msg(job_id, "store_output",
+                                       (e, traceback.format_exc()),
+                                       address)
+        return
+
+    logger.debug("Input arguments loaded, starting computation %s", job)
+
+    # create heart beat process
+    parent_pid = os.getpid()
+    heart = multiprocessing.Process(target=_heart_beat,
+                                    args=(job_id, address, parent_pid,
+                                          job.log_stderr_fn,
+                                          HEARTBEAT_FREQUENCY))
+    logger.info("Starting heart beat")
+    heart.start()
+
+    try:
+        # change working directory
+        if job.working_dir is not None:
+            logger.info("Changing working directory: %s", job.working_dir)
+            os.chdir(job.working_dir)
+
+        # run job
+        logger.info("Executing job")
+        job.execute()
+        logger.info("Finished job")
+
+        # send back result
+        thank_you_note = _send_zmq_msg(job_id, "store_output", job, address)
+        logger.info(thank_you_note)
+
+    finally:
+        # stop heartbeat
+        heart.terminate()
 
 
 def _main():
     """
-    Parse the command line inputs and call Runner.run
+    Parse the command line inputs and call _run_job
     """
 
     # Get command line arguments
@@ -256,9 +248,8 @@ def _main():
                  os.environ['JOB_ID'],
                  args.home_address, args.module_dir)
 
-    # Load up the job and get things running
-    runner = Runner(os.environ['JOB_ID'], args.home_address)
-    runner.run()
+    # Process the database and get job started
+    _run_job(os.environ['JOB_ID'], args.home_address)
 
 
 if __name__ == "__main__":

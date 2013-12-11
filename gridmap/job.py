@@ -317,8 +317,8 @@ class JobMonitor(object):
 
         # determines in which interval to check if jobs are alive
         local_heart = multiprocessing.Process(target=_heart_beat,
-                                              args=(None, self.home_address,
-                                                    CHECK_FREQUENCY))
+                                              args=(-1, self.home_address, -1,
+                                                   "", CHECK_FREQUENCY))
         local_heart.start()
         try:
             self.logger.debug("Starting ZMQ event loop")
