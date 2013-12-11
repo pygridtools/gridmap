@@ -462,8 +462,8 @@ class JobMonitor(object):
                 # try to resubmit
                 old_id = job.jobid
                 handle_resubmit(self.session_id, job, temp_dir=self.temp_dir)
-                logging.info('Resubmitted job %s; it now has ID %s', old_id,
-                             job.jobid)
+                self.logger.info('Resubmitted job %s; it now has ID %s', old_id,
+                                 job.jobid)
                 if job.jobid is None:
                     self.logger.error("giving up on job")
                     job.ret = "job dead"
