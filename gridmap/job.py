@@ -51,7 +51,6 @@ from io import open
 from multiprocessing import Pool
 from socket import gethostname, gethostbyname
 
-import psutil
 import zmq
 
 from gridmap.conf import (CHECK_FREQUENCY, CREATE_PLOTS, DEFAULT_QUEUE,
@@ -76,12 +75,6 @@ if CREATE_PLOTS:
     import matplotlib
     matplotlib.use('AGG')
     import matplotlib.pyplot as plt
-
-
-# Set of "not running" job statuses
-_SLEEP_STATUSES = {psutil.STATUS_SLEEPING, psutil.STATUS_DEAD,
-                   psutil.STATUS_IDLE, psutil.STATUS_STOPPED,
-                   psutil.STATUS_ZOMBIE}
 
 # Placeholder string, since a job could potentially return None on purpose
 _JOB_NOT_FINISHED = '*@#%$*@#___GRIDMAP___NOT___DONE___@#%**#*$&*%'
@@ -227,8 +220,6 @@ class Job(object):
             self.ret = exception
             self.traceback = traceback.format_exc()
             traceback.print_exc()
-        del self.args
-        del self.kwlist
 
     @property
     def native_specification(self):
@@ -326,8 +317,8 @@ class JobMonitor(object):
 
         # determines in which interval to check if jobs are alive
         local_heart = multiprocessing.Process(target=_heart_beat,
-                                              args=(-1, self.home_address, -1,
-                                                    "", CHECK_FREQUENCY))
+                                              args=(None, self.home_address,
+                                                    CHECK_FREQUENCY))
         local_heart.start()
         try:
             self.logger.debug("Starting ZMQ event loop")
@@ -427,11 +418,14 @@ class JobMonitor(object):
                     current_time = datetime.now()
                     time_delta = current_time - job.timestamp
                     if time_delta.seconds > MAX_TIME_BETWEEN_HEARTBEATS:
+                        self.logger.debug("It has been %s seconds since we " +
+                                          "received a message from job %s",
+                                          time_delta.seconds, job.jobid)
                         self.logger.error("Job died for unknown reason")
                         job.cause_of_death = "unknown"
                     elif (len(job.track_cpu) > MAX_IDLE_HEARTBEATS and
-                          all((cpu_load <= IDLE_THRESHOLD and
-                               state in _SLEEP_STATUSES) for cpu_load, state in
+                          all(cpu_load <= IDLE_THRESHOLD and running
+                              for cpu_load, running in
                               job.track_cpu[-MAX_IDLE_HEARTBEATS:])):
                         self.logger.error('Job stalled for unknown reason.')
                         job.cause_of_death = 'stalled'
@@ -464,15 +458,12 @@ class JobMonitor(object):
                 job.track_cpu = []
                 job.track_mem = []
                 handle_resubmit(self.session_id, job, temp_dir=self.temp_dir)
-                self.logger.info('Resubmitted job %s; it now has ID %s', old_id,
-                                 job.jobid)
-                if job.jobid is None:
-                    self.logger.error("giving up on job")
-                    job.ret = "job dead"
                 # Update job ID if successfully resubmitted
-                else:
-                    del self.jobid_to_job[old_id]
-                    self.jobid_to_job[job.jobid] = job
+                self.logger.info('Resubmitted job %s; it now has ID %s',
+                                 old_id,
+                                 job.jobid)
+                del self.jobid_to_job[old_id]
+                self.jobid_to_job[job.jobid] = job
 
                 # break out of loop to avoid too long delay
                 break
@@ -603,6 +594,7 @@ def handle_resubmit(session_id, job, temp_dir='/scratch/'):
 
     side-effect:
     job.num_resubmits incremented
+    job.jobid set to new ID
     """
     # reset some fields
     job.timestamp = None
@@ -624,7 +616,9 @@ def handle_resubmit(session_id, job, temp_dir='/scratch/'):
 
         _resubmit(session_id, job, temp_dir)
     else:
-        job.jobid = None
+        raise JobException(("Job {0} ({1}) failed after {2} " +
+                            "resubmissions").format(job.name, job.jobid,
+                                                    NUM_RESUBMITS))
 
 
 def _execute(job):
