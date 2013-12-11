@@ -461,6 +461,8 @@ class JobMonitor(object):
 
                 # try to resubmit
                 old_id = job.jobid
+                job.track_cpu = []
+                job.track_mem = []
                 handle_resubmit(self.session_id, job, temp_dir=self.temp_dir)
                 self.logger.info('Resubmitted job %s; it now has ID %s', old_id,
                                  job.jobid)
