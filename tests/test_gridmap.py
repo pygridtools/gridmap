@@ -39,11 +39,12 @@ logger = logging.getLogger(__name__)
 logger.debug('Path to gridmap: %s', gridmap)
 
 
-def compute_factorial(n, wait_sec, repeated):
+def compute_factorial(args):
     '''
     Little function to compute ``n`` factorial and sleep for ``wait_sec``
     seconds.
     '''
+    n, wait_sec, repeated = args
     sleep(wait_sec)
     ret = 1
     for i in range(n):
