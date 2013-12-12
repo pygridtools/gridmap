@@ -136,12 +136,12 @@ def get_cpu_load(pid, heart_pid):
     """
     process = psutil.Process(pid)
     cpu_sum = float(process.get_cpu_percent())
-    running = process.status in _SLEEP_STATUSES
+    running = process.status not in _SLEEP_STATUSES
     num_procs = 1
     for p in process.get_children(recursive=True):
         if p.pid != heart_pid:
             cpu_sum += p.get_cpu_percent()
-            running = running or p.status in _SLEEP_STATUSES
+            running = running or p.status not in _SLEEP_STATUSES
     return cpu_sum / num_procs, running
 
 
