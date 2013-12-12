@@ -424,7 +424,7 @@ class JobMonitor(object):
                         self.logger.error("Job died for unknown reason")
                         job.cause_of_death = "unknown"
                     elif (len(job.track_cpu) > MAX_IDLE_HEARTBEATS and
-                          all(cpu_load <= IDLE_THRESHOLD and running
+                          all(cpu_load <= IDLE_THRESHOLD and not running
                               for cpu_load, running in
                               job.track_cpu[-MAX_IDLE_HEARTBEATS:])):
                         self.logger.error('Job stalled for unknown reason.')
