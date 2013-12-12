@@ -20,7 +20,7 @@
 Some simple unit tests for GridMap.
 """
 
-from __future__ import print_function, unicode_literals
+from __future__ import division, print_function, unicode_literals
 
 import logging
 from time import sleep
@@ -39,36 +39,39 @@ logger = logging.getLogger(__name__)
 logger.debug('Path to gridmap: %s', gridmap)
 
 
-def compute_factorial_slow(n):
-    sleep(HEARTBEAT_FREQUENCY + 1)
+def compute_factorial(n, wait_sec, repeated):
+    '''
+    Little function to compute ``n`` factorial and sleep for ``wait_sec``
+    seconds.
+    '''
+    sleep(wait_sec)
     ret = 1
     for i in range(n):
+        if repeated:
+            sleep(wait_sec)
         ret = ret * (i + 1)
     return ret
 
 
-def compute_factorial(n):
-    ret = 1
-    for i in range(n):
-        ret = ret * (i + 1)
-    return ret
-
-
-def test_map():
-    inputs = [1, 2, 4, 8, 16]
+def check_map(wait_sec, repeated):
+    inputs = [(1, wait_sec, repeated), (2, wait_sec, repeated),
+              (4, wait_sec, repeated), (8, wait_sec, repeated),
+              (16, wait_sec, repeated)]
     expected = list(map(compute_factorial, inputs))
     outputs = grid_map(compute_factorial, inputs, quiet=False)
     eq_(expected, outputs)
 
 
-def test_map_slow():
-    inputs = [1, 2, 4, 8, 16]
-    expected = list(map(compute_factorial_slow, inputs))
-    outputs = grid_map(compute_factorial_slow, inputs, quiet=False)
-    eq_(expected, outputs)
+def test_map():
+    for wait_sec, repeated in [(0, False), (HEARTBEAT_FREQUENCY + 1, False),
+                               (HEARTBEAT_FREQUENCY // 2, True)]:
+        yield check_map, wait_sec, repeated
 
 
 def make_jobs(inputvec, function):
+    '''
+    Create job list for ``check_process_jobs``
+    '''
     # create empty job vector
     jobs = []
 
@@ -82,17 +85,17 @@ def make_jobs(inputvec, function):
     return jobs
 
 
-def test_process_jobs():
-    inputs = [1, 2, 4, 8, 16]
+def check_process_jobs(wait_sec, repeated):
+    inputs = [(1, wait_sec, repeated), (2, wait_sec, repeated),
+              (4, wait_sec, repeated), (8, wait_sec, repeated),
+              (16, wait_sec, repeated)]
     expected = list(map(compute_factorial, inputs))
     function_jobs = make_jobs(inputs, compute_factorial)
     outputs = process_jobs(function_jobs, quiet=False)
     eq_(expected, outputs)
 
 
-def test_process_jobs_slow():
-    inputs = [1, 2, 4, 8, 16]
-    expected = list(map(compute_factorial_slow, inputs))
-    function_jobs = make_jobs(inputs, compute_factorial_slow)
-    outputs = process_jobs(function_jobs, quiet=False)
-    eq_(expected, outputs)
+def test_process_jobs():
+    for wait_sec, repeated in [(0, False), (HEARTBEAT_FREQUENCY + 1, False),
+                               (HEARTBEAT_FREQUENCY // 2, True)]:
+        yield check_map, wait_sec, repeated
