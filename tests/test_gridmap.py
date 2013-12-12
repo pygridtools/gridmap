@@ -50,7 +50,10 @@ def compute_factorial(args):
     for i in range(n):
         if repeated:
             sleep(wait_sec)
-        ret = ret * (i + 1)
+        # Do addition instead of subtraction to make this use more CPU
+        old_ret = ret
+        for _ in range(i + 1):
+            ret += old_ret
     return ret
 
 
@@ -65,7 +68,7 @@ def check_map(wait_sec, repeated):
 
 def test_map():
     for wait_sec, repeated in [(0, False), (HEARTBEAT_FREQUENCY + 1, False),
-                               (HEARTBEAT_FREQUENCY // 2, True)]:
+                               ((HEARTBEAT_FREQUENCY // 2) + 1, True)]:
         yield check_map, wait_sec, repeated
 
 
