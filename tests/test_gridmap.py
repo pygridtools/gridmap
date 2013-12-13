@@ -115,5 +115,5 @@ def test_process_jobs():
         yield check_map, wait_sec, False
 
 
-def test_process_jobs_local:
+def test_process_jobs_local():
     yield check_process_jobs, 0, True
