@@ -24,6 +24,7 @@ from __future__ import division, print_function, unicode_literals
 
 import logging
 from datetime import datetime
+from multiprocessing import Pool
 
 import gridmap
 from gridmap import (Job, process_jobs, grid_map, HEARTBEAT_FREQUENCY,
@@ -117,3 +118,33 @@ def test_process_jobs():
 
 def test_process_jobs_local():
     yield check_process_jobs, 0, True
+
+
+def pool_map_factorial(inputs):
+    pool = Pool(len(inputs))
+    res = pool.map(compute_factorial, inputs)
+    pool.close()
+    pool.join()
+    return res
+
+
+def check_idle_parent_process(wait_sec):
+    '''
+    Make sure that we don't kill idle parents that have active children.
+    '''
+    inputs = [(1, wait_sec), (2, wait_sec), (4, wait_sec), (8, wait_sec), (16,
+              wait_sec)]
+    inputs = [(1, wait_sec), (2, wait_sec), (4, wait_sec), (8, wait_sec), (16,
+              wait_sec)]
+    expected = list(map(compute_factorial, inputs))
+    outputs = process_jobs([Job(pool_map_factorial, [inputs])], quiet=False)
+    eq_(expected, outputs)
+
+
+def test_idle_parent_process():
+    '''
+    Make sure that we don't kill idle parents that have active children.
+    '''
+    for wait_sec in [0, HEARTBEAT_FREQUENCY + 1,
+                     MAX_TIME_BETWEEN_HEARTBEATS + 1]:
+        yield check_idle_parent_process, wait_sec
