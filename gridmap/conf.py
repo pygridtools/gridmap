@@ -33,8 +33,8 @@ specifying environment variables with the same name.
                     (Default: ``all.q``)
 :var CREATE_PLOTS: Should we plot cpu and mem usage and send via email?
                    (Default: ``True``)
-:var SEND_ERROR_MAILS: Should we send error emails?
-                       (Default: ``True``)
+:var SEND_ERROR_MAIL: Should we send error emails?
+                      (Default: ``True``)
 :var SMTP_SERVER: SMTP server for sending error emails.
                   (Default: last three sections of the current machine's fully
                   qualified domain name)
@@ -94,7 +94,7 @@ if CREATE_PLOTS:
 
 # Global settings ####
 # email settings
-SEND_ERROR_MAILS = 'TRUE' == os.getenv('SEND_ERROR_MAILS', 'True').upper()
+SEND_ERROR_MAIL = 'TRUE' == os.getenv('SEND_ERROR_MAIL', 'True').upper()
 SMTP_SERVER = os.getenv('SMTP_SERVER', '.'.join(gethostname().split('.')[-3:]))
 ERROR_MAIL_SENDER = os.getenv('ERROR_MAIL_SENDER', 'error@gridmap.py')
 ERROR_MAIL_RECIPIENT = os.getenv('ERROR_MAIL_RECIPIENT',

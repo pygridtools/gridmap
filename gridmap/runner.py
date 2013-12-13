@@ -42,11 +42,17 @@ import time
 import traceback
 from io import open
 
-from psutil import Process
+import psutil
 import zmq
 
 from gridmap.conf import HEARTBEAT_FREQUENCY
 from gridmap.data import clean_path, zloads, zdumps
+
+
+# Set of "not running" job statuses
+_SLEEP_STATUSES = {psutil.STATUS_SLEEPING, psutil.STATUS_DEAD,
+                   psutil.STATUS_IDLE, psutil.STATUS_STOPPED,
+                   psutil.STATUS_ZOMBIE}
 
 
 # TODO: Refactor this so that there's a class that stores socket, since creating
@@ -85,51 +91,70 @@ def _send_zmq_msg(job_id, command, data, address):
 
 def _heart_beat(job_id, address, parent_pid=-1, log_file="", wait_sec=45):
     """
-    will send reponses to the server with
-    information about the current state of
-    the process
+    Infinitely loops and sends information about the currently running job back
+    to the ``JobMonitor``.
     """
-
     while True:
-        status = get_job_status(parent_pid)
-        status["log_file"] = log_file
+        status = get_job_status(parent_pid, os.getpid())
+        if os.path.exists(log_file):
+            with open(log_file) as f:
+                status["log_file"] = f.read()
         _send_zmq_msg(job_id, "heart_beat", status, address)
         time.sleep(wait_sec)
 
 
-def get_memory_usage(pid):
+def get_memory_usage(pid, heart_pid):
     """
     :param pid: Process ID for job whose memory usage we'd like to check.
     :type pid: int
+    :param heart_pid: ID of the heartbeat process, which will not be counted
+                      toward total.
+    :type heart_pid: int
 
-    :returns: Memory usage of process in Mb.
+    :returns: Total memory usage of process (and children) in Mb.
     """
+    process = psutil.Process(pid)
+    mem_total = float(process.get_memory_info()[0])
+    mem_total += sum(float(p.get_memory_info()[0]) for p in
+                     process.get_children(recursive=True)
+                     if process.pid != heart_pid)
+    return mem_total / (1024.0 ** 2.0)
 
-    p = Process(pid)
-    return float(p.get_memory_info()[0]) / (1024.0 ** 2.0)
 
-
-def get_cpu_load(pid):
+def get_cpu_load(pid, heart_pid):
     """
     :param pid: Process ID for job whose CPU load we'd like to check.
     :type pid: int
+    :param heart_pid: ID of the heartbeat process, which will not be counted
+                      toward total.
+    :type heart_pid: int
 
-    :returns: CPU usage of process as ratio of cpu time to real time, and
-              process state.
-    :rtype: (float, str)
+    :returns: Tuple of average ratio of CPU time to real time for process and
+              its children (excluding heartbeat process), and whether at least
+              one of the processes is not sleeping.
+    :rtype: (float, bool)
     """
+    process = psutil.Process(pid)
+    cpu_sum = float(process.get_cpu_percent())
+    running = process.status not in _SLEEP_STATUSES
+    num_procs = 1
+    for p in process.get_children(recursive=True):
+        if p.pid != heart_pid:
+            cpu_sum += float(p.get_cpu_percent())
+            running = running or (p.status not in _SLEEP_STATUSES)
+            num_procs += 1
+    return cpu_sum / num_procs, running
 
-    p = Process(pid)
-    return float(p.get_cpu_percent()), p.status
 
-
-def get_job_status(parent_pid):
+def get_job_status(parent_pid, heart_pid):
     """
-    Determines the status of the current worker and its machine (currently not
-    cross-platform)
+    Determines the status of the current worker and its machine
 
     :param parent_pid: Process ID for job whose status we'd like to check.
     :type parent_pid: int
+    :param heart_pid: ID of the heartbeat process, which will not be counted
+                      toward total.
+    :type heart_pid: int
 
     :returns: Memory and CPU load information for given PID.
     :rtype: dict
@@ -138,8 +163,8 @@ def get_job_status(parent_pid):
     status_container = {}
 
     if parent_pid != -1:
-        status_container["memory"] = get_memory_usage(parent_pid)
-        status_container["cpu_load"] = get_cpu_load(parent_pid)
+        status_container["memory"] = get_memory_usage(parent_pid, heart_pid)
+        status_container["cpu_load"] = get_cpu_load(parent_pid, heart_pid)
 
     return status_container
 
@@ -155,7 +180,7 @@ def _run_job(job_id, address):
     """
     wait_sec = random.randint(0, 5)
     logger = logging.getLogger(__name__)
-    logger.info("waiting %i seconds before starting", wait_sec)
+    logger.info("Waiting %i seconds before starting", wait_sec)
     time.sleep(wait_sec)
 
     try:
@@ -172,7 +197,7 @@ def _run_job(job_id, address):
                                        address)
         return
 
-    logger.debug("input arguments loaded, starting computation %s", job)
+    logger.debug("Input arguments loaded, starting computation %s", job)
 
     # create heart beat process
     parent_pid = os.getpid()
@@ -180,24 +205,27 @@ def _run_job(job_id, address):
                                     args=(job_id, address, parent_pid,
                                           job.log_stderr_fn,
                                           HEARTBEAT_FREQUENCY))
-    logger.info("starting heart beat")
+    logger.info("Starting heart beat")
     heart.start()
 
-    # change working directory
-    if job.working_dir is not None:
-        logger.info("Changing working directory: %s", job.working_dir)
-        os.chdir(job.working_dir)
+    try:
+        # change working directory
+        if job.working_dir is not None:
+            logger.info("Changing working directory: %s", job.working_dir)
+            os.chdir(job.working_dir)
 
-    # run job
-    logger.info("executing job")
-    job.execute()
+        # run job
+        logger.info("Executing job")
+        job.execute()
+        logger.info("Finished job")
 
-    # send back result
-    thank_you_note = _send_zmq_msg(job_id, "store_output", job, address)
-    logger.info(thank_you_note)
+        # send back result
+        thank_you_note = _send_zmq_msg(job_id, "store_output", job, address)
+        logger.info(thank_you_note)
 
-    # stop heartbeat
-    heart.terminate()
+    finally:
+        # stop heartbeat
+        heart.terminate()
 
 
 def _main():
