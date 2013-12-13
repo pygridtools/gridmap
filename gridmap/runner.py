@@ -115,9 +115,12 @@ def get_memory_usage(pid, heart_pid):
     """
     process = psutil.Process(pid)
     mem_total = float(process.get_memory_info()[0])
-    mem_total += sum(float(p.get_memory_info()[0]) for p in
-                     process.get_children(recursive=True)
-                     if p.is_running() and p.pid != heart_pid)
+    for p in process.get_children(recursive=True):
+        if p.is_running() and p.pid != heart_pid:
+            try:
+                mem_total += float(p.get_memory_info()[0])
+            except psutil.NoSuchProcess:
+                continue
     return mem_total / (1024.0 ** 2.0)
 
 
@@ -141,9 +144,13 @@ def get_cpu_load(pid, heart_pid):
     for p in process.get_children(recursive=True):
         # Make sure this process hasn't exited before querying its status
         if p.is_running() and p.pid != heart_pid:
-            cpu_sum += float(p.get_cpu_percent())
-            running = running or (p.status not in _SLEEP_STATUSES)
-            num_procs += 1
+            try:
+                cpu_sum += float(p.get_cpu_percent())
+                running = running or (p.status not in _SLEEP_STATUSES)
+            except psutil.NoSuchProcess:
+                continue
+            else:
+                num_procs += 1
     return cpu_sum / num_procs, running
 
 
