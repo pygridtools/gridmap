@@ -134,14 +134,22 @@ def get_cpu_load(pid, heart_pid):
               one of the processes is not sleeping.
     :rtype: (float, bool)
     """
+    logger = logging.getLogger(__name__)
+    logger.debug('Checking load for PID %s with heart PID %s', pid, heart_pid)
     process = psutil.Process(pid)
     cpu_sum = float(process.get_cpu_percent())
+    logger.debug('Parent process percentage: %s', cpu_sum)
+    logger.debug('Parent running status: %s', process.status)
     running = process.status not in _SLEEP_STATUSES
     num_procs = 1
     for p in process.get_children(recursive=True):
+        logger.debug('Child PID %s', p.pid)
         if p.pid != heart_pid:
-            cpu_sum += p.get_cpu_percent()
-            running = running or p.status not in _SLEEP_STATUSES
+            logger.debug('Child process percentage: %s', p.get_cpu_percent())
+            logger.debug('Child running status: %s', p.status)
+            cpu_sum += float(p.get_cpu_percent())
+            running = running or (p.status not in _SLEEP_STATUSES)
+            num_procs += 1
     return cpu_sum / num_procs, running
 
 
