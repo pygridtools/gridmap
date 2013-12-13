@@ -137,7 +137,7 @@ def check_idle_parent_process(wait_sec):
     inputs = [(1, wait_sec), (2, wait_sec), (4, wait_sec), (8, wait_sec), (16,
               wait_sec)]
     expected = list(map(compute_factorial, inputs))
-    outputs = process_jobs([Job(pool_map_factorial, [inputs])], quiet=False)
+    outputs = process_jobs([Job(pool_map_factorial, [inputs])], quiet=False)[0]
     eq_(expected, outputs)
 
 
