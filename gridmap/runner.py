@@ -204,8 +204,7 @@ def _run_job(job_id, address):
     heart = multiprocessing.Process(target=_heart_beat,
                                     args=(job_id, address, parent_pid,
                                           job.log_stderr_fn,
-                                          HEARTBEAT_FREQUENCY, queue,
-                                          logger.getEffectiveLevel()))
+                                          HEARTBEAT_FREQUENCY))
     logger.info("Starting heart beat")
     heart.start()
 
