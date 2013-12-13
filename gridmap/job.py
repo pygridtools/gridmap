@@ -101,8 +101,8 @@ class Job(object):
 
     __slots__ = ('_f', 'args', 'id', 'kwlist', 'cleanup', 'ret', 'traceback',
                  'num_slots', 'mem_free', 'white_list', 'path', 'uniq_id',
-                 'name', 'queue', 'environment', 'working_dir', 
-                 'cause_of_death', 'num_resubmits', 'home_address', 
+                 'name', 'queue', 'environment', 'working_dir',
+                 'cause_of_death', 'num_resubmits', 'home_address',
                  'log_stderr_fn', 'log_stdout_fn', 'timestamp', 'host_name',
                  'heart_beat', 'track_mem', 'track_cpu')
 
@@ -827,7 +827,7 @@ def _resubmit(session_id, job, temp_dir):
 #####################
 def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
              num_slots=1, temp_dir='/scratch/', white_list=None,
-             queue=DEFAULT_QUEUE, quiet=True):
+             queue=DEFAULT_QUEUE, quiet=True, local=False):
     """
     Maps a function onto the cluster.
 
@@ -862,6 +862,9 @@ def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
     :param quiet: When true, do not output information about the jobs that have
                   been submitted.
     :type quiet: bool
+    :param local: Should we execute the jobs locally in separate processes
+                  instead of on the the cluster?
+    :type local: bool
 
     :returns: List of Job results
     """
@@ -875,47 +878,7 @@ def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
 
     # process jobs
     job_results = process_jobs(jobs, temp_dir=temp_dir, white_list=white_list,
-                               quiet=quiet)
+                               quiet=quiet, local=local)
 
     return job_results
 
-
-def pg_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
-           num_slots=1, temp_dir='/scratch/', white_list=None,
-           queue=DEFAULT_QUEUE, quiet=True):
-    """
-    .. deprecated:: 0.9
-       This function has been renamed grid_map.
-
-    :param f: The function to map on args_list
-    :type f: function
-    :param args_list: List of arguments to pass to f
-    :type args_list: list
-    :param cleanup: Should we remove the stdout and stderr temporary files for
-                    each job when we're done? (They are left in place if there's
-                    an error.)
-    :type cleanup: bool
-    :param mem_free: Estimate of how much memory each job will need (for
-                     scheduling). (Not currently used, because our cluster does
-                     not have that setting enabled.)
-    :type mem_free: str
-    :param name: Base name to give each job (will have a number add to end)
-    :type name: str
-    :param num_slots: Number of slots each job should use.
-    :type num_slots: int
-    :param temp_dir: Local temporary directory for storing output for an
-                     individual job.
-    :type temp_dir: str
-    :param white_list: If specified, limit nodes used to only those in list.
-    :type white_list: list of str
-    :param queue: The SGE queue to use for scheduling.
-    :type queue: str
-    :param quiet: When true, do not output information about the jobs that have
-                  been submitted.
-    :type quiet: bool
-
-    :returns: List of Job results
-    """
-    return grid_map(f, args_list, cleanup=cleanup, mem_free=mem_free, name=name,
-                    num_slots=num_slots, temp_dir=temp_dir,
-                    white_list=white_list, queue=queue, quiet=quiet)
