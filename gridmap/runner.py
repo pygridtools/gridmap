@@ -117,7 +117,7 @@ def get_memory_usage(pid, heart_pid):
     mem_total = float(process.get_memory_info()[0])
     mem_total += sum(float(p.get_memory_info()[0]) for p in
                      process.get_children(recursive=True)
-                     if process.pid != heart_pid)
+                     if p.is_running() and p.pid != heart_pid)
     return mem_total / (1024.0 ** 2.0)
 
 
@@ -139,7 +139,8 @@ def get_cpu_load(pid, heart_pid):
     running = process.status not in _SLEEP_STATUSES
     num_procs = 1
     for p in process.get_children(recursive=True):
-        if p.pid != heart_pid:
+        # Make sure this process hasn't exited before querying its status
+        if p.is_running() and p.pid != heart_pid:
             cpu_sum += float(p.get_cpu_percent())
             running = running or (p.status not in _SLEEP_STATUSES)
             num_procs += 1
