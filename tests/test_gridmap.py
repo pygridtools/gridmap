@@ -23,6 +23,7 @@ Some simple unit tests for GridMap.
 from __future__ import division, print_function, unicode_literals
 
 import logging
+from datetime import datetime
 from time import sleep
 
 import gridmap
@@ -39,37 +40,43 @@ logger = logging.getLogger(__name__)
 logger.debug('Path to gridmap: %s', gridmap)
 
 
+def sleep_walk(secs):
+    '''
+    Pass the time by adding numbers until the specified number of seconds has
+    elapsed. Intended as a replacement for ``time.sleep`` that doesn't leave the
+    CPU idle (which will make the job seem like it's stalled).
+    '''
+    start_time = datetime.now()
+    num = 0
+    while (datetime.now() - start_time).seconds < secs:
+        num = num + 1
+
+
 def compute_factorial(args):
     '''
     Little function to compute ``n`` factorial and sleep for ``wait_sec``
     seconds.
     '''
-    n, wait_sec, repeated = args
-    sleep(wait_sec)
+    n, wait_sec = args
+    sleep_walk(wait_sec)
     ret = 1
     for i in range(n):
-        if repeated:
-            sleep(wait_sec)
-        # Do addition instead of subtraction to make this use more CPU
-        old_ret = ret
-        for _ in range(i + 1):
-            ret += old_ret
+        ret = ret * (i + 1)
     return ret
 
 
-def check_map(wait_sec, repeated):
-    inputs = [(1, wait_sec, repeated), (2, wait_sec, repeated),
-              (4, wait_sec, repeated), (8, wait_sec, repeated),
-              (16, wait_sec, repeated)]
+def check_map(wait_sec):
+    inputs = [(1, wait_sec), (2, wait_sec), (4, wait_sec), (8, wait_sec), (16,
+              wait_sec)]
     expected = list(map(compute_factorial, inputs))
     outputs = grid_map(compute_factorial, inputs, quiet=False)
     eq_(expected, outputs)
 
 
 def test_map():
-    for wait_sec, repeated in [(0, False), (HEARTBEAT_FREQUENCY + 1, False),
+    for wait_sec in [(0, False), (HEARTBEAT_FREQUENCY + 1, False),
                                ((HEARTBEAT_FREQUENCY // 2) + 1, True)]:
-        yield check_map, wait_sec, repeated
+        yield check_map, wait_sec
 
 
 def make_jobs(inputvec, function):
@@ -89,10 +96,9 @@ def make_jobs(inputvec, function):
     return jobs
 
 
-def check_process_jobs(wait_sec, repeated):
-    inputs = [(1, wait_sec, repeated), (2, wait_sec, repeated),
-              (4, wait_sec, repeated), (8, wait_sec, repeated),
-              (16, wait_sec, repeated)]
+def check_process_jobs(wait_sec):
+    inputs = [(1, wait_sec), (2, wait_sec), (4, wait_sec), (8, wait_sec), (16,
+              wait_sec)]
     expected = list(map(compute_factorial, inputs))
     function_jobs = make_jobs(inputs, compute_factorial)
     outputs = process_jobs(function_jobs, quiet=False)
@@ -100,6 +106,6 @@ def check_process_jobs(wait_sec, repeated):
 
 
 def test_process_jobs():
-    for wait_sec, repeated in [(0, False), (HEARTBEAT_FREQUENCY + 1, False),
+    for wait_sec in [(0, False), (HEARTBEAT_FREQUENCY + 1, False),
                                (HEARTBEAT_FREQUENCY // 2, True)]:
-        yield check_map, wait_sec, repeated
+        yield check_map, wait_sec
