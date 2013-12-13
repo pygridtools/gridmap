@@ -95,11 +95,18 @@ def _send_zmq_msg(job_id, command, data, address):
     return msg
 
 
-def _heart_beat(job_id, address, parent_pid=-1, log_file="", wait_sec=45):
+def _heart_beat(job_id, address, parent_pid=-1, log_file="", wait_sec=45,
+                queue=None, log_level=logging.DEBUG):
     """
     Infinitely loops and sends information about the currently running job back
     to the ``JobMonitor``.
     """
+    # Setup logging
+    if queue is not None:
+        handler = QueueHandler(queue)
+        logger = logging.getLogger(__name__)
+        logger.addHandler(handler)
+        logger.setLevel(log_level)
     while True:
         status = get_job_status(parent_pid, os.getpid())
         if os.path.exists(log_file):
@@ -224,7 +231,8 @@ def _run_job(job_id, address):
     heart = multiprocessing.Process(target=_heart_beat,
                                     args=(job_id, address, parent_pid,
                                           job.log_stderr_fn,
-                                          HEARTBEAT_FREQUENCY))
+                                          HEARTBEAT_FREQUENCY, queue,
+                                          logger.getEffectiveLevel()))
     logger.info("Starting heart beat")
     heart.start()
 
@@ -246,7 +254,7 @@ def _run_job(job_id, address):
     finally:
         # stop heartbeat
         heart.terminate()
-        
+
         # Tear-down thread/process-safe logging and switch back to regular
         q_listener.stop()
         logger.removeHandler(q_handler)
