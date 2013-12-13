@@ -65,18 +65,22 @@ def compute_factorial(args):
     return ret
 
 
-def check_map(wait_sec):
+def check_map(wait_sec, local):
     inputs = [(1, wait_sec), (2, wait_sec), (4, wait_sec), (8, wait_sec), (16,
               wait_sec)]
     expected = list(map(compute_factorial, inputs))
-    outputs = grid_map(compute_factorial, inputs, quiet=False)
+    outputs = grid_map(compute_factorial, inputs, quiet=False, local=local)
     eq_(expected, outputs)
 
 
 def test_map():
     for wait_sec in [0, HEARTBEAT_FREQUENCY + 1,
                      MAX_TIME_BETWEEN_HEARTBEATS + 1]:
-        yield check_map, wait_sec
+        yield check_map, wait_sec, False
+
+
+def test_map_local():
+    yield check_map, 0, True
 
 
 def make_jobs(inputvec, function):
@@ -96,16 +100,20 @@ def make_jobs(inputvec, function):
     return jobs
 
 
-def check_process_jobs(wait_sec):
+def check_process_jobs(wait_sec, local):
     inputs = [(1, wait_sec), (2, wait_sec), (4, wait_sec), (8, wait_sec), (16,
               wait_sec)]
     expected = list(map(compute_factorial, inputs))
     function_jobs = make_jobs(inputs, compute_factorial)
-    outputs = process_jobs(function_jobs, quiet=False)
+    outputs = process_jobs(function_jobs, quiet=False, local=local)
     eq_(expected, outputs)
 
 
 def test_process_jobs():
     for wait_sec in [0, HEARTBEAT_FREQUENCY + 1,
                      MAX_TIME_BETWEEN_HEARTBEATS + 1]:
-        yield check_map, wait_sec
+        yield check_map, wait_sec, False
+
+
+def test_process_jobs_local:
+    yield check_process_jobs, 0, True
