@@ -42,15 +42,6 @@ From :py:mod:`~gridmap.job` Module
    :show-inheritance:
 
 
-:mod:`runner` Module
---------------------
-
-.. automodule:: gridmap.runner
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-
 :mod:`web` Module
 -----------------
 

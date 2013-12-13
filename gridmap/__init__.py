@@ -33,8 +33,8 @@ in a more 'pythonic' fashion.
                     (Default: ``all.q``)
 :var CREATE_PLOTS: Should we plot cpu and mem usage and send via email?
                    (Default: ``True``)
-:var SEND_ERROR_MAILS: Should we send error emails?
-                       (Default: ``True``)
+:var SEND_ERROR_MAIL: Should we send error emails?
+                      (Default: ``True``)
 :var SMTP_SERVER: SMTP server for sending error emails.
                   (Default: last three sections of the current machine's fully
                   qualified domain name)
@@ -70,15 +70,14 @@ from gridmap.conf import (CHECK_FREQUENCY, CREATE_PLOTS, DEFAULT_QUEUE,
                           ERROR_MAIL_RECIPIENT, ERROR_MAIL_SENDER,
                           HEARTBEAT_FREQUENCY, IDLE_THRESHOLD,
                           MAX_IDLE_HEARTBEATS, MAX_TIME_BETWEEN_HEARTBEATS,
-                          NUM_RESUBMITS, SEND_ERROR_MAILS, SMTP_SERVER,
+                          NUM_RESUBMITS, SEND_ERROR_MAIL, SMTP_SERVER,
                           USE_MEM_FREE)
-from gridmap.job import Job, JobException, process_jobs, grid_map, pg_map
+from gridmap.job import Job, JobException, process_jobs, grid_map
 from gridmap.version import __version__, VERSION
 
 # For * imports
-__all__ = ['Job', 'JobException', 'process_jobs', 'grid_map', 'pg_map',
-           'CHECK_FREQUENCY', 'CREATE_PLOTS', 'DEFAULT_QUEUE',
-           'ERROR_MAIL_RECIPIENT', 'ERROR_MAIL_SENDER', 'HEARTBEAT_FREQUENCY',
-           'IDLE_THRESHOLD', 'MAX_IDLE_HEARTBEATS',
-           'MAX_TIME_BETWEEN_HEARTBEATS', 'NUM_RESUBMITS', 'SEND_ERROR_MAILS',
-           'SMTP_SERVER', 'USE_MEM_FREE']
+__all__ = ['Job', 'JobException', 'process_jobs', 'grid_map', 'CHECK_FREQUENCY',
+           'CREATE_PLOTS', 'DEFAULT_QUEUE', 'ERROR_MAIL_RECIPIENT',
+           'ERROR_MAIL_SENDER', 'HEARTBEAT_FREQUENCY', 'IDLE_THRESHOLD',
+           'MAX_IDLE_HEARTBEATS', 'MAX_TIME_BETWEEN_HEARTBEATS',
+           'NUM_RESUBMITS', 'SEND_ERROR_MAIL', 'SMTP_SERVER', 'USE_MEM_FREE']

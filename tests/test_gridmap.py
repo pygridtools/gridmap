@@ -20,13 +20,15 @@
 Some simple unit tests for GridMap.
 """
 
-from __future__ import print_function, unicode_literals
+from __future__ import division, print_function, unicode_literals
 
 import logging
-from time import sleep
+from datetime import datetime
+from multiprocessing import Pool
 
 import gridmap
-from gridmap import Job, process_jobs, grid_map, HEARTBEAT_FREQUENCY
+from gridmap import (Job, process_jobs, grid_map, HEARTBEAT_FREQUENCY,
+                     MAX_TIME_BETWEEN_HEARTBEATS)
 
 from nose.tools import eq_
 
@@ -39,36 +41,53 @@ logger = logging.getLogger(__name__)
 logger.debug('Path to gridmap: %s', gridmap)
 
 
-def compute_factorial_slow(n):
-    sleep(HEARTBEAT_FREQUENCY + 1)
+def sleep_walk(secs):
+    '''
+    Pass the time by adding numbers until the specified number of seconds has
+    elapsed. Intended as a replacement for ``time.sleep`` that doesn't leave the
+    CPU idle (which will make the job seem like it's stalled).
+    '''
+    start_time = datetime.now()
+    num = 0
+    while (datetime.now() - start_time).seconds < secs:
+        num = num + 1
+
+
+def compute_factorial(args):
+    '''
+    Little function to compute ``n`` factorial and sleep for ``wait_sec``
+    seconds.
+    '''
+    n, wait_sec = args
+    sleep_walk(wait_sec)
     ret = 1
     for i in range(n):
         ret = ret * (i + 1)
     return ret
 
 
-def compute_factorial(n):
-    ret = 1
-    for i in range(n):
-        ret = ret * (i + 1)
-    return ret
+def check_map(wait_sec, local):
+    inputs = [(1, wait_sec), (2, wait_sec), (4, wait_sec), (8, wait_sec), (16,
+              wait_sec)]
+    expected = list(map(compute_factorial, inputs))
+    outputs = grid_map(compute_factorial, inputs, quiet=False, local=local)
+    eq_(expected, outputs)
 
 
 def test_map():
-    inputs = [1, 2, 4, 8, 16]
-    expected = list(map(compute_factorial, inputs))
-    outputs = grid_map(compute_factorial, inputs, quiet=False)
-    eq_(expected, outputs)
+    for wait_sec in [0, HEARTBEAT_FREQUENCY + 1,
+                     MAX_TIME_BETWEEN_HEARTBEATS + 1]:
+        yield check_map, wait_sec, False
 
 
-def test_map_slow():
-    inputs = [1, 2, 4, 8, 16]
-    expected = list(map(compute_factorial_slow, inputs))
-    outputs = grid_map(compute_factorial_slow, inputs, quiet=False)
-    eq_(expected, outputs)
+def test_map_local():
+    yield check_map, 0, True
 
 
 def make_jobs(inputvec, function):
+    '''
+    Create job list for ``check_process_jobs``
+    '''
     # create empty job vector
     jobs = []
 
@@ -82,17 +101,50 @@ def make_jobs(inputvec, function):
     return jobs
 
 
-def test_process_jobs():
-    inputs = [1, 2, 4, 8, 16]
+def check_process_jobs(wait_sec, local):
+    inputs = [(1, wait_sec), (2, wait_sec), (4, wait_sec), (8, wait_sec), (16,
+              wait_sec)]
     expected = list(map(compute_factorial, inputs))
     function_jobs = make_jobs(inputs, compute_factorial)
-    outputs = process_jobs(function_jobs, quiet=False)
+    outputs = process_jobs(function_jobs, quiet=False, local=local)
     eq_(expected, outputs)
 
 
-def test_process_jobs_slow():
-    inputs = [1, 2, 4, 8, 16]
-    expected = list(map(compute_factorial_slow, inputs))
-    function_jobs = make_jobs(inputs, compute_factorial_slow)
-    outputs = process_jobs(function_jobs, quiet=False)
+def test_process_jobs():
+    for wait_sec in [0, HEARTBEAT_FREQUENCY + 1,
+                     MAX_TIME_BETWEEN_HEARTBEATS + 1]:
+        yield check_map, wait_sec, False
+
+
+def test_process_jobs_local():
+    yield check_process_jobs, 0, True
+
+
+def pool_map_factorial(inputs):
+    pool = Pool(len(inputs))
+    res = pool.map(compute_factorial, inputs)
+    pool.close()
+    pool.join()
+    return res
+
+
+def check_idle_parent_process(wait_sec):
+    '''
+    Make sure that we don't kill idle parents that have active children.
+    '''
+    inputs = [(1, wait_sec), (2, wait_sec), (4, wait_sec), (8, wait_sec), (16,
+              wait_sec)]
+    inputs = [(1, wait_sec), (2, wait_sec), (4, wait_sec), (8, wait_sec), (16,
+              wait_sec)]
+    expected = list(map(compute_factorial, inputs))
+    outputs = process_jobs([Job(pool_map_factorial, [inputs])], quiet=False)[0]
     eq_(expected, outputs)
+
+
+def test_idle_parent_process():
+    '''
+    Make sure that we don't kill idle parents that have active children.
+    '''
+    for wait_sec in [0, HEARTBEAT_FREQUENCY + 1,
+                     MAX_TIME_BETWEEN_HEARTBEATS + 1]:
+        yield check_idle_parent_process, wait_sec

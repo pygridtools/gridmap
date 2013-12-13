@@ -51,7 +51,6 @@ from io import open
 from multiprocessing import Pool
 from socket import gethostname, gethostbyname
 
-import psutil
 import zmq
 
 from gridmap.conf import (CHECK_FREQUENCY, CREATE_PLOTS, DEFAULT_QUEUE,
@@ -59,7 +58,7 @@ from gridmap.conf import (CHECK_FREQUENCY, CREATE_PLOTS, DEFAULT_QUEUE,
                           ERROR_MAIL_SENDER, HEARTBEAT_FREQUENCY,
                           IDLE_THRESHOLD, MAX_IDLE_HEARTBEATS,
                           MAX_TIME_BETWEEN_HEARTBEATS, NUM_RESUBMITS,
-                          SEND_ERROR_MAILS, SMTP_SERVER, USE_MEM_FREE)
+                          SEND_ERROR_MAIL, SMTP_SERVER, USE_MEM_FREE)
 from gridmap.data import clean_path, zdumps, zloads
 from gridmap.runner import _heart_beat
 
@@ -76,12 +75,6 @@ if CREATE_PLOTS:
     import matplotlib
     matplotlib.use('AGG')
     import matplotlib.pyplot as plt
-
-
-# Set of "not running" job statuses
-_SLEEP_STATUSES = {psutil.STATUS_SLEEPING, psutil.STATUS_DEAD,
-                   psutil.STATUS_IDLE, psutil.STATUS_STOPPED,
-                   psutil.STATUS_ZOMBIE}
 
 # Placeholder string, since a job could potentially return None on purpose
 _JOB_NOT_FINISHED = '*@#%$*@#___GRIDMAP___NOT___DONE___@#%**#*$&*%'
@@ -106,9 +99,9 @@ class Job(object):
        are defined at the module or class level).
     """
 
-    __slots__ = ('_f', 'args', 'jobid', 'kwlist', 'cleanup', 'ret', 'traceback',
-                 'num_slots', 'mem_free', 'white_list', 'path',
-                 'uniq_id', 'name', 'queue', 'environment', 'working_dir',
+    __slots__ = ('_f', 'args', 'id', 'kwlist', 'cleanup', 'ret', 'traceback',
+                 'num_slots', 'mem_free', 'white_list', 'path', 'uniq_id',
+                 'name', 'queue', 'environment', 'working_dir',
                  'cause_of_death', 'num_resubmits', 'home_address',
                  'log_stderr_fn', 'log_stdout_fn', 'timestamp', 'host_name',
                  'heart_beat', 'track_mem', 'track_cpu')
@@ -152,7 +145,7 @@ class Job(object):
         self._f = None
         self.function = f
         self.args = args
-        self.jobid = -1
+        self.id = -1
         self.kwlist = kwlist if kwlist is not None else {}
         self.cleanup = cleanup
         self.ret = _JOB_NOT_FINISHED
@@ -227,8 +220,6 @@ class Job(object):
             self.ret = exception
             self.traceback = traceback.format_exc()
             traceback.print_exc()
-        del self.args
-        del self.kwlist
 
     @property
     def native_specification(self):
@@ -282,9 +273,9 @@ class JobMonitor(object):
 
         # uninitialized field (set in check method)
         self.jobs = []
-        self.jobids = []
+        self.ids = []
         self.session_id = -1
-        self.jobid_to_job = {}
+        self.id_to_job = {}
 
     def __enter__(self):
         '''
@@ -319,7 +310,7 @@ class JobMonitor(object):
         """
         # save list of jobs
         self.jobs = jobs
-        self.jobid_to_job = {job.jobid: job for job in self.jobs}
+        self.id_to_job = {job.id: job for job in self.jobs}
 
         # keep track of DRMAA session_id (for resubmissions)
         self.session_id = session_id
@@ -327,7 +318,7 @@ class JobMonitor(object):
         # determines in which interval to check if jobs are alive
         local_heart = multiprocessing.Process(target=_heart_beat,
                                               args=(-1, self.home_address, -1,
-                                                    "", CHECK_FREQUENCY))
+                                                   "", CHECK_FREQUENCY))
         local_heart.start()
         try:
             self.logger.debug("Starting ZMQ event loop")
@@ -344,11 +335,11 @@ class JobMonitor(object):
                 # only if its not the local beat
                 if job_id != -1:
                     # If message is from a valid job, process that message
-                    if job_id in self.jobid_to_job:
-                        job = self.jobid_to_job[job_id]
+                    if job_id in self.id_to_job:
+                        job = self.id_to_job[job_id]
 
                         if msg["command"] == "fetch_input":
-                            return_msg = self.jobid_to_job[job_id]
+                            return_msg = self.id_to_job[job_id]
                             job.timestamp = datetime.now()
 
                         if msg["command"] == "store_output":
@@ -394,7 +385,7 @@ class JobMonitor(object):
                         self.logger.error(('Received message from unknown job' +
                                            ' with ID %s. Known job IDs are: ' +
                                            '%s'), job_id,
-                                          list(self.jobid_to_job.keys()))
+                                          list(self.id_to_job.keys()))
                         return_msg = 'thanks, but no thanks'
                 else:
                     # run check
@@ -427,11 +418,14 @@ class JobMonitor(object):
                     current_time = datetime.now()
                     time_delta = current_time - job.timestamp
                     if time_delta.seconds > MAX_TIME_BETWEEN_HEARTBEATS:
+                        self.logger.debug("It has been %s seconds since we " +
+                                          "received a message from job %s",
+                                          time_delta.seconds, job.id)
                         self.logger.error("Job died for unknown reason")
                         job.cause_of_death = "unknown"
                     elif (len(job.track_cpu) > MAX_IDLE_HEARTBEATS and
-                          all((cpu_load <= IDLE_THRESHOLD and
-                               state in _SLEEP_STATUSES) for cpu_load, state in
+                          all(cpu_load <= IDLE_THRESHOLD and not running
+                              for cpu_load, running in
                               job.track_cpu[-MAX_IDLE_HEARTBEATS:])):
                         self.logger.error('Job stalled for unknown reason.')
                         job.cause_of_death = 'stalled'
@@ -446,7 +440,7 @@ class JobMonitor(object):
                 self.logger.error("GridMap job traceback for %s:", job.name)
                 self.logger.error("-" * 80)
                 self.logger.error("Exception: %s", type(job.ret).__name__)
-                self.logger.error("Job ID: %s", job.jobid)
+                self.logger.error("Job ID: %s", job.id)
                 self.logger.error("Host: %s", job.host_name)
                 self.logger.error("." * 80)
                 self.logger.error(job.traceback)
@@ -460,17 +454,16 @@ class JobMonitor(object):
                 send_error_mail(job)
 
                 # try to resubmit
-                old_id = job.jobid
+                old_id = job.id
+                job.track_cpu = []
+                job.track_mem = []
                 handle_resubmit(self.session_id, job, temp_dir=self.temp_dir)
-                logging.info('Resubmitted job %s; it now has ID %s', old_id,
-                             job.jobid)
-                if job.jobid is None:
-                    self.logger.error("giving up on job")
-                    job.ret = "job dead"
                 # Update job ID if successfully resubmitted
-                else:
-                    del self.jobid_to_job[old_id]
-                    self.jobid_to_job[job.jobid] = job
+                self.logger.info('Resubmitted job %s; it now has ID %s',
+                                 old_id,
+                                 job.id)
+                del self.id_to_job[old_id]
+                self.id_to_job[job.id] = job
 
                 # break out of loop to avoid too long delay
                 break
@@ -535,7 +528,7 @@ def send_error_mail(job):
         with open(log_file_fn, "rb") as log_file:
             log_file_attachement = MIMEText(log_file.read())
         log_file_attachement.add_header('Content-Disposition', 'attachment',
-                                        filename='{}_log.txt'.format(job.jobid))
+                                        filename='{}_log.txt'.format(job.id))
         msg.attach(log_file_attachement)
 
     # if matplotlib is installed
@@ -551,7 +544,7 @@ def send_error_mail(job):
         time = [HEARTBEAT_FREQUENCY * i for i in range(len(job.track_mem))]
 
         # attack mem plot
-        img_mem_fn = os.path.join('/tmp', "{}_mem.png".format(job.jobid))
+        img_mem_fn = os.path.join('/tmp', "{}_mem.png".format(job.id))
         plt.figure(1)
         plt.plot(time, job.track_mem, "-o")
         plt.xlabel("time (s)")
@@ -566,7 +559,7 @@ def send_error_mail(job):
         msg.attach(img_mem_attachement)
 
         # attach cpu plot
-        img_cpu_fn = os.path.join("/tmp", "{}_cpu.png".format(job.jobid))
+        img_cpu_fn = os.path.join("/tmp", "{}_cpu.png".format(job.id))
         plt.figure(2)
         plt.plot(time, [cpu_load for cpu_load, _ in job.track_cpu], "-o")
         plt.xlabel("time (s)")
@@ -580,7 +573,7 @@ def send_error_mail(job):
                                        filename=os.path.basename(img_cpu_fn))
         msg.attach(img_cpu_attachement)
 
-    if SEND_ERROR_MAILS:
+    if SEND_ERROR_MAIL:
         try:
             s = smtplib.SMTP(SMTP_SERVER)
         except smtplib.SMTPConnectError:
@@ -601,6 +594,7 @@ def handle_resubmit(session_id, job, temp_dir='/scratch/'):
 
     side-effect:
     job.num_resubmits incremented
+    job.id set to new ID
     """
     # reset some fields
     job.timestamp = None
@@ -622,7 +616,9 @@ def handle_resubmit(session_id, job, temp_dir='/scratch/'):
 
         _resubmit(session_id, job, temp_dir)
     else:
-        job.jobid = None
+        raise JobException(("Job {0} ({1}) failed after {2} " +
+                            "resubmissions").format(job.name, job.id,
+                                                    NUM_RESUBMITS))
 
 
 def _execute(job):
@@ -703,7 +699,7 @@ def _submit_jobs(jobs, home_address, temp_dir='/scratch', white_list=None,
 def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
     """
     For an active session, append new job based on information stored in job
-    object. Also sets job.job_id to the ID of the job on the grid.
+    object. Also sets job.id to the ID of the job on the grid.
 
     :param session: The current DRMAA session with the grid engine.
     :type session: Session
@@ -739,16 +735,16 @@ def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
                             "{}.  Your jobs may not start " +
                             "correctly.").format(temp_dir))
 
-    jobid = session.runJob(jt)
+    job_id = session.runJob(jt)
 
-    # set job fields that depend on the jobid assigned by grid engine
-    job.jobid = jobid
-    job.log_stdout_fn = os.path.join(temp_dir, '{}.o{}'.format(job.name, jobid))
-    job.log_stderr_fn = os.path.join(temp_dir, '{}.e{}'.format(job.name, jobid))
+    # set job fields that depend on the job_id assigned by grid engine
+    job.id = job_id
+    job.log_stdout_fn = os.path.join(temp_dir, '{}.o{}'.format(job.name, job_id))
+    job.log_stderr_fn = os.path.join(temp_dir, '{}.e{}'.format(job.name, job_id))
 
     if not quiet:
         print('Your job {} has been submitted with id {}'.format(job.name,
-                                                                 jobid),
+                                                                 job_id),
               file=sys.stderr)
 
     session.deleteJobTemplate(jt)
@@ -789,7 +785,7 @@ def process_jobs(jobs, temp_dir='/scratch/', white_list=None, quiet=True,
             # get interface and port
             home_address = monitor.home_address
 
-            # jobid field is attached to each job object
+            # job_id field is attached to each job object
             sid = _submit_jobs(jobs, home_address, temp_dir=temp_dir,
                                white_list=white_list, quiet=quiet)
 
@@ -815,10 +811,10 @@ def _resubmit(session_id, job, temp_dir):
         with Session(session_id) as session:
             # try to kill off old job
             try:
-                session.control(job.jobid, JobControlAction.TERMINATE)
+                session.control(job.id, JobControlAction.TERMINATE)
                 logger.info("zombie job killed")
             except Exception:
-                logger.error("Could not kill job with SGE id %s", job.jobid,
+                logger.error("Could not kill job with SGE id %s", job.id,
                              exc_info=True)
             # create new job
             _append_job_to_session(session, job, temp_dir=temp_dir)
@@ -831,7 +827,7 @@ def _resubmit(session_id, job, temp_dir):
 #####################
 def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
              num_slots=1, temp_dir='/scratch/', white_list=None,
-             queue=DEFAULT_QUEUE, quiet=True):
+             queue=DEFAULT_QUEUE, quiet=True, local=False):
     """
     Maps a function onto the cluster.
 
@@ -866,6 +862,9 @@ def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
     :param quiet: When true, do not output information about the jobs that have
                   been submitted.
     :type quiet: bool
+    :param local: Should we execute the jobs locally in separate processes
+                  instead of on the the cluster?
+    :type local: bool
 
     :returns: List of Job results
     """
@@ -879,47 +878,7 @@ def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
 
     # process jobs
     job_results = process_jobs(jobs, temp_dir=temp_dir, white_list=white_list,
-                               quiet=quiet)
+                               quiet=quiet, local=local)
 
     return job_results
 
-
-def pg_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
-           num_slots=1, temp_dir='/scratch/', white_list=None,
-           queue=DEFAULT_QUEUE, quiet=True):
-    """
-    .. deprecated:: 0.9
-       This function has been renamed grid_map.
-
-    :param f: The function to map on args_list
-    :type f: function
-    :param args_list: List of arguments to pass to f
-    :type args_list: list
-    :param cleanup: Should we remove the stdout and stderr temporary files for
-                    each job when we're done? (They are left in place if there's
-                    an error.)
-    :type cleanup: bool
-    :param mem_free: Estimate of how much memory each job will need (for
-                     scheduling). (Not currently used, because our cluster does
-                     not have that setting enabled.)
-    :type mem_free: str
-    :param name: Base name to give each job (will have a number add to end)
-    :type name: str
-    :param num_slots: Number of slots each job should use.
-    :type num_slots: int
-    :param temp_dir: Local temporary directory for storing output for an
-                     individual job.
-    :type temp_dir: str
-    :param white_list: If specified, limit nodes used to only those in list.
-    :type white_list: list of str
-    :param queue: The SGE queue to use for scheduling.
-    :type queue: str
-    :param quiet: When true, do not output information about the jobs that have
-                  been submitted.
-    :type quiet: bool
-
-    :returns: List of Job results
-    """
-    return grid_map(f, args_list, cleanup=cleanup, mem_free=mem_free, name=name,
-                    num_slots=num_slots, temp_dir=temp_dir,
-                    white_list=white_list, queue=queue, quiet=quiet)
