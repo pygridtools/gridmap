@@ -14,10 +14,11 @@ before_install:
   - export SGE_ROOT=/var/lib/gridengine
   - export SGE_CELL=default
   - export DRMAA_LIBRARY_PATH=/usr/lib/libdrmaa.so.1.0
-  - export SEND_ERROR_MAILS=False
+  - export SEND_ERROR_MAIL=False
   - sudo mkdir /scratch/
   - sudo chmod 777 /scratch/
 install:
+  - if [ ${TRAVIS_PYTHON_VERSION:0:1} == "2" ]; then pip install --use-mirrors logutils; fi
   - pip install -r requirements.txt --use-mirrors
   - pip install python-coveralls --use-mirrors
   - pip install nose-cov --use-mirrors

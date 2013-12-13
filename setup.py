@@ -19,6 +19,7 @@
 
 # You should have received a copy of the GNU General Public License
 # along with GridMap.  If not, see <http://www.gnu.org/licenses/>.
+import sys
 from setuptools import setup
 
 # To get around the fact that you can't import stuff from packages in setup.py
@@ -34,6 +35,8 @@ def readme():
 def requirements():
     with open('requirements.txt') as f:
         reqs = f.read().splitlines()
+    if sys.version_info < (3, 0):
+        reqs.append('logutils')
     return reqs
 
 

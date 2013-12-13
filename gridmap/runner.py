@@ -45,6 +45,12 @@ from io import open
 import psutil
 import zmq
 
+# Import QueueHandler and QueueListener for multiprocess-safe logging
+if sys.version_info < (3, 0):
+    from logutils.queue import QueueHandler, QueueListener
+else:
+    from logging.handlers import QueueHandler, QueueListener
+
 from gridmap.conf import HEARTBEAT_FREQUENCY
 from gridmap.data import clean_path, zloads, zdumps
 
@@ -206,6 +212,13 @@ def _run_job(job_id, address):
 
     logger.debug("Input arguments loaded, starting computation %s", job)
 
+    # Create thread/process-safe logger stuff
+    queue = multiprocessing.Queue(-1)
+    q_handler = QueueHandler(queue)
+    logger.addHandler(q_handler)
+    q_listener = QueueListener(queue)
+    q_listener.start()
+
     # create heart beat process
     parent_pid = os.getpid()
     heart = multiprocessing.Process(target=_heart_beat,
@@ -233,6 +246,10 @@ def _run_job(job_id, address):
     finally:
         # stop heartbeat
         heart.terminate()
+        
+        # Tear-down thread/process-safe logging and switch back to regular
+        q_listener.stop()
+        logger.removeHandler(q_handler)
 
 
 def _main():
