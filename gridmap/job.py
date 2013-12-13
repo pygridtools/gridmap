@@ -58,7 +58,7 @@ from gridmap.conf import (CHECK_FREQUENCY, CREATE_PLOTS, DEFAULT_QUEUE,
                           ERROR_MAIL_SENDER, HEARTBEAT_FREQUENCY,
                           IDLE_THRESHOLD, MAX_IDLE_HEARTBEATS,
                           MAX_TIME_BETWEEN_HEARTBEATS, NUM_RESUBMITS,
-                          SEND_ERROR_MAILS, SMTP_SERVER, USE_MEM_FREE)
+                          SEND_ERROR_MAIL, SMTP_SERVER, USE_MEM_FREE)
 from gridmap.data import clean_path, zdumps, zloads
 from gridmap.runner import _heart_beat
 
@@ -573,7 +573,7 @@ def send_error_mail(job):
                                        filename=os.path.basename(img_cpu_fn))
         msg.attach(img_cpu_attachement)
 
-    if SEND_ERROR_MAILS:
+    if SEND_ERROR_MAIL:
         try:
             s = smtplib.SMTP(SMTP_SERVER)
         except smtplib.SMTPConnectError:
