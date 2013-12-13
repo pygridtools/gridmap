@@ -24,10 +24,10 @@ from __future__ import division, print_function, unicode_literals
 
 import logging
 from datetime import datetime
-from time import sleep
 
 import gridmap
-from gridmap import Job, process_jobs, grid_map, HEARTBEAT_FREQUENCY
+from gridmap import (Job, process_jobs, grid_map, HEARTBEAT_FREQUENCY,
+                     MAX_TIME_BETWEEN_HEARTBEATS)
 
 from nose.tools import eq_
 
@@ -74,8 +74,8 @@ def check_map(wait_sec):
 
 
 def test_map():
-    for wait_sec in [(0, False), (HEARTBEAT_FREQUENCY + 1, False),
-                               ((HEARTBEAT_FREQUENCY // 2) + 1, True)]:
+    for wait_sec in [0, HEARTBEAT_FREQUENCY + 1,
+                     MAX_TIME_BETWEEN_HEARTBEATS + 1]:
         yield check_map, wait_sec
 
 
@@ -106,6 +106,6 @@ def check_process_jobs(wait_sec):
 
 
 def test_process_jobs():
-    for wait_sec in [(0, False), (HEARTBEAT_FREQUENCY + 1, False),
-                               (HEARTBEAT_FREQUENCY // 2, True)]:
+    for wait_sec in [0, HEARTBEAT_FREQUENCY + 1,
+                     MAX_TIME_BETWEEN_HEARTBEATS + 1]:
         yield check_map, wait_sec
