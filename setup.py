@@ -35,8 +35,6 @@ def readme():
 def requirements():
     with open('requirements.txt') as f:
         reqs = f.read().splitlines()
-    if sys.version_info < (3, 0):
-        reqs.append('logutils')
     return reqs
 
 

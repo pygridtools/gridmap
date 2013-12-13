@@ -45,12 +45,6 @@ from io import open
 import psutil
 import zmq
 
-# Import QueueHandler and QueueListener for multiprocess-safe logging
-if sys.version_info < (3, 0):
-    from logutils.queue import QueueHandler, QueueListener
-else:
-    from logging.handlers import QueueHandler, QueueListener
-
 from gridmap.conf import HEARTBEAT_FREQUENCY
 from gridmap.data import clean_path, zloads, zdumps
 
@@ -95,18 +89,11 @@ def _send_zmq_msg(job_id, command, data, address):
     return msg
 
 
-def _heart_beat(job_id, address, parent_pid=-1, log_file="", wait_sec=45,
-                queue=None, log_level=logging.DEBUG):
+def _heart_beat(job_id, address, parent_pid=-1, log_file="", wait_sec=45):
     """
     Infinitely loops and sends information about the currently running job back
     to the ``JobMonitor``.
     """
-    # Setup logging
-    if queue is not None:
-        handler = QueueHandler(queue)
-        logger = logging.getLogger(__name__)
-        logger.addHandler(handler)
-        logger.setLevel(log_level)
     while True:
         status = get_job_status(parent_pid, os.getpid())
         if os.path.exists(log_file):
@@ -147,19 +134,12 @@ def get_cpu_load(pid, heart_pid):
               one of the processes is not sleeping.
     :rtype: (float, bool)
     """
-    logger = logging.getLogger(__name__)
-    logger.debug('Checking load for PID %s with heart PID %s', pid, heart_pid)
     process = psutil.Process(pid)
     cpu_sum = float(process.get_cpu_percent())
-    logger.debug('Parent process percentage: %s', cpu_sum)
-    logger.debug('Parent running status: %s', process.status)
     running = process.status not in _SLEEP_STATUSES
     num_procs = 1
     for p in process.get_children(recursive=True):
-        logger.debug('Child PID %s', p.pid)
         if p.pid != heart_pid:
-            logger.debug('Child process percentage: %s', p.get_cpu_percent())
-            logger.debug('Child running status: %s', p.status)
             cpu_sum += float(p.get_cpu_percent())
             running = running or (p.status not in _SLEEP_STATUSES)
             num_procs += 1
@@ -219,13 +199,6 @@ def _run_job(job_id, address):
 
     logger.debug("Input arguments loaded, starting computation %s", job)
 
-    # Create thread/process-safe logger stuff
-    queue = multiprocessing.Queue(-1)
-    q_handler = QueueHandler(queue)
-    logger.addHandler(q_handler)
-    q_listener = QueueListener(queue)
-    q_listener.start()
-
     # create heart beat process
     parent_pid = os.getpid()
     heart = multiprocessing.Process(target=_heart_beat,
@@ -254,10 +227,6 @@ def _run_job(job_id, address):
     finally:
         # stop heartbeat
         heart.terminate()
-
-        # Tear-down thread/process-safe logging and switch back to regular
-        q_listener.stop()
-        logger.removeHandler(q_handler)
 
 
 def _main():
