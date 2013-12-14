@@ -41,6 +41,7 @@ import cherrypy
 
 from gridmap.data import clean_path
 from gridmap.runner import _send_zmq_msg
+from gridmap.version import __version__
 
 
 class WebMonitor(object):
@@ -148,6 +149,8 @@ def main(argv=None):
     parser.add_argument('-p', '--port',
                         help='Port for server to listen on.', type=int,
                         default=8076)
+    parser.add_argument('--version', action='version',
+                        version='%(prog)s {0}'.format(__version__))
     args = parser.parse_args(argv)
 
     # Make warnings from built-in warnings module get formatted more nicely
