@@ -508,7 +508,7 @@ def send_error_mail(job):
     if job.heart_beat:
         body_text += "Last memory usage: {}\n".format(job.heart_beat["memory"])
         body_text += "Last cpu load: {}\n".format(job.heart_beat["cpu_load"][0])
-        body_text += ("Last process state: " +
+        body_text += ("Process was running at last check: " +
                       "{}\n\n").format(job.heart_beat["cpu_load"][1])
 
     body_text += "Host: {}\n\n".format(job.host_name)
@@ -523,10 +523,8 @@ def send_error_mail(job):
     msg.attach(body_msg)
 
     # attach log file
-    if job.heart_beat and os.path.exists(job.heart_beat["log_file"]):
-        log_file_fn = job.heart_beat['log_file']
-        with open(log_file_fn, "rb") as log_file:
-            log_file_attachement = MIMEText(log_file.read())
+    if job.heart_beat and "log_file" in job.heart_beat:
+        log_file_attachement = MIMEText(job.heart_beat['log_file'])
         log_file_attachement.add_header('Content-Disposition', 'attachment',
                                         filename='{}_log.txt'.format(job.id))
         msg.attach(log_file_attachement)
@@ -602,8 +600,9 @@ def handle_resubmit(session_id, job, temp_dir='/scratch/'):
 
     if job.num_resubmits < NUM_RESUBMITS:
         logger = logging.getLogger(__name__)
-        logger.warning("Looks like job died an unnatural death, resubmitting" +
-                       "(previous resubmits = %i)", job.num_resubmits)
+        logger.warning("Looks like job %s (%s) died an unnatural death, " +
+                       "resubmitting (previous resubmits = %i)", job.name,
+                       job.id, job.num_resubmits)
 
         # remove node from white_list
         node_name = '{}@{}'.format(job.queue, job.host_name)
