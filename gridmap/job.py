@@ -432,6 +432,8 @@ class JobMonitor(object):
 
             # could have been an exception, we check right away
             elif isinstance(job.ret, Exception):
+                job.cause_of_death = 'exception'
+
                 # Send error email, in addition to raising and logging exception
                 send_error_mail(job)
 
