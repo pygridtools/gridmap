@@ -64,7 +64,7 @@ from gridmap.runner import _heart_beat
 
 if DRMAA_PRESENT:
     from drmaa import (InvalidJobException, JobControlAction,
-                       JOB_IDS_SESSION_ALL, Session)
+                       JOB_IDS_SESSION_ALL, Session, TIMEOUT_NO_WAIT)
 
 # Python 2.x backward compatibility
 if sys.version_info < (3, 0):
@@ -401,6 +401,10 @@ class JobMonitor(object):
         finally:
             # Kill child processes that we don't need anymore
             local_heart.terminate()
+
+            # Get rid of job info to prevent memory leak
+            with Session(self.session_id) as session:
+                session.synchronize(TIMEOUT_NO_WAIT, dispose=True)
 
     def check_if_alive(self):
         """
