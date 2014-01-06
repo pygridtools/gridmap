@@ -291,8 +291,8 @@ class JobMonitor(object):
         # Always close socket
         self.socket.close()
 
-        # If we encounter an exception, try to kill all jobs
-        if exc_type is not None:
+        # If we encounter an exception and session is valid, kill all jobs
+        if exc_type is not None and self.session_id != -1:
             self.logger.info('Encountered %s, so killing all jobs.',
                              exc_type.__name__)
             with Session(self.session_id) as session:
