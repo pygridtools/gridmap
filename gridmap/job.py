@@ -304,6 +304,10 @@ class JobMonitor(object):
                     self.logger.debug("Could not kill all jobs for session.",
                                       exc_info=True)
 
+                # Get rid of job info to prevent memory leak
+                session.synchronize([JOB_IDS_SESSION_ALL], TIMEOUT_NO_WAIT,
+                                    dispose=True)
+
     def check(self, session_id, jobs):
         """
         serves input and output data
@@ -402,11 +406,6 @@ class JobMonitor(object):
         finally:
             # Kill child processes that we don't need anymore
             local_heart.terminate()
-
-            # Get rid of job info to prevent memory leak
-            with Session(self.session_id) as session:
-                session.synchronize([JOB_IDS_SESSION_ALL], TIMEOUT_NO_WAIT,
-                                    dispose=True)
 
     def check_if_alive(self):
         """
