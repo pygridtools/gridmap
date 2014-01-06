@@ -405,7 +405,7 @@ class JobMonitor(object):
 
             # Get rid of job info to prevent memory leak
             with Session(self.session_id) as session:
-                session.synchronize(JOB_IDS_SESSION_ALL, TIMEOUT_NO_WAIT,
+                session.synchronize([JOB_IDS_SESSION_ALL], TIMEOUT_NO_WAIT,
                                     dispose=True)
 
     def check_if_alive(self):
