@@ -63,8 +63,9 @@ from gridmap.data import clean_path, zdumps, zloads
 from gridmap.runner import _heart_beat
 
 if DRMAA_PRESENT:
-    from drmaa import (InvalidJobException, JobControlAction,
-                       JOB_IDS_SESSION_ALL, Session, TIMEOUT_NO_WAIT)
+    from drmaa import (ExitTimeoutException,, InvalidJobException,
+                       JobControlAction, JOB_IDS_SESSION_ALL, Session,
+                       TIMEOUT_NO_WAIT)
 
 # Python 2.x backward compatibility
 if sys.version_info < (3, 0):
@@ -305,8 +306,11 @@ class JobMonitor(object):
                                       exc_info=True)
 
                 # Get rid of job info to prevent memory leak
-                session.synchronize([JOB_IDS_SESSION_ALL], TIMEOUT_NO_WAIT,
-                                    dispose=True)
+                try:
+                    session.synchronize([JOB_IDS_SESSION_ALL], TIMEOUT_NO_WAIT,
+                                        dispose=True)
+                except ExitTimeoutException:
+                    pass
 
     def check(self, session_id, jobs):
         """
