@@ -292,18 +292,20 @@ class JobMonitor(object):
         # Always close socket
         self.socket.close()
 
-        # If we encounter an exception and session is valid, kill all jobs
-        if exc_type is not None and self.session_id != -1:
-            self.logger.info('Encountered %s, so killing all jobs.',
-                             exc_type.__name__)
+        # Clean up if we have a valid session
+        if self.session_id != -1:
             with Session(self.session_id) as session:
-                # try to kill off all old jobs
-                try:
-                    session.control(JOB_IDS_SESSION_ALL,
-                                    JobControlAction.TERMINATE)
-                except InvalidJobException:
-                    self.logger.debug("Could not kill all jobs for session.",
-                                      exc_info=True)
+                # If we encounter an exception, kill all jobs
+                if exc_type is not None:
+                    self.logger.info('Encountered %s, so killing all jobs.',
+                                     exc_type.__name__)
+                    # try to kill off all old jobs
+                    try:
+                        session.control(JOB_IDS_SESSION_ALL,
+                                        JobControlAction.TERMINATE)
+                    except InvalidJobException:
+                        self.logger.debug("Could not kill all jobs for " +
+                                          "session.", exc_info=True)
 
                 # Get rid of job info to prevent memory leak
                 try:
