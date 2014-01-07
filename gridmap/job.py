@@ -63,7 +63,7 @@ from gridmap.data import clean_path, zdumps, zloads
 from gridmap.runner import _heart_beat
 
 if DRMAA_PRESENT:
-    from drmaa import (ExitTimeoutException,, InvalidJobException,
+    from drmaa import (ExitTimeoutException, InvalidJobException,
                        JobControlAction, JOB_IDS_SESSION_ALL, Session,
                        TIMEOUT_NO_WAIT)
 
