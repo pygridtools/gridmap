@@ -275,7 +275,7 @@ class JobMonitor(object):
         # uninitialized field (set in check method)
         self.jobs = []
         self.ids = []
-        self.session_id = -1
+        self.session_id = None
         self.id_to_job = {}
 
     def __enter__(self):
@@ -293,7 +293,7 @@ class JobMonitor(object):
         self.socket.close()
 
         # Clean up if we have a valid session
-        if self.session_id != -1:
+        if self.session_id is not None:
             with Session(self.session_id) as session:
                 # If we encounter an exception, kill all jobs
                 if exc_type is not None:
