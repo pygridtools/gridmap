@@ -53,7 +53,7 @@ specifying environment variables with the same name.
                      running.
                      (Default: 1.0)
 :var MAX_IDLE_HEARTBEATS: Number of heartbeats we can receive where the process
-                          has >= IDLE_THRESHOLD CPU utilization and is sleeping
+                          has <= IDLE_THRESHOLD CPU utilization and is sleeping
                           before we consider the process dead. (Default: 3)
 :var NUM_RESUBMITS: How many times can a particular job can die, before we give
                     up. (Default: 3)
