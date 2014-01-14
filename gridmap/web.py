@@ -80,9 +80,8 @@ class WebMonitor(object):
             '''
 
         for job in jobs:
-            out_html += ("<tr><td><a href='/view_job?address={}" +
-                         "&job_id={}'>{}</td>").format(address, job.jobid,
-                                                       job.jobid)
+            out_html += ("<tr><td><a href='/view_job?address={0}" +
+                         "&job_id={1}'>{1}</td>").format(address, job.id)
             out_html += "<td>{}</td>".format(job.ret is not None)
             out_html += "<td>{}</td>".format(job.cause_of_death)
             out_html += "</tr>"
