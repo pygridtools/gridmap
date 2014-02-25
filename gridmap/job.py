@@ -789,7 +789,7 @@ def process_jobs(jobs, temp_dir='/scratch/', white_list=None, quiet=True,
     if (not local and not DRMAA_PRESENT):
         logger = logging.getLogger(__name__)
         logger.warning('Could not import drmaa. Processing jobs locally.')
-        local = False
+        local = True
 
     if not local:
         # initialize monitor to get port number
