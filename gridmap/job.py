@@ -639,6 +639,7 @@ def _execute(job):
     Used by _process_jobs_locally
     """
     job.execute()
+    return job.ret
 
 
 def _process_jobs_locally(jobs, max_processes=1):
@@ -663,8 +664,8 @@ def _process_jobs_locally(jobs, max_processes=1):
     else:
         pool = Pool(max_processes)
         result = pool.map(_execute, jobs)
-        for ix, job in enumerate(jobs):
-            job.ret = result[ix]
+        for ret_val, job in zip(result, jobs):
+            job.ret = ret_val
         pool.close()
         pool.join()
 
