@@ -839,7 +839,7 @@ def _resubmit(session_id, job, temp_dir):
 #####################
 def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
              num_slots=1, temp_dir='/scratch/', white_list=None,
-             queue=DEFAULT_QUEUE, quiet=True, local=False):
+             queue=DEFAULT_QUEUE, quiet=True, local=False, max_processes=1):
     """
     Maps a function onto the cluster.
 
@@ -877,6 +877,9 @@ def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
     :param local: Should we execute the jobs locally in separate processes
                   instead of on the the cluster?
     :type local: bool
+    :param max_processes: The maximum number of concurrent processes to use if
+                          processing jobs locally.
+    :type max_processes: int
 
     :returns: List of Job results
     """
@@ -890,7 +893,8 @@ def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
 
     # process jobs
     job_results = process_jobs(jobs, temp_dir=temp_dir, white_list=white_list,
-                               quiet=quiet, local=local)
+                               quiet=quiet, local=local,
+                               max_processes=max_processes)
 
     return job_results
 
