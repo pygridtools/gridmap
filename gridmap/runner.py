@@ -230,7 +230,13 @@ def _run_job(job_id, address):
         # send back result
         thank_you_note = _send_zmq_msg(job_id, "store_output", job, address)
         logger.info(thank_you_note)
-
+    # If anything goes wrong, send back the exception
+    except Exception as e:
+        # send back exception and traceback string
+        thank_you_note = _send_zmq_msg(job_id, "store_output",
+                                       (e, traceback.format_exc()),
+                                       address)
+        logger.info(thank_you_note)
     finally:
         # stop heartbeat
         heart.terminate()
