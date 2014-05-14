@@ -186,9 +186,18 @@ def _run_job(job_id, address):
     :param address: IP address of submitting host.
     :type address: str
     """
-    wait_sec = random.randint(0, 5)
+    # create heart beat process
     logger = logging.getLogger(__name__)
-    logger.info("Waiting %i seconds before starting", wait_sec)
+    parent_pid = os.getpid()
+    heart = multiprocessing.Process(target=_heart_beat,
+                                    args=(job_id, address, parent_pid,
+                                          os.environ['SGE_STDERR_PATH'],
+                                          HEARTBEAT_FREQUENCY))
+    logger.info("Starting heart beat")
+    heart.start()
+
+    wait_sec = random.randint(0, 5)
+    logger.info("Waiting %i seconds before fetching input", wait_sec)
     time.sleep(wait_sec)
 
     try:
@@ -203,18 +212,11 @@ def _run_job(job_id, address):
         thank_you_note = _send_zmq_msg(job_id, "store_output",
                                        (e, traceback.format_exc()),
                                        address)
+        # stop heartbeat
+        heart.terminate()
         return
 
     logger.debug("Input arguments loaded, starting computation %s", job)
-
-    # create heart beat process
-    parent_pid = os.getpid()
-    heart = multiprocessing.Process(target=_heart_beat,
-                                    args=(job_id, address, parent_pid,
-                                          job.log_stderr_fn,
-                                          HEARTBEAT_FREQUENCY))
-    logger.info("Starting heart beat")
-    heart.start()
 
     try:
         # change working directory
