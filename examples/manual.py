@@ -28,16 +28,28 @@ execute them on the cluster as well.
 
 from __future__ import print_function, unicode_literals
 
-import time
+from datetime import datetime
 
 from gridmap import Job, process_jobs
+
+
+def sleep_walk(secs):
+    '''
+    Pass the time by adding numbers until the specified number of seconds has
+    elapsed. Intended as a replacement for ``time.sleep`` that doesn't leave the
+    CPU idle (which will make the job seem like it's stalled).
+    '''
+    start_time = datetime.now()
+    num = 0
+    while (datetime.now() - start_time).seconds < secs:
+        num = num + 1
 
 
 def compute_factorial(n):
     """
     computes factorial of n
     """
-    time.sleep(10)
+    sleep_walk(10)
     ret = 1
     for i in range(n):
         ret = ret * (i + 1)
@@ -83,7 +95,7 @@ def main():
     print("sending function jobs to cluster")
     print("")
 
-    job_outputs = process_jobs(functionJobs)
+    job_outputs = process_jobs(functionJobs, max_processes=4)
 
     print("results from each job")
     for (i, result) in enumerate(job_outputs):
