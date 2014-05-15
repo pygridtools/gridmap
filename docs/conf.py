@@ -67,7 +67,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'GridMap'
-copyright = u'2008-2012 Max-Planck-Society, 2012-2013 ETS'
+copyright = u'2008-2012 Max-Planck-Society, 2012-2014 ETS'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -276,7 +276,7 @@ texinfo_documents = [
 epub_title = u'GridMap'
 epub_author = u'Daniel Blanchard, Cheng Soon Ong, Christian Widmer'
 epub_publisher = u'Educational Testing Service'
-epub_copyright = u'2008-2012 Max-Planck-Society, 2012-2013 Educational Testing Service'
+epub_copyright = u'2008-2012 Max-Planck-Society, 2012-2014 Educational Testing Service'
 
 # The language of the text. It defaults to the language option
 # or en if the language is not set.

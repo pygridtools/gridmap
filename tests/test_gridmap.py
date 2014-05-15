@@ -1,5 +1,5 @@
-# Written (W) 2012-2013 Daniel Blanchard, dblanchard@ets.org
-# Copyright (C) 2008-2012 Max-Planck-Society, 2012-2013 ETS
+# Written (W) 2012-2014 Daniel Blanchard, dblanchard@ets.org
+# Copyright (C) 2008-2012 Max-Planck-Society, 2012-2014 ETS
 
 # This file is part of GridMap.
 
