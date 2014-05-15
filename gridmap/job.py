@@ -352,6 +352,8 @@ class JobMonitor(object):
                         if msg["command"] == "fetch_input":
                             return_msg = self.id_to_job[job_id]
                             job.timestamp = datetime.now()
+                            self.logger.debug("Received input request from %s",
+                                              job_id)
 
                         if msg["command"] == "store_output":
                             # be nice
@@ -363,9 +365,13 @@ class JobMonitor(object):
                                 # copy relevant fields
                                 job.ret = tmp_job.ret
                                 job.traceback = tmp_job.traceback
+                                self.logger.info("Received output from %s",
+                                                  job_id)
                             # Returned exception instead of job, so store that
                             elif isinstance(msg["data"], tuple):
                                 job.ret, job.traceback = msg["data"]
+                                self.logger.info("Received exception from %s",
+                                                  job_id)
                             else:
                                 self.logger.error(("Received message with " +
                                                    "invalid data: %s"), msg)
