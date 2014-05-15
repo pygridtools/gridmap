@@ -68,6 +68,7 @@ def main():
     intermediate_results = grid_map(computeFactorial, args, quiet=False,
                                     max_processes=4)
 
+    # Just print the items instead of really reducing. We could always sum them.
     print("reducing result")
     for i, ret in enumerate(intermediate_results):
         print("f({0}) = {1}".format(args[i], ret))
