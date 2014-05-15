@@ -28,6 +28,7 @@ execute them on the cluster as well.
 
 from __future__ import print_function, unicode_literals
 
+import logging
 from datetime import datetime
 
 from gridmap import Job, process_jobs
@@ -84,6 +85,10 @@ def main():
     """
     run a set of jobs on cluster
     """
+
+    logging.captureWarnings(True)
+    logging.basicConfig(format=('%(asctime)s - %(name)s - %(levelname)s - ' +
+                                '%(message)s'), level=logging.INFO)
 
     print("=====================================")
     print("========   Submit and Wait   ========")

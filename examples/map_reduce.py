@@ -30,6 +30,7 @@ This example demonstrates how to use that interface.
 
 from __future__ import print_function, unicode_literals
 
+import logging
 from datetime import datetime
 
 from gridmap import grid_map
@@ -62,6 +63,10 @@ def main():
     """
     execute map example
     """
+
+    logging.captureWarnings(True)
+    logging.basicConfig(format=('%(asctime)s - %(name)s - %(levelname)s - ' +
+                                '%(message)s'), level=logging.INFO)
 
     args = [3, 5, 10, 20]
 
