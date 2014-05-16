@@ -75,7 +75,9 @@ def make_jobs():
 
     # create job objects
     for arg in inputvec:
-        job = Job(compute_factorial, arg)
+        # The default queue used by the Job class is all.q. You must specify
+        # the `queue` keyword argument if that is not the name of your queue.
+        job = Job(compute_factorial, arg, queue='all.q')
         jobs.append(job)
 
     return jobs

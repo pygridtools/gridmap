@@ -70,8 +70,10 @@ def main():
 
     args = [3, 5, 10, 20]
 
+    # The default queue used by grid_map is all.q. You must specify
+    # the `queue` keyword argument if that is not the name of your queue.
     intermediate_results = grid_map(computeFactorial, args, quiet=False,
-                                    max_processes=4)
+                                    max_processes=4, queue='all.q')
 
     # Just print the items instead of really reducing. We could always sum them.
     print("reducing result")
