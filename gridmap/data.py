@@ -39,19 +39,6 @@ except ImportError:
 import re
 
 
-def clean_path(path):
-    '''
-    Replace all weird SAN paths with normal paths. This is really
-    ETS-specific, but shouldn't harm anyone else.
-    '''
-
-    path = re.sub(r'/\.automount/\w+/SAN/NLP/(\w+)-(dynamic|static)',
-                  r'/home/nlp-\1/\2', path)
-    path = re.sub(r'/\.automount/[^/]+/SAN/Research/HomeResearch',
-                  '/home/research', path)
-    return path
-
-
 def zdumps(obj):
     """
     dumps pickleable object into bz2 compressed string

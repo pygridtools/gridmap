@@ -39,7 +39,6 @@ from socket import gethostname
 
 import cherrypy
 
-from gridmap.data import clean_path
 from gridmap.runner import _send_zmq_msg
 from gridmap.version import __version__
 
@@ -161,7 +160,7 @@ def main(argv=None):
     # Append module directories to path
     for module_dir in args.module_dir:
         logger.info("Appended {0} to PYTHONPATH".format(module_dir))
-        sys.path.append(clean_path(module_dir))
+        sys.path.append(module_dir)
 
     # Start server
     hostname = gethostname()

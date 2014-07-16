@@ -59,7 +59,7 @@ from gridmap.conf import (CHECK_FREQUENCY, CREATE_PLOTS, DEFAULT_QUEUE,
                           IDLE_THRESHOLD, MAX_IDLE_HEARTBEATS,
                           MAX_TIME_BETWEEN_HEARTBEATS, NUM_RESUBMITS,
                           SEND_ERROR_MAIL, SMTP_SERVER, USE_MEM_FREE)
-from gridmap.data import clean_path, zdumps, zloads
+from gridmap.data import zdumps, zloads
 from gridmap.runner import _heart_beat
 
 if DRMAA_PRESENT:
@@ -168,7 +168,7 @@ class Job(object):
                 logger.warning('Skipping non-ASCII environment variable.')
             else:
                 self.environment[env_var] = value
-        self.working_dir = clean_path(os.getcwd())
+        self.working_dir = os.getcwd()
 
     @property
     def function(self):
@@ -184,8 +184,8 @@ class Job(object):
 
         m = inspect.getmodule(f)
         try:
-            self.path = clean_path(os.path.dirname(os.path.abspath(
-                inspect.getsourcefile(f))))
+            self.path = os.path.dirname(os.path.abspath(
+                inspect.getsourcefile(f)))
         except TypeError:
             self.path = ''
 

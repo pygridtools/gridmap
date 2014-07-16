@@ -46,7 +46,7 @@ import psutil
 import zmq
 
 from gridmap.conf import HEARTBEAT_FREQUENCY
-from gridmap.data import clean_path, zloads, zdumps
+from gridmap.data import zloads, zdumps
 
 
 # Set of "not running" job statuses
@@ -270,7 +270,7 @@ def _main():
     logger = logging.getLogger(__name__)
 
     logger.info("Appended {0} to PYTHONPATH".format(args.module_dir))
-    sys.path.append(clean_path(args.module_dir))
+    sys.path.append(args.module_dir)
 
     logger.debug("Job ID: %i\tHome address: %s\tModule dir: %s",
                  os.environ['JOB_ID'],
