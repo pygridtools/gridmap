@@ -48,6 +48,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from io import open
+from importlib import import_module
 from multiprocessing import Pool
 from socket import gethostname, gethostbyname
 
@@ -199,7 +200,7 @@ class Job(object):
             mn = os.path.splitext(os.path.basename(m.__file__))[0]
 
             # make sure module is present
-            __import__(mn)
+            import_module(mn)
 
             # get module
             mod = sys.modules[mn]
