@@ -233,8 +233,6 @@ class Job(object):
 
         ret = "-shell yes -b yes"
 
-        if self.name:
-            ret += " -N {}".format(self.name)
         if self.mem_free and USE_MEM_FREE:
             ret += " -l mem_free={}".format(self.mem_free)
         if self.num_slots and self.num_slots > 1:
@@ -753,6 +751,7 @@ def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
     jt.remoteCommand = sys.executable
     jt.args = ['-m', 'gridmap.runner', '{}'.format(job.home_address), job.path]
     jt.nativeSpecification = job.native_specification
+    jt.jobName = job.name
     jt.workingDirectory = job.working_dir
     jt.outputPath = ":{}".format(temp_dir)
     jt.errorPath = ":{}".format(temp_dir)
