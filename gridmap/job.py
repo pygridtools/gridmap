@@ -51,6 +51,8 @@ from io import open
 from importlib import import_module
 from multiprocessing import Pool
 from socket import gethostname, gethostbyname
+from smtplib import (SMTPRecipientsRefused, SMTPHeloError, SMTPSenderRefused,
+                     SMTPDataError)
 
 import zmq
 
@@ -453,7 +455,8 @@ class JobMonitor(object):
                 job.cause_of_death = 'exception'
 
                 # Send error email, in addition to raising and logging exception
-                send_error_mail(job)
+                if SEND_ERROR_MAIL:
+                    send_error_mail(job)
 
                 # Format traceback much like joblib does
                 self.logger.error("-" * 80)
@@ -471,7 +474,8 @@ class JobMonitor(object):
                 self.logger.info("Creating error report")
 
                 # send report
-                send_error_mail(job)
+                if SEND_ERROR_MAIL:
+                    send_error_mail(job)
 
                 # try to resubmit
                 old_id = job.id
@@ -511,6 +515,14 @@ def send_error_mail(job):
     send out diagnostic email
     """
     logger = logging.getLogger(__name__)
+
+    # Connect to server
+    try:
+        s = smtplib.SMTP(SMTP_SERVER)
+    except smtplib.SMTPConnectError:
+        logger.error('Failed to connect to SMTP server to send error ' +
+                     'email.', exc_info=True)
+        return
 
     # create message
     msg = MIMEMultipart()
@@ -591,19 +603,18 @@ def send_error_mail(job):
                                        filename=os.path.basename(img_cpu_fn))
         msg.attach(img_cpu_attachement)
 
-    if SEND_ERROR_MAIL:
-        try:
-            s = smtplib.SMTP(SMTP_SERVER)
-        except smtplib.SMTPConnectError:
-            logger.error('Failed to connect to SMTP server to send error ' +
-                         'email.', exc_info=True)
-        else:
-            s.sendmail(ERROR_MAIL_SENDER, ERROR_MAIL_RECIPIENT, msg.as_string())
-            # Clean up plot temporary files
-            if CREATE_PLOTS:
-                os.unlink(img_cpu_fn)
-                os.unlink(img_mem_fn)
-            s.quit()
+    # Send mail
+    try:
+        s.sendmail(ERROR_MAIL_SENDER, ERROR_MAIL_RECIPIENT, msg.as_string())
+    except (SMTPRecipientsRefused, SMTPHeloError, SMTPSenderRefused,
+            SMTPDataError):
+        logger.error('Failed to send error email.', exc_info=True)
+
+    # Clean up plot temporary files
+    if CREATE_PLOTS:
+        os.unlink(img_cpu_fn)
+        os.unlink(img_mem_fn)
+    s.quit()
 
 
 def handle_resubmit(session_id, job, temp_dir='/scratch/'):
