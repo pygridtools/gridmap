@@ -270,7 +270,7 @@ def _main():
     logger = logging.getLogger(__name__)
 
     logger.info("Appended {0} to PYTHONPATH".format(args.module_dir))
-    sys.path.append(args.module_dir)
+    sys.path.insert(0, args.module_dir)
 
     logger.debug("Job ID: %i\tHome address: %s\tModule dir: %s",
                  os.environ['JOB_ID'],
