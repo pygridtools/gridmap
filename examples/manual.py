@@ -2,8 +2,8 @@
 
 # Written (W) 2008-2012 Christian Widmer
 # Written (W) 2008-2010 Cheng Soon Ong
-# Written (W) 2012-2013 Daniel Blanchard, dblanchard@ets.org
-# Copyright (C) 2008-2012 Max-Planck-Society, 2012-2013 ETS
+# Written (W) 2012-2014 Daniel Blanchard, dblanchard@ets.org
+# Copyright (C) 2008-2012 Max-Planck-Society, 2012-2014 ETS
 
 # This file is part of GridMap.
 
@@ -28,16 +28,29 @@ execute them on the cluster as well.
 
 from __future__ import print_function, unicode_literals
 
-import time
+import logging
+from datetime import datetime
 
 from gridmap import Job, process_jobs
+
+
+def sleep_walk(secs):
+    '''
+    Pass the time by adding numbers until the specified number of seconds has
+    elapsed. Intended as a replacement for ``time.sleep`` that doesn't leave the
+    CPU idle (which will make the job seem like it's stalled).
+    '''
+    start_time = datetime.now()
+    num = 0
+    while (datetime.now() - start_time).seconds < secs:
+        num = num + 1
 
 
 def compute_factorial(n):
     """
     computes factorial of n
     """
-    time.sleep(10)
+    sleep_walk(10)
     ret = 1
     for i in range(n):
         ret = ret * (i + 1)
@@ -62,7 +75,9 @@ def make_jobs():
 
     # create job objects
     for arg in inputvec:
-        job = Job(compute_factorial, arg)
+        # The default queue used by the Job class is all.q. You must specify
+        # the `queue` keyword argument if that is not the name of your queue.
+        job = Job(compute_factorial, arg, queue='all.q')
         jobs.append(job)
 
     return jobs
@@ -72,6 +87,10 @@ def main():
     """
     run a set of jobs on cluster
     """
+
+    logging.captureWarnings(True)
+    logging.basicConfig(format=('%(asctime)s - %(name)s - %(levelname)s - ' +
+                                '%(message)s'), level=logging.INFO)
 
     print("=====================================")
     print("========   Submit and Wait   ========")
@@ -83,7 +102,7 @@ def main():
     print("sending function jobs to cluster")
     print("")
 
-    job_outputs = process_jobs(functionJobs)
+    job_outputs = process_jobs(functionJobs, max_processes=4)
 
     print("results from each job")
     for (i, result) in enumerate(job_outputs):

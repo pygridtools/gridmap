@@ -2,8 +2,8 @@
 
 # Written (W) 2008-2012 Christian Widmer
 # Written (W) 2008-2010 Cheng Soon Ong
-# Written (W) 2012-2013 Daniel Blanchard, dblanchard@ets.org
-# Copyright (C) 2008-2012 Max-Planck-Society, 2012-2013 ETS
+# Written (W) 2012-2014 Daniel Blanchard, dblanchard@ets.org
+# Copyright (C) 2008-2012 Max-Planck-Society, 2012-2014 ETS
 
 # This file is part of GridMap.
 
@@ -30,13 +30,29 @@ This example demonstrates how to use that interface.
 
 from __future__ import print_function, unicode_literals
 
+import logging
+from datetime import datetime
+
 from gridmap import grid_map
+
+
+def sleep_walk(secs):
+    '''
+    Pass the time by adding numbers until the specified number of seconds has
+    elapsed. Intended as a replacement for ``time.sleep`` that doesn't leave the
+    CPU idle (which will make the job seem like it's stalled).
+    '''
+    start_time = datetime.now()
+    num = 0
+    while (datetime.now() - start_time).seconds < secs:
+        num = num + 1
 
 
 def computeFactorial(n):
     """
     computes factorial of n
     """
+    sleep_walk(10)
     ret = 1
     for i in range(n):
         ret = ret * (i + 1)
@@ -48,10 +64,18 @@ def main():
     execute map example
     """
 
-    args = [1, 2, 4, 8, 16]
+    logging.captureWarnings(True)
+    logging.basicConfig(format=('%(asctime)s - %(name)s - %(levelname)s - ' +
+                                '%(message)s'), level=logging.INFO)
 
-    intermediate_results = grid_map(computeFactorial, args, quiet=False)
+    args = [3, 5, 10, 20]
 
+    # The default queue used by grid_map is all.q. You must specify
+    # the `queue` keyword argument if that is not the name of your queue.
+    intermediate_results = grid_map(computeFactorial, args, quiet=False,
+                                    max_processes=4, queue='all.q')
+
+    # Just print the items instead of really reducing. We could always sum them.
     print("reducing result")
     for i, ret in enumerate(intermediate_results):
         print("f({0}) = {1}".format(args[i], ret))

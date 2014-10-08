@@ -2,8 +2,8 @@
 
 # Written (W) 2008-2012 Christian Widmer
 # Written (W) 2008-2010 Cheng Soon Ong
-# Written (W) 2012-2013 Daniel Blanchard, dblanchard@ets.org
-# Copyright (C) 2008-2012 Max-Planck-Society, 2012-2013 ETS
+# Written (W) 2012-2014 Daniel Blanchard, dblanchard@ets.org
+# Copyright (C) 2008-2012 Max-Planck-Society, 2012-2014 ETS
 
 # This file is part of GridMap.
 
@@ -37,19 +37,6 @@ try:
 except ImportError:
     import pickle
 import re
-
-
-def clean_path(path):
-    '''
-    Replace all weird SAN paths with normal paths. This is really
-    ETS-specific, but shouldn't harm anyone else.
-    '''
-
-    path = re.sub(r'/\.automount/\w+/SAN/NLP/(\w+)-(dynamic|static)',
-                  r'/home/nlp-\1/\2', path)
-    path = re.sub(r'/\.automount/[^/]+/SAN/Research/HomeResearch',
-                  '/home/research', path)
-    return path
 
 
 def zdumps(obj):

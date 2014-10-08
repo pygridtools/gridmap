@@ -1,14 +1,12 @@
 language: python
 python:
   - 2.7
-  - 3.3
+  - 3.4
 
 notifications:
   email: false
 
 # Install stuff
-virtualenv:
-  system_site_packages: true
 before_install:
   - travis/install_sge.sh
   - export SGE_ROOT=/var/lib/gridengine

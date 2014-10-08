@@ -2,8 +2,8 @@
 
 # Written (W) 2008-2012 Christian Widmer
 # Written (W) 2008-2010 Cheng Soon Ong
-# Written (W) 2012-2013 Daniel Blanchard, dblanchard@ets.org
-# Copyright (C) 2008-2012 Max-Planck-Society, 2012-2013 ETS
+# Written (W) 2012-2014 Daniel Blanchard, dblanchard@ets.org
+# Copyright (C) 2008-2012 Max-Planck-Society, 2012-2014 ETS
 
 # This file is part of GridMap.
 
@@ -46,7 +46,7 @@ import psutil
 import zmq
 
 from gridmap.conf import HEARTBEAT_FREQUENCY
-from gridmap.data import clean_path, zloads, zdumps
+from gridmap.data import zloads, zdumps
 
 
 # Set of "not running" job statuses
@@ -186,9 +186,18 @@ def _run_job(job_id, address):
     :param address: IP address of submitting host.
     :type address: str
     """
-    wait_sec = random.randint(0, 5)
+    # create heart beat process
     logger = logging.getLogger(__name__)
-    logger.info("Waiting %i seconds before starting", wait_sec)
+    parent_pid = os.getpid()
+    heart = multiprocessing.Process(target=_heart_beat,
+                                    args=(job_id, address, parent_pid,
+                                          os.environ['SGE_STDERR_PATH'],
+                                          HEARTBEAT_FREQUENCY))
+    logger.info("Starting heart beat")
+    heart.start()
+
+    wait_sec = random.randint(0, 5)
+    logger.info("Waiting %i seconds before fetching input", wait_sec)
     time.sleep(wait_sec)
 
     try:
@@ -203,18 +212,11 @@ def _run_job(job_id, address):
         thank_you_note = _send_zmq_msg(job_id, "store_output",
                                        (e, traceback.format_exc()),
                                        address)
+        # stop heartbeat
+        heart.terminate()
         return
 
     logger.debug("Input arguments loaded, starting computation %s", job)
-
-    # create heart beat process
-    parent_pid = os.getpid()
-    heart = multiprocessing.Process(target=_heart_beat,
-                                    args=(job_id, address, parent_pid,
-                                          job.log_stderr_fn,
-                                          HEARTBEAT_FREQUENCY))
-    logger.info("Starting heart beat")
-    heart.start()
 
     try:
         # change working directory
@@ -230,7 +232,13 @@ def _run_job(job_id, address):
         # send back result
         thank_you_note = _send_zmq_msg(job_id, "store_output", job, address)
         logger.info(thank_you_note)
-
+    # If anything goes wrong, send back the exception
+    except Exception as e:
+        # send back exception and traceback string
+        thank_you_note = _send_zmq_msg(job_id, "store_output",
+                                       (e, traceback.format_exc()),
+                                       address)
+        logger.info(thank_you_note)
     finally:
         # stop heartbeat
         heart.terminate()
@@ -262,7 +270,7 @@ def _main():
     logger = logging.getLogger(__name__)
 
     logger.info("Appended {0} to PYTHONPATH".format(args.module_dir))
-    sys.path.append(clean_path(args.module_dir))
+    sys.path.insert(0, args.module_dir)
 
     logger.debug("Job ID: %i\tHome address: %s\tModule dir: %s",
                  os.environ['JOB_ID'],

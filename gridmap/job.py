@@ -2,8 +2,8 @@
 
 # Written (W) 2008-2012 Christian Widmer
 # Written (W) 2008-2010 Cheng Soon Ong
-# Written (W) 2012-2013 Daniel Blanchard, dblanchard@ets.org
-# Copyright (C) 2008-2012 Max-Planck-Society, 2012-2013 ETS
+# Written (W) 2012-2014 Daniel Blanchard, dblanchard@ets.org
+# Copyright (C) 2008-2012 Max-Planck-Society, 2012-2014 ETS
 
 # This file is part of GridMap.
 
@@ -48,8 +48,11 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
 from io import open
+from importlib import import_module
 from multiprocessing import Pool
 from socket import gethostname, gethostbyname
+from smtplib import (SMTPRecipientsRefused, SMTPHeloError, SMTPSenderRefused,
+                     SMTPDataError)
 
 import zmq
 
@@ -59,7 +62,7 @@ from gridmap.conf import (CHECK_FREQUENCY, CREATE_PLOTS, DEFAULT_QUEUE,
                           IDLE_THRESHOLD, MAX_IDLE_HEARTBEATS,
                           MAX_TIME_BETWEEN_HEARTBEATS, NUM_RESUBMITS,
                           SEND_ERROR_MAIL, SMTP_SERVER, USE_MEM_FREE)
-from gridmap.data import clean_path, zdumps, zloads
+from gridmap.data import zdumps, zloads
 from gridmap.runner import _heart_beat
 
 if DRMAA_PRESENT:
@@ -168,7 +171,7 @@ class Job(object):
                 logger.warning('Skipping non-ASCII environment variable.')
             else:
                 self.environment[env_var] = value
-        self.working_dir = clean_path(os.getcwd())
+        self.working_dir = os.getcwd()
 
     @property
     def function(self):
@@ -184,8 +187,8 @@ class Job(object):
 
         m = inspect.getmodule(f)
         try:
-            self.path = clean_path(os.path.dirname(os.path.abspath(
-                inspect.getsourcefile(f))))
+            self.path = os.path.dirname(os.path.abspath(
+                inspect.getsourcefile(f)))
         except TypeError:
             self.path = ''
 
@@ -199,7 +202,7 @@ class Job(object):
             mn = os.path.splitext(os.path.basename(m.__file__))[0]
 
             # make sure module is present
-            __import__(mn)
+            import_module(mn)
 
             # get module
             mod = sys.modules[mn]
@@ -230,8 +233,6 @@ class Job(object):
 
         ret = "-shell yes -b yes"
 
-        if self.name:
-            ret += " -N {}".format(self.name)
         if self.mem_free and USE_MEM_FREE:
             ret += " -l mem_free={}".format(self.mem_free)
         if self.num_slots and self.num_slots > 1:
@@ -352,6 +353,8 @@ class JobMonitor(object):
                         if msg["command"] == "fetch_input":
                             return_msg = self.id_to_job[job_id]
                             job.timestamp = datetime.now()
+                            self.logger.debug("Received input request from %s",
+                                              job_id)
 
                         if msg["command"] == "store_output":
                             # be nice
@@ -363,9 +366,13 @@ class JobMonitor(object):
                                 # copy relevant fields
                                 job.ret = tmp_job.ret
                                 job.traceback = tmp_job.traceback
+                                self.logger.info("Received output from %s",
+                                                  job_id)
                             # Returned exception instead of job, so store that
                             elif isinstance(msg["data"], tuple):
                                 job.ret, job.traceback = msg["data"]
+                                self.logger.info("Received exception from %s",
+                                                  job_id)
                             else:
                                 self.logger.error(("Received message with " +
                                                    "invalid data: %s"), msg)
@@ -446,7 +453,8 @@ class JobMonitor(object):
                 job.cause_of_death = 'exception'
 
                 # Send error email, in addition to raising and logging exception
-                send_error_mail(job)
+                if SEND_ERROR_MAIL:
+                    send_error_mail(job)
 
                 # Format traceback much like joblib does
                 self.logger.error("-" * 80)
@@ -464,7 +472,8 @@ class JobMonitor(object):
                 self.logger.info("Creating error report")
 
                 # send report
-                send_error_mail(job)
+                if SEND_ERROR_MAIL:
+                    send_error_mail(job)
 
                 # try to resubmit
                 old_id = job.id
@@ -504,6 +513,14 @@ def send_error_mail(job):
     send out diagnostic email
     """
     logger = logging.getLogger(__name__)
+
+    # Connect to server
+    try:
+        s = smtplib.SMTP(SMTP_SERVER)
+    except smtplib.SMTPConnectError:
+        logger.error('Failed to connect to SMTP server to send error ' +
+                     'email.', exc_info=True)
+        return
 
     # create message
     msg = MIMEMultipart()
@@ -584,19 +601,18 @@ def send_error_mail(job):
                                        filename=os.path.basename(img_cpu_fn))
         msg.attach(img_cpu_attachement)
 
-    if SEND_ERROR_MAIL:
-        try:
-            s = smtplib.SMTP(SMTP_SERVER)
-        except smtplib.SMTPConnectError:
-            logger.error('Failed to connect to SMTP server to send error ' +
-                         'email.', exc_info=True)
-        else:
-            s.sendmail(ERROR_MAIL_SENDER, ERROR_MAIL_RECIPIENT, msg.as_string())
-            # Clean up plot temporary files
-            if CREATE_PLOTS:
-                os.unlink(img_cpu_fn)
-                os.unlink(img_mem_fn)
-            s.quit()
+    # Send mail
+    try:
+        s.sendmail(ERROR_MAIL_SENDER, ERROR_MAIL_RECIPIENT, msg.as_string())
+    except (SMTPRecipientsRefused, SMTPHeloError, SMTPSenderRefused,
+            SMTPDataError):
+        logger.error('Failed to send error email.', exc_info=True)
+
+    # Clean up plot temporary files
+    if CREATE_PLOTS:
+        os.unlink(img_cpu_fn)
+        os.unlink(img_mem_fn)
+    s.quit()
 
 
 def handle_resubmit(session_id, job, temp_dir='/scratch/'):
@@ -735,6 +751,7 @@ def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
     jt.remoteCommand = sys.executable
     jt.args = ['-m', 'gridmap.runner', '{}'.format(job.home_address), job.path]
     jt.nativeSpecification = job.native_specification
+    jt.jobName = job.name
     jt.workingDirectory = job.working_dir
     jt.outputPath = ":{}".format(temp_dir)
     jt.errorPath = ":{}".format(temp_dir)
@@ -752,8 +769,10 @@ def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
 
     # set job fields that depend on the job_id assigned by grid engine
     job.id = job_id
-    job.log_stdout_fn = os.path.join(temp_dir, '{}.o{}'.format(job.name, job_id))
-    job.log_stderr_fn = os.path.join(temp_dir, '{}.e{}'.format(job.name, job_id))
+    job.log_stdout_fn = os.path.join(temp_dir, '{}.o{}'.format(job.name,
+                                                               job_id))
+    job.log_stderr_fn = os.path.join(temp_dir, '{}.e{}'.format(job.name,
+                                                               job_id))
 
     if not quiet:
         print('Your job {} has been submitted with id {}'.format(job.name,

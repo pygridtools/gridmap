@@ -4,8 +4,8 @@
 
 # Written (W) 2008-2012 Christian Widmer
 # Written (W) 2008-2010 Cheng Soon Ong
-# Written (W) 2012-2013 Daniel Blanchard, dblanchard@ets.org
-# Copyright (C) 2008-2012 Max-Planck-Society, 2012-2013 ETS
+# Written (W) 2012-2014 Daniel Blanchard, dblanchard@ets.org
+# Copyright (C) 2008-2012 Max-Planck-Society, 2012-2014 ETS
 
 # This file is part of GridMap.
 
@@ -39,7 +39,6 @@ from socket import gethostname
 
 import cherrypy
 
-from gridmap.data import clean_path
 from gridmap.runner import _send_zmq_msg
 from gridmap.version import __version__
 
@@ -161,7 +160,7 @@ def main(argv=None):
     # Append module directories to path
     for module_dir in args.module_dir:
         logger.info("Appended {0} to PYTHONPATH".format(module_dir))
-        sys.path.append(clean_path(module_dir))
+        sys.path.append(module_dir)
 
     # Start server
     hostname = gethostname()
