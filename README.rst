@@ -1,28 +1,24 @@
 GridMap
 -----------
 
-.. image:: https://travis-ci.org/EducationalTestingService/gridmap.png
+.. image:: https://travis-ci.org/EducationalTestingService/gridmap.svg?branch=master
+   :alt: Build status
    :target: https://travis-ci.org/EducationalTestingService/gridmap
-   :alt: Travis build status
 
-
-.. image:: https://coveralls.io/repos/EducationalTestingService/gridmap/badge.png
-  :target: https://coveralls.io/r/EducationalTestingService/gridmap
-  :alt: Test coverage
-
-.. image:: https://pypip.in/d/gridmap/badge.png
-   :target: https://crate.io/packages/gridmap
+.. image:: http://img.shields.io/coveralls/EducationalTestingService/gridmap/stable.svg
+    :target: https://coveralls.io/r/EducationalTestingService/gridmap
+    
+.. image:: http://img.shields.io/pypi/dm/gridmap.svg
+   :target: https://warehouse.python.org/project/gridmap/
    :alt: PyPI downloads
 
-.. image:: https://pypip.in/v/gridmap/badge.png
-   :target: https://crate.io/packages/gridmap
+.. image:: http://img.shields.io/pypi/v/gridmap.svg
+   :target: https://warehouse.python.org/project/gridmap/
    :alt: Latest version on PyPI
 
-.. image:: https://d2weczhvl823v0.cloudfront.net/EducationalTestingService/gridmap/trend.png
-   :target: https://bitdeli.com/free
-   :alt: Bitdeli badge
-
-
+.. image:: http://img.shields.io/pypi/l/gridmap.svg
+   :alt: License
+   
 A package to allow you to easily create jobs on the cluster directly from
 Python. You can directly map Python functions onto the cluster without needing
 to write any wrapper code yourself.
