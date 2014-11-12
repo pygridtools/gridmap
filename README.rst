@@ -5,7 +5,7 @@ GridMap
    :alt: Build status
    :target: https://travis-ci.org/EducationalTestingService/gridmap
 
-.. image:: http://img.shields.io/coveralls/EducationalTestingService/gridmap/stable.svg
+.. image:: http://img.shields.io/coveralls/EducationalTestingService/gridmap/master.svg
     :target: https://coveralls.io/r/EducationalTestingService/gridmap
     
 .. image:: http://img.shields.io/pypi/dm/gridmap.svg
