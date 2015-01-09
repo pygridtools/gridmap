@@ -197,7 +197,7 @@ def _run_job(job_id, address):
     heart.start()
 
     wait_sec = random.randint(0, 5)
-    logger.info("Waiting %i seconds before fetching input", wait_sec)
+    logger.info("Waiting %s seconds before fetching input", wait_sec)
     time.sleep(wait_sec)
 
     try:
@@ -272,7 +272,7 @@ def _main():
     logger.info("Appended {0} to PYTHONPATH".format(args.module_dir))
     sys.path.insert(0, args.module_dir)
 
-    logger.debug("Job ID: %i\tHome address: %s\tModule dir: %s",
+    logger.debug("Job ID: %s\tHome address: %s\tModule dir: %s",
                  os.environ['JOB_ID'],
                  args.home_address, args.module_dir)
 
