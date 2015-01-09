@@ -50,7 +50,7 @@ from email.mime.image import MIMEImage
 from io import open
 from importlib import import_module
 from multiprocessing import Pool
-from socket import gethostname, gethostbyname
+from socket import gethostname, gethostbyname, getaddrinfo, getfqdn
 from smtplib import (SMTPRecipientsRefused, SMTPHeloError, SMTPSenderRefused,
                      SMTPDataError)
 
@@ -265,6 +265,16 @@ class JobMonitor(object):
 
         self.host_name = gethostname()
         self.ip_address = gethostbyname(self.host_name)
+
+        for _, _, _, _, (ip, _) in getaddrinfo(getfqdn(), 0):
+            if ip != '127.0.0.1':
+                self.ip_address = ip
+                self.interface = "tcp://%s" % (self.ip_address)
+                break
+            else:
+                self.logger.warning('IP address for JobMonitor server is 127.0.0.1.    Runners on other machines will be unable to connect.')
+                self.ip_address = '127.0.0.1'
+
         self.interface = "tcp://%s" % (self.ip_address)
 
         # bind to random port and remember it
