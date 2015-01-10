@@ -271,9 +271,11 @@ class JobMonitor(object):
                 self.ip_address = ip
                 self.interface = "tcp://%s" % (self.ip_address)
                 break
-            else:
-                self.logger.warning('IP address for JobMonitor server is 127.0.0.1.    Runners on other machines will be unable to connect.')
-                self.ip_address = '127.0.0.1'
+        else:
+            self.logger.warning('IP address for JobMonitor server is '
+                                '127.0.0.1.  Runners on other machines will be'
+                                ' unable to connect.')
+            self.ip_address = '127.0.0.1'
 
         self.interface = "tcp://%s" % (self.ip_address)
 
