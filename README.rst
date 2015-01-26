@@ -1,27 +1,22 @@
 GridMap
 -----------
 
-.. image:: https://travis-ci.org/EducationalTestingService/gridmap.png
+.. image:: https://travis-ci.org/EducationalTestingService/gridmap.svg
    :target: https://travis-ci.org/EducationalTestingService/gridmap
    :alt: Travis build status
 
 
-.. image:: https://coveralls.io/repos/EducationalTestingService/gridmap/badge.png
+.. image:: https://coveralls.io/repos/EducationalTestingService/gridmap/badge.svg
   :target: https://coveralls.io/r/EducationalTestingService/gridmap
   :alt: Test coverage
 
-.. image:: https://pypip.in/d/gridmap/badge.png
+.. image:: https://pypip.in/d/gridmap/badge.svg
    :target: https://crate.io/packages/gridmap
    :alt: PyPI downloads
 
-.. image:: https://pypip.in/v/gridmap/badge.png
+.. image:: https://pypip.in/v/gridmap/badge.svg
    :target: https://crate.io/packages/gridmap
    :alt: Latest version on PyPI
-
-.. image:: https://d2weczhvl823v0.cloudfront.net/EducationalTestingService/gridmap/trend.png
-   :target: https://bitdeli.com/free
-   :alt: Bitdeli badge
-
 
 A package to allow you to easily create jobs on the cluster directly from
 Python. You can directly map Python functions onto the cluster without needing
