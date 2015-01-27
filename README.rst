@@ -1,22 +1,22 @@
 GridMap
 -----------
 
-.. image:: https://travis-ci.org/pygridtools/gridmap.svg?branch=stable
+.. image:: https://img.shields.io/travis/pygridtools/gridmap/stable.svg
    :alt: Build status
    :target: https://travis-ci.org/pygridtools/gridmap
 
-.. image:: http://img.shields.io/coveralls/pygridtools/gridmap/stable.svg
+.. image:: https://img.shields.io/coveralls/pygridtools/gridmap/stable.svg
     :target: https://coveralls.io/r/pygridtools/gridmap
 
-.. image:: http://img.shields.io/pypi/dm/gridmap.svg
+.. image:: https://img.shields.io/pypi/dm/gridmap.svg
    :target: https://warehouse.python.org/project/gridmap/
    :alt: PyPI downloads
 
-.. image:: http://img.shields.io/pypi/v/gridmap.svg
+.. image:: https://img.shields.io/pypi/v/gridmap.svg
    :target: https://warehouse.python.org/project/gridmap/
    :alt: Latest version on PyPI
 
-.. image:: http://img.shields.io/pypi/l/gridmap.svg
+.. image:: https://img.shields.io/pypi/l/gridmap.svg
    :alt: License
 
 A package to allow you to easily create jobs on the cluster directly from
