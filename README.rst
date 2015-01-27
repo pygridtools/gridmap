@@ -46,10 +46,12 @@ Requirements
 -  `pyzmq <https://github.com/zeromq/pyzmq>`__
 -  Python 2.7+
 
-License
-~~~~~~~
+Acknowledgments
+~~~~~~~~~~~~~~~
 
--  GPLv3
+Thank you to `Max-Planck-Society <http://www.mpg.de/en>`__ and 
+`Educational Testing Service <https://github.com/EducationalTestingService>`__ for
+funding the development of GridMap.
 
 Changelog
 ~~~~~~~~~
