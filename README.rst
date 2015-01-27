@@ -23,11 +23,10 @@ A package to allow you to easily create jobs on the cluster directly from
 Python. You can directly map Python functions onto the cluster without needing
 to write any wrapper code yourself.
 
-This is the ETS fork of an older project called `Python Grid <https://github.com/cwidmer/pythongrid>`__. Unlike the older
+This is the ETS fork of an older project called `Python Grid <https://github.com/pygridtools/pythongrid>`__. Unlike the older
 version, it is Python 2/3 compatible. Another major difference is that you can
 change the configuration via environment variables instead of having to modify
-a Python file in your ``site-packages`` directory. We've also removed some
-cruft and improved the reliability of some of the features.
+a Python file in your ``site-packages`` directory. We've also fixed some bugs.
 
 For some examples of how to use it, check out ``map_reduce.py`` (for a simple
 example of how you can map a function onto the cluster) and ``manual.py`` (for
