@@ -108,10 +108,10 @@ class Job(object):
                  'name', 'queue', 'environment', 'working_dir',
                  'cause_of_death', 'num_resubmits', 'home_address',
                  'log_stderr_fn', 'log_stdout_fn', 'timestamp', 'host_name',
-                 'heart_beat', 'track_mem', 'track_cpu')
+                 'heart_beat', 'track_mem', 'track_cpu', 'engine')
 
     def __init__(self, f, args, kwlist=None, cleanup=True, mem_free="1G",
-                 name='gridmap_job', num_slots=1, queue=DEFAULT_QUEUE):
+                 name='gridmap_job', num_slots=1, queue=DEFAULT_QUEUE, engine="SGE"):
         """
         Initializes a new Job.
 
@@ -132,6 +132,9 @@ class Job(object):
         :type num_slots: int
         :param queue: SGE queue to schedule job on.
         :type queue: str
+
+        :param engine: Indicates compatability with a grid engine. Either SGE or TORQUE / PBS
+        :type engine: str
 
         """
         self.track_mem = []
@@ -158,6 +161,7 @@ class Job(object):
         self.white_list = []
         self.name = name.replace(' ', '_')
         self.queue = queue
+        self.engine = engine
         # Save copy of environment variables
         self.environment = {}
         for env_var, value in os.environ.items():
@@ -230,15 +234,30 @@ class Job(object):
         """
         define python-style getter
         """
+        pbs = (self.engine == "TORQUE" or self.engine == "PBS")
+        sge = (self.engine == "SGE")
 
-        ret = "-shell yes -b yes"
+        ret = ""
+
+        if sge:
+            ret = "-shell yes -b yes"
+
+        if self.num_slots and self.num_slots > 1:
+            if sge:
+                ret += " -pe smp {}".format(self.num_slots)
+            if pbs:
+                ret += " -l nodes=1:ppn={}".format(self.num_slots)
 
         if self.mem_free and USE_MEM_FREE:
-            ret += " -l mem_free={}".format(self.mem_free)
-        if self.num_slots and self.num_slots > 1:
-            ret += " -pe smp {}".format(self.num_slots)
+            if sge:
+                ret += " -l mem_free={}".format(self.mem_free)
+            if pbs:
+                ret += " -l mem={}".format(self.mem_free)
+
         if self.white_list:
-            ret += " -l h={}".format('|'.join(self.white_list))
+            if sge:
+                ret += " -l h={}".format('|'.join(self.white_list))
+
         if self.queue:
             ret += " -q {}".format(self.queue)
 
