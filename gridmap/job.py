@@ -884,7 +884,7 @@ def _resubmit(session, job, temp_dir):
             logger.error("Could not kill job with SGE id %s", job.id,
                          exc_info=True)
         # create new job
-        _append_job_to_session(session, job, temp_dir=temp_dir)
+        _append_job_to_session(session, job)
     else:
         logger.error("Could not restart job because we're in local mode.")
 
