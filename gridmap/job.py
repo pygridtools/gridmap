@@ -684,6 +684,8 @@ def handle_resubmit(session, job, temp_dir='/scratch/'):
 
         _resubmit(session, job, temp_dir)
     else:
+        # Try killing off job just so you do not have a zombie job that returns later
+        _killjob(session, job)
         raise JobException(("Job {0} ({1}) failed after {2} " +
                             "resubmissions").format(job.name, job.id,
                                                     NUM_RESUBMITS))
@@ -875,6 +877,16 @@ def process_jobs(jobs, temp_dir='/scratch/', white_list=None, quiet=True,
     return [job.ret for job in jobs]
 
 
+def _killjob(session, job):
+    logger = logging.getLogger(__name__)
+    try:
+        session.control(job.id, JobControlAction.TERMINATE)
+        logger.info("zombie job killed")
+    except Exception:
+        logger.error("Could not kill job with SGE id %s", job.id,
+                     exc_info=True)
+
+
 def _resubmit(session, job, temp_dir):
     """
     Resubmit a failed job.
@@ -887,12 +899,7 @@ def _resubmit(session, job, temp_dir):
     if DRMAA_PRESENT:
         # append to session
         # try to kill off old job
-        try:
-            session.control(job.id, JobControlAction.TERMINATE)
-            logger.info("zombie job killed")
-        except Exception:
-            logger.error("Could not kill job with SGE id %s", job.id,
-                         exc_info=True)
+        _killjob(session, job)
         # create new job
         _append_job_to_session(session, job)
     else:
