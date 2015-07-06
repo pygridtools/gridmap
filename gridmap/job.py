@@ -61,7 +61,7 @@ from gridmap.conf import (CHECK_FREQUENCY, CREATE_PLOTS, DEFAULT_QUEUE,
                           ERROR_MAIL_SENDER, HEARTBEAT_FREQUENCY,
                           IDLE_THRESHOLD, MAX_IDLE_HEARTBEATS,
                           MAX_TIME_BETWEEN_HEARTBEATS, NUM_RESUBMITS,
-                          SEND_ERROR_MAIL, SMTP_SERVER, USE_MEM_FREE)
+                          SEND_ERROR_MAIL, SMTP_SERVER, USE_MEM_FREE, MAX_BOOTUP_TIME)
 from gridmap.data import zdumps, zloads
 from gridmap.runner import _heart_beat
 
@@ -108,7 +108,7 @@ class Job(object):
                  'name', 'queue', 'environment', 'working_dir',
                  'cause_of_death', 'num_resubmits', 'home_address',
                  'log_stderr_fn', 'log_stdout_fn', 'timestamp', 'host_name',
-                 'heart_beat', 'track_mem', 'track_cpu')
+                 'heart_beat', 'track_mem', 'track_cpu', 'submit_time')
 
     def __init__(self, f, args, kwlist=None, cleanup=True, mem_free="1G",
                  name='gridmap_job', num_slots=1, queue=DEFAULT_QUEUE):
@@ -172,6 +172,7 @@ class Job(object):
             else:
                 self.environment[env_var] = value
         self.working_dir = os.getcwd()
+        self.submit_time = None
 
     @property
     def function(self):
@@ -455,6 +456,14 @@ class JobMonitor(object):
                           job.track_cpu[-MAX_IDLE_HEARTBEATS:])):
                     self.logger.error('Job stalled for unknown reason.')
                     job.cause_of_death = 'stalled'
+            else:
+                # Job was submitted a long time back but never got scheduled. Never received a message from Job.
+                current_time = datetime.now()
+                time_delta = current_time - job.submit_time
+                if time_delta.seconds > MAX_BOOTUP_TIME:
+                    self.logger.debug("Job %s didn't spin up in %s", job.id, time_delta.seconds)
+                    self.logger.error("Job didn't spin up in time.")
+                    job.cause_of_death = "nospinup"
 
         # could have been an exception, we check right away
         elif isinstance(job.ret, Exception):
@@ -807,6 +816,7 @@ def _append_job_to_session(temp_dir='/scratch/', quiet=True):
                                                                    job_id))
         job.log_stderr_fn = os.path.join(temp_dir, '{}.e{}'.format(job.name,
                                                                    job_id))
+        job.submit_time = datetime.now()
 
         if not quiet:
             print('Your job {} has been submitted with id {}'.format(job.name,

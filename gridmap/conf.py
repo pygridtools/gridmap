@@ -127,3 +127,6 @@ USE_MEM_FREE = 'TRUE' == os.getenv('USE_MEM_FREE', 'False').upper()
 
 # Which queue should we use by default
 DEFAULT_QUEUE = os.getenv('DEFAULT_QUEUE', 'all.q')
+
+# Maximum bootup time for job in seconnds
+MAX_BOOTUP_TIME = int(os.getenv('MAX_BOOTUP_TIME', '3600'))
