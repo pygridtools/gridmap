@@ -114,11 +114,11 @@ def get_memory_usage(pid, heart_pid):
     :returns: Total memory usage of process (and children) in Mb.
     """
     process = psutil.Process(pid)
-    mem_total = float(process.get_memory_info()[0])
-    for p in process.get_children(recursive=True):
+    mem_total = float(process.memory_info()[0])
+    for p in process.children(recursive=True):
         if p.is_running() and p.pid != heart_pid:
             try:
-                mem_total += float(p.get_memory_info()[0])
+                mem_total += float(p.memory_info()[0])
             except psutil.NoSuchProcess:
                 continue
     return mem_total / (1024.0 ** 2.0)
@@ -138,14 +138,14 @@ def get_cpu_load(pid, heart_pid):
     :rtype: (float, bool)
     """
     process = psutil.Process(pid)
-    cpu_sum = float(process.get_cpu_percent())
+    cpu_sum = float(process.cpu_percent())
     running = process.status not in _SLEEP_STATUSES
     num_procs = 1
-    for p in process.get_children(recursive=True):
+    for p in process.children(recursive=True):
         # Make sure this process hasn't exited before querying its status
         if p.is_running() and p.pid != heart_pid:
             try:
-                cpu_sum += float(p.get_cpu_percent())
+                cpu_sum += float(p.cpu_percent())
                 running = running or (p.status not in _SLEEP_STATUSES)
             except psutil.NoSuchProcess:
                 continue
