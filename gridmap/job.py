@@ -108,10 +108,11 @@ class Job(object):
                  'name', 'queue', 'environment', 'working_dir',
                  'cause_of_death', 'num_resubmits', 'home_address',
                  'log_stderr_fn', 'log_stdout_fn', 'timestamp', 'host_name',
-                 'heart_beat', 'track_mem', 'track_cpu')
+                 'heart_beat', 'track_mem', 'track_cpu', 'interpreting_shell')
 
     def __init__(self, f, args, kwlist=None, cleanup=True, mem_free="1G",
-                 name='gridmap_job', num_slots=1, queue=DEFAULT_QUEUE):
+                 name='gridmap_job', num_slots=1, queue=DEFAULT_QUEUE,
+                 interpreting_shell=None):
         """
         Initializes a new Job.
 
@@ -132,7 +133,8 @@ class Job(object):
         :type num_slots: int
         :param queue: SGE queue to schedule job on.
         :type queue: str
-
+        :param interpreting_shell: The interpreting shell for the job
+        :type interpreting_shell: str
         """
         self.track_mem = []
         self.track_cpu = []
@@ -158,6 +160,7 @@ class Job(object):
         self.white_list = []
         self.name = name.replace(' ', '_')
         self.queue = queue
+        self.interpreting_shell = interpreting_shell
         # Save copy of environment variables
         self.environment = {}
         for env_var, value in os.environ.items():
@@ -231,7 +234,10 @@ class Job(object):
         define python-style getter
         """
 
-        ret = "-shell yes -b yes"
+        ret = "-shell yes"
+        if self.interpreting_shell:
+            ret += " -S {}".format(self.interpreting_shell)
+        ret += " -b yes"
 
         if self.mem_free and USE_MEM_FREE:
             ret += " -l mem_free={}".format(self.mem_free)
@@ -871,7 +877,8 @@ def _resubmit(session_id, job, temp_dir):
 #####################
 def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
              num_slots=1, temp_dir='/scratch/', white_list=None,
-             queue=DEFAULT_QUEUE, quiet=True, local=False, max_processes=1):
+             queue=DEFAULT_QUEUE, quiet=True, local=False, max_processes=1,
+             interpreting_shell=None):
     """
     Maps a function onto the cluster.
 
@@ -912,6 +919,8 @@ def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
     :param max_processes: The maximum number of concurrent processes to use if
                           processing jobs locally.
     :type max_processes: int
+    :param interpreting_shell: The interpreting shell for the jobs.
+    :type interpreting_shell: str
 
     :returns: List of Job results
     """
@@ -920,7 +929,7 @@ def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
     jobs = [Job(f, [args] if not isinstance(args, list) else args,
                 cleanup=cleanup, mem_free=mem_free,
                 name='{}{}'.format(name, job_num), num_slots=num_slots,
-                queue=queue)
+                queue=queue, interpreting_shell=interpreting_shell)
             for job_num, args in enumerate(args_list)]
 
     # process jobs
