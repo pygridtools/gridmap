@@ -883,7 +883,7 @@ def _resubmit(session_id, job, temp_dir):
 def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
              num_slots=1, temp_dir='/scratch/', white_list=None,
              queue=DEFAULT_QUEUE, quiet=True, local=False, max_processes=1,
-             interpreting_shell=None, copy_env=True, completion_mail=None):
+             interpreting_shell=None, copy_env=True, completion_mail=False):
     """
     Maps a function onto the cluster.
 
