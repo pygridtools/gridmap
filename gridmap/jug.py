@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-from gridmap.job import grid_map
 import jug.jug
 
 
@@ -9,6 +8,8 @@ def grid_jug(jug_args, jug_nworkers=4, name='gridjug', **kwargs):
     A light-weight wrapper to run jug with gridmap on a Grid Engine cluster
     """
 
+    from gridmap.job import grid_map
+    
     jug_argv = ['dummy_script_name_not_parsed_by_jug', 'execute']
     jug_argv.extend(jug_args)
 
