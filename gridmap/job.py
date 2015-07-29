@@ -883,7 +883,7 @@ def _resubmit(session_id, job, temp_dir):
 def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
              num_slots=1, temp_dir='/scratch/', white_list=None,
              queue=DEFAULT_QUEUE, quiet=True, local=False, max_processes=1,
-             interpreting_shell=None, copy_env=True):
+             interpreting_shell=None, copy_env=True, completion_mail=None):
     """
     Maps a function onto the cluster.
 
@@ -928,6 +928,9 @@ def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
     :type interpreting_shell: str
     :param copy_env: copy environment from master node to worker node?
     :type copy_env: boolean
+    :param completion_mail: whether to send an e-mail upon completion of all
+                            jobs
+    :type completion_mail: boolean
 
     :returns: List of Job results
     """
@@ -941,9 +944,52 @@ def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
             for job_num, args in enumerate(args_list)]
 
     # process jobs
-    job_results = process_jobs(jobs, temp_dir=temp_dir, white_list=white_list,
+    job_results = process_jobs(jobs, temp_dir=temp_dir,
+                               white_list=white_list,
                                quiet=quiet, local=local,
                                max_processes=max_processes)
 
+    # send a completion mail (if requested and configured)
+    if completion_mail and SEND_ERROR_MAIL:
+        send_completion_mail(name=name)
+
     return job_results
 
+
+def send_completion_mail(name):
+    """
+    send out success email
+    """
+    logger = logging.getLogger(__name__)
+
+    # Connect to server
+    try:
+        s = smtplib.SMTP(SMTP_SERVER)
+    except smtplib.SMTPConnectError:
+        logger.error('Failed to connect to SMTP server to send success ' +
+                     'email.', exc_info=True)
+        return
+
+    # create message
+    msg = MIMEMultipart()
+    msg["subject"] = "GridMap completed grid_map {}".format(name)
+    msg["From"] = ERROR_MAIL_SENDER
+    msg["To"] = ERROR_MAIL_RECIPIENT
+
+    # compose error message
+    body_text = ""
+    body_text += "Job {}\n".format(name)
+
+    logger.info('Email body: %s', body_text)
+
+    body_msg = MIMEText(body_text)
+    msg.attach(body_msg)
+
+    # Send mail
+    try:
+        s.sendmail(ERROR_MAIL_SENDER, ERROR_MAIL_RECIPIENT, msg.as_string())
+    except (SMTPRecipientsRefused, SMTPHeloError, SMTPSenderRefused,
+            SMTPDataError):
+        logger.error('Failed to send success email.', exc_info=True)
+
+    s.quit()
