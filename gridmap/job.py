@@ -531,25 +531,57 @@ class JobMonitor(object):
                    for job in self.jobs)
 
 
-def send_error_mail(job):
+def _send_mail(subject, body_text, attachments=None):
     """
-    send out diagnostic email
+    Send out job status email
+
+    This is a helper function for send_error_mail and send_completion_mail
     """
+
     logger = logging.getLogger(__name__)
 
     # Connect to server
     try:
         s = smtplib.SMTP(SMTP_SERVER)
     except smtplib.SMTPConnectError:
-        logger.error('Failed to connect to SMTP server to send error ' +
+        logger.error('Failed to connect to SMTP server to send status ' +
                      'email.', exc_info=True)
         return
 
     # create message
     msg = MIMEMultipart()
-    msg["subject"] = "GridMap error {}".format(job.name)
+    msg["subject"] = subject
     msg["From"] = ERROR_MAIL_SENDER
     msg["To"] = ERROR_MAIL_RECIPIENT
+
+    logger.info('Email body: %s', body_text)
+
+    body_msg = MIMEText(body_text)
+    msg.attach(body_msg)
+
+    if attachments is not None:
+        for attachment in attachments:
+            msg.attach(attachment)
+
+    # Send mail
+    try:
+        s.sendmail(ERROR_MAIL_SENDER, ERROR_MAIL_RECIPIENT, msg.as_string())
+    except (SMTPRecipientsRefused, SMTPHeloError, SMTPSenderRefused,
+            SMTPDataError):
+        logger.error('Failed to send status email.', exc_info=True)
+
+    s.quit()
+
+
+def send_error_mail(job):
+    """
+    send out diagnostic email
+    """
+    logger = logging.getLogger(__name__)
+
+    # create message
+    subject = "GridMap error {}".format(job.name)
+    attachments = list()
 
     # compose error message
     body_text = ""
@@ -570,17 +602,12 @@ def send_error_mail(job):
         body_text += "Job encountered exception: {}\n".format(job.ret)
         body_text += "Stacktrace: {}\n\n".format(job.traceback)
 
-    logger.info('Email body: %s', body_text)
-
-    body_msg = MIMEText(body_text)
-    msg.attach(body_msg)
-
     # attach log file
     if job.heart_beat and "log_file" in job.heart_beat:
         log_file_attachement = MIMEText(job.heart_beat['log_file'])
         log_file_attachement.add_header('Content-Disposition', 'attachment',
                                         filename='{}_log.txt'.format(job.id))
-        msg.attach(log_file_attachement)
+        attachments.append(log_file_attachement)
 
     # if matplotlib is installed
     if CREATE_PLOTS:
@@ -607,7 +634,7 @@ def send_error_mail(job):
         img_mem_attachement = MIMEImage(img_data)
         img_mem_attachement.add_header('Content-Disposition', 'attachment',
                                        filename=os.path.basename(img_mem_fn))
-        msg.attach(img_mem_attachement)
+        attachments.append(img_mem_attachement)
 
         # attach cpu plot
         img_cpu_fn = os.path.join("/tmp", "{}_cpu.png".format(job.id))
@@ -622,20 +649,15 @@ def send_error_mail(job):
         img_cpu_attachement = MIMEImage(img_data)
         img_cpu_attachement.add_header('Content-Disposition', 'attachment',
                                        filename=os.path.basename(img_cpu_fn))
-        msg.attach(img_cpu_attachement)
+        attachments.append(img_cpu_attachement)
 
     # Send mail
-    try:
-        s.sendmail(ERROR_MAIL_SENDER, ERROR_MAIL_RECIPIENT, msg.as_string())
-    except (SMTPRecipientsRefused, SMTPHeloError, SMTPSenderRefused,
-            SMTPDataError):
-        logger.error('Failed to send error email.', exc_info=True)
+    _send_mail(subject, body_text, attachments)
 
     # Clean up plot temporary files
     if CREATE_PLOTS:
         os.unlink(img_cpu_fn)
         os.unlink(img_mem_fn)
-    s.quit()
 
 
 def handle_resubmit(session_id, job, temp_dir='/scratch/'):
@@ -960,36 +982,12 @@ def send_completion_mail(name):
     """
     send out success email
     """
-    logger = logging.getLogger(__name__)
-
-    # Connect to server
-    try:
-        s = smtplib.SMTP(SMTP_SERVER)
-    except smtplib.SMTPConnectError:
-        logger.error('Failed to connect to SMTP server to send success ' +
-                     'email.', exc_info=True)
-        return
-
     # create message
-    msg = MIMEMultipart()
-    msg["subject"] = "GridMap completed grid_map {}".format(name)
-    msg["From"] = ERROR_MAIL_SENDER
-    msg["To"] = ERROR_MAIL_RECIPIENT
+    subject = "GridMap completed grid_map {}".format(name)
 
     # compose error message
     body_text = ""
     body_text += "Job {}\n".format(name)
 
-    logger.info('Email body: %s', body_text)
-
-    body_msg = MIMEText(body_text)
-    msg.attach(body_msg)
-
     # Send mail
-    try:
-        s.sendmail(ERROR_MAIL_SENDER, ERROR_MAIL_RECIPIENT, msg.as_string())
-    except (SMTPRecipientsRefused, SMTPHeloError, SMTPSenderRefused,
-            SMTPDataError):
-        logger.error('Failed to send success email.', exc_info=True)
-
-    s.quit()
+    _send_mail(subject, body_text)
