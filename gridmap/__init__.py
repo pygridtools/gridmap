@@ -73,6 +73,7 @@ from gridmap.conf import (CHECK_FREQUENCY, CREATE_PLOTS, DEFAULT_QUEUE,
                           NUM_RESUBMITS, SEND_ERROR_MAIL, SMTP_SERVER,
                           USE_MEM_FREE)
 from gridmap.job import Job, JobException, process_jobs, grid_map
+from gridmap.jug import grid_jug
 from gridmap.version import __version__, VERSION
 
 # For * imports
