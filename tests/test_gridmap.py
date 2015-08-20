@@ -28,9 +28,9 @@ from multiprocessing import Pool
 
 import gridmap
 from gridmap import (Job, process_jobs, grid_map, HEARTBEAT_FREQUENCY,
-                     MAX_TIME_BETWEEN_HEARTBEATS)
+                     MAX_TIME_BETWEEN_HEARTBEATS, DRMAANotPresentException)
 
-from nose.tools import eq_
+from nose.tools import eq_, assert_raises
 
 
 # Setup logging
@@ -66,11 +66,12 @@ def compute_factorial(args):
     return ret
 
 
-def check_map(wait_sec, local):
+def check_map(wait_sec, local, require_cluster=False):
     inputs = [(1, wait_sec), (2, wait_sec), (4, wait_sec), (8, wait_sec), (16,
               wait_sec)]
     expected = list(map(compute_factorial, inputs))
-    outputs = grid_map(compute_factorial, inputs, quiet=False, local=local)
+    outputs = grid_map(compute_factorial, inputs, quiet=False, local=local,
+                       require_cluster=require_cluster)
     eq_(expected, outputs)
 
 
@@ -82,6 +83,12 @@ def test_map():
 
 def test_map_local():
     yield check_map, 0, True
+
+
+def test_map_raises_if_not_cluster():
+    if gridmap.conf.DRMAA_PRESENT:
+        return
+    assert_raises(DRMAANotPresentException, check_map, 0, False, True)
 
 
 def make_jobs(inputvec, function):
@@ -101,12 +108,13 @@ def make_jobs(inputvec, function):
     return jobs
 
 
-def check_process_jobs(wait_sec, local):
+def check_process_jobs(wait_sec, local, require_cluster=False):
     inputs = [(1, wait_sec), (2, wait_sec), (4, wait_sec), (8, wait_sec), (16,
               wait_sec)]
     expected = list(map(compute_factorial, inputs))
     function_jobs = make_jobs(inputs, compute_factorial)
-    outputs = process_jobs(function_jobs, quiet=False, local=local)
+    outputs = process_jobs(function_jobs, quiet=False, local=local,
+                           require_cluster=require_cluster)
     eq_(expected, outputs)
 
 
@@ -118,6 +126,12 @@ def test_process_jobs():
 
 def test_process_jobs_local():
     yield check_process_jobs, 0, True
+
+
+def test_process_jobs_raise_if_not_cluster():
+    if gridmap.conf.DRMAA_PRESENT:
+        return
+    assert_raises(DRMAANotPresentException, check_process_jobs, 0, False, True)
 
 
 def pool_map_factorial(inputs):
