@@ -113,7 +113,7 @@ def check_process_jobs(wait_sec, local):
 def test_process_jobs():
     for wait_sec in [0, HEARTBEAT_FREQUENCY + 1,
                      MAX_TIME_BETWEEN_HEARTBEATS + 1]:
-        yield check_map, wait_sec, False
+        yield check_process_jobs, wait_sec, False
 
 
 def test_process_jobs_local():
