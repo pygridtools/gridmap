@@ -43,6 +43,7 @@ import os
 import smtplib
 import sys
 import traceback
+import functools
 from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -200,8 +201,9 @@ class Job(object):
         except TypeError:
             self.path = ''
 
-        # if module is not __main__, all is good
-        if m.__name__ != "__main__":
+        # if module is not __main__, all is good. If the function is a
+        #   partial function we'll take it as is also.
+        if isinstance(f, functools.partial) or m.__name__ != "__main__":
             self._f = f
 
         else:
