@@ -22,16 +22,18 @@ Some simple unit tests for GridMap.
 
 from __future__ import division, print_function, unicode_literals
 
+import os
 import logging
 from datetime import datetime
 from multiprocessing import Pool
+from operator import add
+from functools import partial
 
 import gridmap
 from gridmap import (Job, process_jobs, grid_map, HEARTBEAT_FREQUENCY,
                      MAX_TIME_BETWEEN_HEARTBEATS)
 
 from nose.tools import eq_
-
 
 # Setup logging
 logging.captureWarnings(True)
@@ -82,6 +84,24 @@ def test_map():
 
 def test_map_local():
     yield check_map, 0, True
+
+
+# Create a simple partial object and test as above
+add_two = partial(add, 2)
+
+def check_map_partial(local):
+    inputs = [1, 2, 4, 6, 8, 16]
+    expected = [x + 2 for x in inputs]
+    outputs = grid_map(add_two, inputs, quiet=False, local=local)
+    eq_(expected, outputs)
+
+
+def test_map_partial():
+    yield check_map_partial, False
+
+
+def test_map_partial_local():
+    yield check_map_partial, True
 
 
 def make_jobs(inputvec, function):
