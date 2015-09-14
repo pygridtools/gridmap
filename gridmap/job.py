@@ -43,6 +43,7 @@ import os
 import smtplib
 import sys
 import traceback
+import functools
 from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -61,7 +62,8 @@ from gridmap.conf import (CHECK_FREQUENCY, CREATE_PLOTS, DEFAULT_QUEUE,
                           ERROR_MAIL_SENDER, HEARTBEAT_FREQUENCY,
                           IDLE_THRESHOLD, MAX_IDLE_HEARTBEATS,
                           MAX_TIME_BETWEEN_HEARTBEATS, NUM_RESUBMITS,
-                          SEND_ERROR_MAIL, SMTP_SERVER, USE_MEM_FREE)
+                          SEND_ERROR_MAIL, SMTP_SERVER, USE_MEM_FREE,
+                          DEFAULT_TEMP_DIR)
 from gridmap.data import zdumps, zloads
 from gridmap.runner import _heart_beat
 
@@ -200,8 +202,9 @@ class Job(object):
         except TypeError:
             self.path = ''
 
-        # if module is not __main__, all is good
-        if m.__name__ != "__main__":
+        # if module is not __main__, all is good. If the function is a
+        #   partial function we'll take it as is also.
+        if isinstance(f, functools.partial) or m.__name__ != "__main__":
             self._f = f
 
         else:
@@ -264,7 +267,7 @@ class JobMonitor(object):
     """
     Job monitor that communicates with other nodes via 0MQ.
     """
-    def __init__(self, temp_dir='/scratch'):
+    def __init__(self, temp_dir=DEFAULT_TEMP_DIR):
         """
         set up socket
         """
@@ -660,7 +663,7 @@ def send_error_mail(job):
         os.unlink(img_mem_fn)
 
 
-def handle_resubmit(session_id, job, temp_dir='/scratch/'):
+def handle_resubmit(session_id, job, temp_dir=DEFAULT_TEMP_DIR):
     """
     heuristic to determine if the job should be resubmitted
 
@@ -733,7 +736,7 @@ def _process_jobs_locally(jobs, max_processes=1):
     return jobs
 
 
-def _submit_jobs(jobs, home_address, temp_dir='/scratch', white_list=None,
+def _submit_jobs(jobs, home_address, temp_dir=DEFAULT_TEMP_DIR, white_list=None,
                  quiet=True):
     """
     Method used to send a list of jobs onto the cluster.
@@ -770,7 +773,7 @@ def _submit_jobs(jobs, home_address, temp_dir='/scratch', white_list=None,
     return sid
 
 
-def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
+def _append_job_to_session(session, job, temp_dir=DEFAULT_TEMP_DIR, quiet=True):
     """
     For an active session, append new job based on information stored in job
     object. Also sets job.id to the ID of the job on the grid.
@@ -827,7 +830,7 @@ def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
     session.deleteJobTemplate(jt)
 
 
-def process_jobs(jobs, temp_dir='/scratch/', white_list=None, quiet=True,
+def process_jobs(jobs, temp_dir=DEFAULT_TEMP_DIR, white_list=None, quiet=True,
                  max_processes=1, local=False):
     """
     Take a list of jobs and process them on the cluster.
@@ -903,7 +906,7 @@ def _resubmit(session_id, job, temp_dir):
 # MapReduce Interface
 #####################
 def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
-             num_slots=1, temp_dir='/scratch/', white_list=None,
+             num_slots=1, temp_dir=DEFAULT_TEMP_DIR, white_list=None,
              queue=DEFAULT_QUEUE, quiet=True, local=False, max_processes=1,
              interpreting_shell=None, copy_env=True, completion_mail=False):
     """
