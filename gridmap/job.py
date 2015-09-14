@@ -115,7 +115,7 @@ class Job(object):
 
     def __init__(self, f, args, kwlist=None, cleanup=True, mem_free="1G",
                  name='gridmap_job', num_slots=1, queue=DEFAULT_QUEUE,
-                 interpreting_shell=None, copy_env=True):
+                 interpreting_shell=None, copy_env=True, add_env=None):
         """
         Initializes a new Job.
 
@@ -140,6 +140,10 @@ class Job(object):
         :type interpreting_shell: str
         :param copy_env: copy environment from master node to worker node?
         :type copy_env: boolean
+        :param add_env: Environment variables to add to the environment.
+                        Overwrites variables which already exist due to
+                        ``copy_env=True``.
+        :type add_env: dict
         """
         self.track_mem = []
         self.track_cpu = []
@@ -169,8 +173,8 @@ class Job(object):
         self.copy_env = copy_env
         # Save copy of environment variables
         self.environment = {}
-        if self.copy_env:
-            for env_var, value in os.environ.items():
+        def _add_env(env_vars):
+            for env_var, value in env_vars.items():
                 try:
                     if not isinstance(env_var, bytes):
                         env_var = env_var.encode()
@@ -181,6 +185,10 @@ class Job(object):
                     logger.warning('Skipping non-ASCII environment variable.')
                 else:
                     self.environment[env_var] = value
+        if self.copy_env:
+            _add_env(os.environ)
+        if add_env is not None:
+            _add_env(add_env)
         self.working_dir = os.getcwd()
 
     @property
@@ -908,7 +916,8 @@ def _resubmit(session_id, job, temp_dir):
 def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
              num_slots=1, temp_dir=DEFAULT_TEMP_DIR, white_list=None,
              queue=DEFAULT_QUEUE, quiet=True, local=False, max_processes=1,
-             interpreting_shell=None, copy_env=True, completion_mail=False):
+             interpreting_shell=None, copy_env=True, add_env=None,
+             completion_mail=False):
     """
     Maps a function onto the cluster.
 
@@ -953,6 +962,10 @@ def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
     :type interpreting_shell: str
     :param copy_env: copy environment from master node to worker node?
     :type copy_env: boolean
+    :param add_env: Environment variables to add to the environment.
+                    Overwrites variables which already exist due to
+                    ``copy_env=True``.
+    :type add_env: dict
     :param completion_mail: whether to send an e-mail upon completion of all
                             jobs
     :type completion_mail: boolean
@@ -965,7 +978,7 @@ def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
                 cleanup=cleanup, mem_free=mem_free,
                 name='{}{}'.format(name, job_num), num_slots=num_slots,
                 queue=queue, interpreting_shell=interpreting_shell,
-                copy_env=copy_env)
+                copy_env=copy_env, add_env=add_env)
             for job_num, args in enumerate(args_list)]
 
     # process jobs
