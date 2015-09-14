@@ -67,6 +67,11 @@ from gridmap.conf import (CHECK_FREQUENCY, CREATE_PLOTS, DEFAULT_QUEUE,
 from gridmap.data import zdumps, zloads
 from gridmap.runner import _heart_beat
 
+
+class DRMAANotPresentException(ImportError):
+    pass
+
+
 if DRMAA_PRESENT:
     from drmaa import (ExitTimeoutException, InvalidJobException,
                        JobControlAction, JOB_IDS_SESSION_ALL, Session,
@@ -839,7 +844,7 @@ def _append_job_to_session(session, job, temp_dir=DEFAULT_TEMP_DIR, quiet=True):
 
 
 def process_jobs(jobs, temp_dir=DEFAULT_TEMP_DIR, white_list=None, quiet=True,
-                 max_processes=1, local=False):
+                 max_processes=1, local=False, require_cluster=False):
     """
     Take a list of jobs and process them on the cluster.
 
@@ -859,11 +864,18 @@ def process_jobs(jobs, temp_dir=DEFAULT_TEMP_DIR, white_list=None, quiet=True,
     :param local: Should we execute the jobs locally in separate processes
                   instead of on the the cluster?
     :type local: bool
+    :param require_cluster: Should we raise an exception if access to cluster
+                            is not available?
+    :type require_cluster: bool
 
     :returns: List of Job results
     """
     if (not local and not DRMAA_PRESENT):
         logger = logging.getLogger(__name__)
+        if require_cluster:
+            raise DRMAANotPresentException(
+                'Could not import drmaa, but cluster access required.'
+            )
         logger.warning('Could not import drmaa. Processing jobs locally.')
         local = True
 
@@ -917,7 +929,7 @@ def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
              num_slots=1, temp_dir=DEFAULT_TEMP_DIR, white_list=None,
              queue=DEFAULT_QUEUE, quiet=True, local=False, max_processes=1,
              interpreting_shell=None, copy_env=True, add_env=None,
-             completion_mail=False):
+             completion_mail=False, require_cluster=False):
     """
     Maps a function onto the cluster.
 
@@ -969,6 +981,9 @@ def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
     :param completion_mail: whether to send an e-mail upon completion of all
                             jobs
     :type completion_mail: boolean
+    :param require_cluster: Should we raise an exception if access to cluster
+                            is not available?
+    :type require_cluster: bool
 
     :returns: List of Job results
     """
@@ -985,7 +1000,8 @@ def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
     job_results = process_jobs(jobs, temp_dir=temp_dir,
                                white_list=white_list,
                                quiet=quiet, local=local,
-                               max_processes=max_processes)
+                               max_processes=max_processes,
+                               require_cluster=require_cluster)
 
     # send a completion mail (if requested and configured)
     if completion_mail and SEND_ERROR_MAIL:

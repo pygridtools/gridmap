@@ -74,11 +74,13 @@ from gridmap.conf import (CHECK_FREQUENCY, CREATE_PLOTS, DEFAULT_QUEUE,
                           MAX_IDLE_HEARTBEATS, MAX_TIME_BETWEEN_HEARTBEATS,
                           NUM_RESUBMITS, SEND_ERROR_MAIL, SMTP_SERVER,
                           USE_MEM_FREE, DEFAULT_TEMP_DIR)
-from gridmap.job import Job, JobException, process_jobs, grid_map
+from gridmap.job import (Job, JobException, process_jobs, grid_map,
+                         DRMAANotPresentException)
 from gridmap.version import __version__, VERSION
 
 # For * imports
-__all__ = ['Job', 'JobException', 'process_jobs', 'grid_map', 'CHECK_FREQUENCY',
+__all__ = ['Job', 'JobException', 'process_jobs', 'grid_map',
+           'DRMAANotPresentException', 'CHECK_FREQUENCY',
            'CREATE_PLOTS', 'DEFAULT_QUEUE', 'ERROR_MAIL_RECIPIENT',
            'ERROR_MAIL_SENDER', 'HEARTBEAT_FREQUENCY', 'IDLE_THRESHOLD',
            'MAX_IDLE_HEARTBEATS', 'MAX_TIME_BETWEEN_HEARTBEATS',
