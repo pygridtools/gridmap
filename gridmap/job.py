@@ -293,7 +293,6 @@ class Job(object):
         if self.queue:
             ret += " -q {}".format(self.queue)
 
-        print("------" + ret)
         return ret
 
 
