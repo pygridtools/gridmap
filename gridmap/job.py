@@ -116,11 +116,11 @@ class Job(object):
                  'cause_of_death', 'num_resubmits', 'home_address',
                  'log_stderr_fn', 'log_stdout_fn', 'timestamp', 'host_name',
                  'heart_beat', 'track_mem', 'track_cpu', 'interpreting_shell',
-                 'copy_env')
+                 'copy_env', 'engine')
 
     def __init__(self, f, args, kwlist=None, cleanup=True, mem_free="1G",
                  name='gridmap_job', num_slots=1, queue=DEFAULT_QUEUE,
-                 interpreting_shell=None, copy_env=True, add_env=None
+                 interpreting_shell=None, copy_env=True, add_env=None,
                  engine='SGE'):
         """
         Initializes a new Job.
