@@ -248,6 +248,7 @@ class Job(object):
         contain a pickled version of it.
         Input data is removed after execution to save space.
         """
+
         try:
             self.ret = self.function(*self.args, **self.kwlist)
         except Exception as exception:
@@ -263,11 +264,13 @@ class Job(object):
         pbs = (self.engine == "TORQUE" or self.engine == "PBS")
         sge = (self.engine == "SGE")
 
-        ret = "-shell yes"
-        if self.interpreting_shell:
-            ret += " -S {}".format(self.interpreting_shell)
+        ret = ""
 
         if sge:
+            ret = "-shell yes"
+            if self.interpreting_shell:
+                ret += " -S {}".format(self.interpreting_shell)
+
             ret += " -b yes"
 
 
@@ -281,7 +284,7 @@ class Job(object):
             if sge:
                 ret += " -l mem_free={}".format(self.mem_free)
             if pbs:
-                ret += " -l mem={}".format(self.mem_free)
+                ret += " -l vmem={}".format(self.mem_free)
 
         if self.white_list:
             if sge:
@@ -290,6 +293,7 @@ class Job(object):
         if self.queue:
             ret += " -q {}".format(self.queue)
 
+        print("------" + ret)
         return ret
 
 
