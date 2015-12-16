@@ -32,7 +32,11 @@ import logging
 from datetime import datetime
 
 from gridmap import Job, process_jobs
+import argparse
 
+parser = argparse.ArgumentParser()
+parser.add_argument('--engine', help='Name of the grid engine you are using. TOURQUE|PBS|SGE', default='SGE')
+parser.add_argument('--queue', help='Name of the queue you want to send jobs to.', default='all.q')
 
 def sleep_walk(secs):
     '''
@@ -57,7 +61,7 @@ def compute_factorial(n):
     return ret
 
 
-def make_jobs():
+def make_jobs(engine, queue):
     """
     creates a list of Job objects,
     which carry all information needed
@@ -77,7 +81,7 @@ def make_jobs():
     for arg in inputvec:
         # The default queue used by the Job class is all.q. You must specify
         # the `queue` keyword argument if that is not the name of your queue.
-        job = Job(compute_factorial, arg, queue='all.q')
+        job = Job(compute_factorial, arg, queue=queue, engine=engine)
         jobs.append(job)
 
     return jobs
@@ -88,19 +92,23 @@ def main():
     run a set of jobs on cluster
     """
 
+    args = parser.parse_args()
+    engine = args.engine
+    queue = args.queue
+
     logging.captureWarnings(True)
     logging.basicConfig(format=('%(asctime)s - %(name)s - %(levelname)s - ' +
                                 '%(message)s'), level=logging.INFO)
 
     print("=====================================")
     print("========   Submit and Wait   ========")
-    print("=====================================")
-    print("")
+    print("=====================================\n")
 
-    functionJobs = make_jobs()
 
-    print("sending function jobs to cluster")
-    print("")
+    functionJobs = make_jobs(engine, queue)
+
+    print("Sending function jobs to cluster engine: {}. Into queue: {} \n".format(engine, queue))
+
 
     job_outputs = process_jobs(functionJobs, max_processes=4)
 
@@ -111,4 +119,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
