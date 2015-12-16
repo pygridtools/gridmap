@@ -75,7 +75,7 @@ from socket import gethostname
 try:
     import drmaa
     DRMAA_PRESENT = True
-except (ImportError, RuntimeError):
+except (ImportError, OSError, RuntimeError):
     logger = logging.getLogger(__name__)
     logger.warning('Could not import drmaa. Only local multiprocessing ' +
                    'supported.')
@@ -127,3 +127,6 @@ USE_MEM_FREE = 'TRUE' == os.getenv('USE_MEM_FREE', 'False').upper()
 
 # Which queue should we use by default
 DEFAULT_QUEUE = os.getenv('DEFAULT_QUEUE', 'all.q')
+
+# Where shall we use as temporary_directory
+DEFAULT_TEMP_DIR = os.getenv('DEFAULT_TEMP_DIR', '/scratch/')

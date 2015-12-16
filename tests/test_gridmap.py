@@ -22,16 +22,18 @@ Some simple unit tests for GridMap.
 
 from __future__ import division, print_function, unicode_literals
 
+import os
 import logging
 from datetime import datetime
 from multiprocessing import Pool
+from operator import add
+from functools import partial
 
 import gridmap
 from gridmap import (Job, process_jobs, grid_map, HEARTBEAT_FREQUENCY,
-                     MAX_TIME_BETWEEN_HEARTBEATS)
+                     MAX_TIME_BETWEEN_HEARTBEATS, DRMAANotPresentException)
 
-from nose.tools import eq_
-
+from nose.tools import eq_, assert_raises
 
 # Setup logging
 logging.captureWarnings(True)
@@ -66,11 +68,12 @@ def compute_factorial(args):
     return ret
 
 
-def check_map(wait_sec, local):
+def check_map(wait_sec, local, require_cluster=False):
     inputs = [(1, wait_sec), (2, wait_sec), (4, wait_sec), (8, wait_sec), (16,
               wait_sec)]
     expected = list(map(compute_factorial, inputs))
-    outputs = grid_map(compute_factorial, inputs, quiet=False, local=local)
+    outputs = grid_map(compute_factorial, inputs, quiet=False, local=local,
+                       require_cluster=require_cluster)
     eq_(expected, outputs)
 
 
@@ -82,6 +85,30 @@ def test_map():
 
 def test_map_local():
     yield check_map, 0, True
+
+
+# Create a simple partial object and test as above
+add_two = partial(add, 2)
+
+def check_map_partial(local):
+    inputs = [1, 2, 4, 6, 8, 16]
+    expected = [x + 2 for x in inputs]
+    outputs = grid_map(add_two, inputs, quiet=False, local=local)
+    eq_(expected, outputs)
+
+
+def test_map_partial():
+    yield check_map_partial, False
+
+
+def test_map_partial_local():
+    yield check_map_partial, True
+
+
+def test_map_raises_if_not_cluster():
+    if gridmap.conf.DRMAA_PRESENT:
+        return
+    assert_raises(DRMAANotPresentException, check_map, 0, False, True)
 
 
 def make_jobs(inputvec, function):
@@ -101,23 +128,30 @@ def make_jobs(inputvec, function):
     return jobs
 
 
-def check_process_jobs(wait_sec, local):
+def check_process_jobs(wait_sec, local, require_cluster=False):
     inputs = [(1, wait_sec), (2, wait_sec), (4, wait_sec), (8, wait_sec), (16,
               wait_sec)]
     expected = list(map(compute_factorial, inputs))
     function_jobs = make_jobs(inputs, compute_factorial)
-    outputs = process_jobs(function_jobs, quiet=False, local=local)
+    outputs = process_jobs(function_jobs, quiet=False, local=local,
+                           require_cluster=require_cluster)
     eq_(expected, outputs)
 
 
 def test_process_jobs():
     for wait_sec in [0, HEARTBEAT_FREQUENCY + 1,
                      MAX_TIME_BETWEEN_HEARTBEATS + 1]:
-        yield check_map, wait_sec, False
+        yield check_process_jobs, wait_sec, False
 
 
 def test_process_jobs_local():
     yield check_process_jobs, 0, True
+
+
+def test_process_jobs_raise_if_not_cluster():
+    if gridmap.conf.DRMAA_PRESENT:
+        return
+    assert_raises(DRMAANotPresentException, check_process_jobs, 0, False, True)
 
 
 def pool_map_factorial(inputs):

@@ -43,6 +43,7 @@ import os
 import smtplib
 import sys
 import traceback
+import functools
 from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -61,9 +62,15 @@ from gridmap.conf import (CHECK_FREQUENCY, CREATE_PLOTS, DEFAULT_QUEUE,
                           ERROR_MAIL_SENDER, HEARTBEAT_FREQUENCY,
                           IDLE_THRESHOLD, MAX_IDLE_HEARTBEATS,
                           MAX_TIME_BETWEEN_HEARTBEATS, NUM_RESUBMITS,
-                          SEND_ERROR_MAIL, SMTP_SERVER, USE_MEM_FREE)
+                          SEND_ERROR_MAIL, SMTP_SERVER, USE_MEM_FREE,
+                          DEFAULT_TEMP_DIR)
 from gridmap.data import zdumps, zloads
 from gridmap.runner import _heart_beat
+
+
+class DRMAANotPresentException(ImportError):
+    pass
+
 
 if DRMAA_PRESENT:
     from drmaa import (ExitTimeoutException, InvalidJobException,
@@ -108,10 +115,13 @@ class Job(object):
                  'name', 'queue', 'environment', 'working_dir',
                  'cause_of_death', 'num_resubmits', 'home_address',
                  'log_stderr_fn', 'log_stdout_fn', 'timestamp', 'host_name',
-                 'heart_beat', 'track_mem', 'track_cpu', 'engine')
+                 'heart_beat', 'track_mem', 'track_cpu', 'interpreting_shell',
+                 'copy_env')
 
     def __init__(self, f, args, kwlist=None, cleanup=True, mem_free="1G",
-                 name='gridmap_job', num_slots=1, queue=DEFAULT_QUEUE, engine="SGE"):
+                 name='gridmap_job', num_slots=1, queue=DEFAULT_QUEUE,
+                 interpreting_shell=None, copy_env=True, add_env=None
+                 engine='SGE'):
         """
         Initializes a new Job.
 
@@ -132,10 +142,17 @@ class Job(object):
         :type num_slots: int
         :param queue: SGE queue to schedule job on.
         :type queue: str
-
-        :param engine: Indicates compatability with a grid engine. Either SGE or TORQUE / PBS
+        :param engine: Indicates compatability with a grid engine. Either SGE or
+                        TORQUE / PBS
         :type engine: str
-
+        :param interpreting_shell: The interpreting shell for the job
+        :type interpreting_shell: str
+        :param copy_env: copy environment from master node to worker node?
+        :type copy_env: boolean
+        :param add_env: Environment variables to add to the environment.
+                        Overwrites variables which already exist due to
+                        ``copy_env=True``.
+        :type add_env: dict
         """
         self.track_mem = []
         self.track_cpu = []
@@ -162,19 +179,27 @@ class Job(object):
         self.name = name.replace(' ', '_')
         self.queue = queue
         self.engine = engine
+        self.interpreting_shell = interpreting_shell
+        self.copy_env = copy_env
+
         # Save copy of environment variables
         self.environment = {}
-        for env_var, value in os.environ.items():
-            try:
-                if not isinstance(env_var, bytes):
-                    env_var = env_var.encode()
-                if not isinstance(value, bytes):
-                    value = value.encode()
-            except UnicodeEncodeError:
-                logger = logging.getLogger(__name__)
-                logger.warning('Skipping non-ASCII environment variable.')
-            else:
-                self.environment[env_var] = value
+        def _add_env(env_vars):
+            for env_var, value in env_vars.items():
+                try:
+                    if not isinstance(env_var, bytes):
+                        env_var = env_var.encode()
+                    if not isinstance(value, bytes):
+                        value = value.encode()
+                except UnicodeEncodeError:
+                    logger = logging.getLogger(__name__)
+                    logger.warning('Skipping non-ASCII environment variable.')
+                else:
+                    self.environment[env_var] = value
+        if self.copy_env:
+            _add_env(os.environ)
+        if add_env is not None:
+            _add_env(add_env)
         self.working_dir = os.getcwd()
 
     @property
@@ -196,8 +221,9 @@ class Job(object):
         except TypeError:
             self.path = ''
 
-        # if module is not __main__, all is good
-        if m.__name__ != "__main__":
+        # if module is not __main__, all is good. If the function is a
+        #   partial function we'll take it as is also.
+        if isinstance(f, functools.partial) or m.__name__ != "__main__":
             self._f = f
 
         else:
@@ -237,10 +263,11 @@ class Job(object):
         pbs = (self.engine == "TORQUE" or self.engine == "PBS")
         sge = (self.engine == "SGE")
 
-        ret = ""
+        ret = "-shell yes"
+        if self.interpreting_shell:
+            ret += " -S {}".format(self.interpreting_shell)
+        ret += " -b yes"
 
-        if sge:
-            ret = "-shell yes -b yes"
 
         if self.num_slots and self.num_slots > 1:
             if sge:
@@ -272,7 +299,7 @@ class JobMonitor(object):
     """
     Job monitor that communicates with other nodes via 0MQ.
     """
-    def __init__(self, temp_dir='/scratch'):
+    def __init__(self, temp_dir=DEFAULT_TEMP_DIR):
         """
         set up socket
         """
@@ -539,25 +566,57 @@ class JobMonitor(object):
                    for job in self.jobs)
 
 
-def send_error_mail(job):
+def _send_mail(subject, body_text, attachments=None):
     """
-    send out diagnostic email
+    Send out job status email
+
+    This is a helper function for send_error_mail and send_completion_mail
     """
+
     logger = logging.getLogger(__name__)
 
     # Connect to server
     try:
         s = smtplib.SMTP(SMTP_SERVER)
     except smtplib.SMTPConnectError:
-        logger.error('Failed to connect to SMTP server to send error ' +
+        logger.error('Failed to connect to SMTP server to send status ' +
                      'email.', exc_info=True)
         return
 
     # create message
     msg = MIMEMultipart()
-    msg["subject"] = "GridMap error {}".format(job.name)
+    msg["subject"] = subject
     msg["From"] = ERROR_MAIL_SENDER
     msg["To"] = ERROR_MAIL_RECIPIENT
+
+    logger.info('Email body: %s', body_text)
+
+    body_msg = MIMEText(body_text)
+    msg.attach(body_msg)
+
+    if attachments is not None:
+        for attachment in attachments:
+            msg.attach(attachment)
+
+    # Send mail
+    try:
+        s.sendmail(ERROR_MAIL_SENDER, ERROR_MAIL_RECIPIENT, msg.as_string())
+    except (SMTPRecipientsRefused, SMTPHeloError, SMTPSenderRefused,
+            SMTPDataError):
+        logger.error('Failed to send status email.', exc_info=True)
+
+    s.quit()
+
+
+def send_error_mail(job):
+    """
+    send out diagnostic email
+    """
+    logger = logging.getLogger(__name__)
+
+    # create message
+    subject = "GridMap error {}".format(job.name)
+    attachments = list()
 
     # compose error message
     body_text = ""
@@ -578,17 +637,12 @@ def send_error_mail(job):
         body_text += "Job encountered exception: {}\n".format(job.ret)
         body_text += "Stacktrace: {}\n\n".format(job.traceback)
 
-    logger.info('Email body: %s', body_text)
-
-    body_msg = MIMEText(body_text)
-    msg.attach(body_msg)
-
     # attach log file
     if job.heart_beat and "log_file" in job.heart_beat:
         log_file_attachement = MIMEText(job.heart_beat['log_file'])
         log_file_attachement.add_header('Content-Disposition', 'attachment',
                                         filename='{}_log.txt'.format(job.id))
-        msg.attach(log_file_attachement)
+        attachments.append(log_file_attachement)
 
     # if matplotlib is installed
     if CREATE_PLOTS:
@@ -615,7 +669,7 @@ def send_error_mail(job):
         img_mem_attachement = MIMEImage(img_data)
         img_mem_attachement.add_header('Content-Disposition', 'attachment',
                                        filename=os.path.basename(img_mem_fn))
-        msg.attach(img_mem_attachement)
+        attachments.append(img_mem_attachement)
 
         # attach cpu plot
         img_cpu_fn = os.path.join("/tmp", "{}_cpu.png".format(job.id))
@@ -630,23 +684,18 @@ def send_error_mail(job):
         img_cpu_attachement = MIMEImage(img_data)
         img_cpu_attachement.add_header('Content-Disposition', 'attachment',
                                        filename=os.path.basename(img_cpu_fn))
-        msg.attach(img_cpu_attachement)
+        attachments.append(img_cpu_attachement)
 
     # Send mail
-    try:
-        s.sendmail(ERROR_MAIL_SENDER, ERROR_MAIL_RECIPIENT, msg.as_string())
-    except (SMTPRecipientsRefused, SMTPHeloError, SMTPSenderRefused,
-            SMTPDataError):
-        logger.error('Failed to send error email.', exc_info=True)
+    _send_mail(subject, body_text, attachments)
 
     # Clean up plot temporary files
     if CREATE_PLOTS:
         os.unlink(img_cpu_fn)
         os.unlink(img_mem_fn)
-    s.quit()
 
 
-def handle_resubmit(session_id, job, temp_dir='/scratch/'):
+def handle_resubmit(session_id, job, temp_dir=DEFAULT_TEMP_DIR):
     """
     heuristic to determine if the job should be resubmitted
 
@@ -719,7 +768,7 @@ def _process_jobs_locally(jobs, max_processes=1):
     return jobs
 
 
-def _submit_jobs(jobs, home_address, temp_dir='/scratch', white_list=None,
+def _submit_jobs(jobs, home_address, temp_dir=DEFAULT_TEMP_DIR, white_list=None,
                  quiet=True):
     """
     Method used to send a list of jobs onto the cluster.
@@ -756,7 +805,7 @@ def _submit_jobs(jobs, home_address, temp_dir='/scratch', white_list=None,
     return sid
 
 
-def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
+def _append_job_to_session(session, job, temp_dir=DEFAULT_TEMP_DIR, quiet=True):
     """
     For an active session, append new job based on information stored in job
     object. Also sets job.id to the ID of the job on the grid.
@@ -813,8 +862,8 @@ def _append_job_to_session(session, job, temp_dir='/scratch/', quiet=True):
     session.deleteJobTemplate(jt)
 
 
-def process_jobs(jobs, temp_dir='/scratch/', white_list=None, quiet=True,
-                 max_processes=1, local=False):
+def process_jobs(jobs, temp_dir=DEFAULT_TEMP_DIR, white_list=None, quiet=True,
+                 max_processes=1, local=False, require_cluster=False):
     """
     Take a list of jobs and process them on the cluster.
 
@@ -834,11 +883,18 @@ def process_jobs(jobs, temp_dir='/scratch/', white_list=None, quiet=True,
     :param local: Should we execute the jobs locally in separate processes
                   instead of on the the cluster?
     :type local: bool
+    :param require_cluster: Should we raise an exception if access to cluster
+                            is not available?
+    :type require_cluster: bool
 
     :returns: List of Job results
     """
     if (not local and not DRMAA_PRESENT):
         logger = logging.getLogger(__name__)
+        if require_cluster:
+            raise DRMAANotPresentException(
+                'Could not import drmaa, but cluster access required.'
+            )
         logger.warning('Could not import drmaa. Processing jobs locally.')
         local = True
 
@@ -889,8 +945,10 @@ def _resubmit(session_id, job, temp_dir):
 # MapReduce Interface
 #####################
 def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
-             num_slots=1, temp_dir='/scratch/', white_list=None,
-             queue=DEFAULT_QUEUE, quiet=True, local=False, max_processes=1):
+             num_slots=1, temp_dir=DEFAULT_TEMP_DIR, white_list=None,
+             queue=DEFAULT_QUEUE, quiet=True, local=False, max_processes=1,
+             interpreting_shell=None, copy_env=True, add_env=None,
+             completion_mail=False, require_cluster=False):
     """
     Maps a function onto the cluster.
 
@@ -931,6 +989,20 @@ def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
     :param max_processes: The maximum number of concurrent processes to use if
                           processing jobs locally.
     :type max_processes: int
+    :param interpreting_shell: The interpreting shell for the jobs.
+    :type interpreting_shell: str
+    :param copy_env: copy environment from master node to worker node?
+    :type copy_env: boolean
+    :param add_env: Environment variables to add to the environment.
+                    Overwrites variables which already exist due to
+                    ``copy_env=True``.
+    :type add_env: dict
+    :param completion_mail: whether to send an e-mail upon completion of all
+                            jobs
+    :type completion_mail: boolean
+    :param require_cluster: Should we raise an exception if access to cluster
+                            is not available?
+    :type require_cluster: bool
 
     :returns: List of Job results
     """
@@ -939,13 +1011,34 @@ def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
     jobs = [Job(f, [args] if not isinstance(args, list) else args,
                 cleanup=cleanup, mem_free=mem_free,
                 name='{}{}'.format(name, job_num), num_slots=num_slots,
-                queue=queue)
+                queue=queue, interpreting_shell=interpreting_shell,
+                copy_env=copy_env, add_env=add_env)
             for job_num, args in enumerate(args_list)]
 
     # process jobs
-    job_results = process_jobs(jobs, temp_dir=temp_dir, white_list=white_list,
+    job_results = process_jobs(jobs, temp_dir=temp_dir,
+                               white_list=white_list,
                                quiet=quiet, local=local,
-                               max_processes=max_processes)
+                               max_processes=max_processes,
+                               require_cluster=require_cluster)
+
+    # send a completion mail (if requested and configured)
+    if completion_mail and SEND_ERROR_MAIL:
+        send_completion_mail(name=name)
 
     return job_results
 
+
+def send_completion_mail(name):
+    """
+    send out success email
+    """
+    # create message
+    subject = "GridMap completed grid_map {}".format(name)
+
+    # compose error message
+    body_text = ""
+    body_text += "Job {}\n".format(name)
+
+    # Send mail
+    _send_mail(subject, body_text)
