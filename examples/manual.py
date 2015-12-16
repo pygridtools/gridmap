@@ -37,7 +37,7 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--engine', help='Name of the grid engine you are using. TOURQUE|PBS|SGE', default='SGE')
 parser.add_argument('--queue', help='Name of the queue you want to send jobs to.', default='all.q')
-
+parser.add_argument('--vmem', help='Amount of memory to use on a node.', default='200m')
 def sleep_walk(secs):
     '''
     Pass the time by adding numbers until the specified number of seconds has
@@ -61,7 +61,7 @@ def compute_factorial(n):
     return ret
 
 
-def make_jobs(engine, queue):
+def make_jobs(engine, queue, vmem):
     """
     creates a list of Job objects,
     which carry all information needed
@@ -81,7 +81,8 @@ def make_jobs(engine, queue):
     for arg in inputvec:
         # The default queue used by the Job class is all.q. You must specify
         # the `queue` keyword argument if that is not the name of your queue.
-        job = Job(compute_factorial, arg, queue=queue, engine=engine)
+        job = Job(compute_factorial, arg, queue=queue, engine=engine,
+                                    mem_free=vmem)
         jobs.append(job)
 
     return jobs
@@ -95,6 +96,7 @@ def main():
     args = parser.parse_args()
     engine = args.engine
     queue = args.queue
+    vmem = args.vmem
 
     logging.captureWarnings(True)
     logging.basicConfig(format=('%(asctime)s - %(name)s - %(levelname)s - ' +
@@ -105,7 +107,7 @@ def main():
     print("=====================================\n")
 
 
-    functionJobs = make_jobs(engine, queue)
+    functionJobs = make_jobs(engine, queue, vmem)
 
     print("Sending function jobs to cluster engine: {}. Into queue: {} \n".format(engine, queue))
 
