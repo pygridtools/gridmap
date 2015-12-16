@@ -266,7 +266,9 @@ class Job(object):
         ret = "-shell yes"
         if self.interpreting_shell:
             ret += " -S {}".format(self.interpreting_shell)
-        ret += " -b yes"
+
+        if sge:
+            ret += " -b yes"
 
 
         if self.num_slots and self.num_slots > 1:
