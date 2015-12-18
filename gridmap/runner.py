@@ -190,8 +190,13 @@ def _run_job(job_id, address):
     logger = logging.getLogger(__name__)
     parent_pid = os.getpid()
     log_path = ""
+
     if 'SGE_STDERR_PATH' in os.environ:
         log_path = os.environ['SGE_STDERR_PATH']
+
+    if 'PBS_JOBDIR' in os.environ:
+        log_path = os.environ['PBS_JOBDIR']
+
     heart = multiprocessing.Process(target=_heart_beat,
                                     args=(job_id, address, parent_pid,
                                           log_path,
