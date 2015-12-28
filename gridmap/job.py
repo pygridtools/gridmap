@@ -304,7 +304,7 @@ class JobMonitor(object):
     """
     Job monitor that communicates with other nodes via 0MQ.
     """
-    def __init__(self, temp_dir=DEFAULT_TEMP_DIR):
+    def __init__(self, temp_dir=DEFAULT_TEMP_DIR, port=None):
         """
         set up socket
         """
@@ -331,7 +331,11 @@ class JobMonitor(object):
         self.interface = "tcp://%s" % (self.ip_address)
 
         # bind to random port and remember it
-        self.port = self.socket.bind_to_random_port(self.interface)
+        if port is None:
+            self.port = self.socket.bind_to_random_port(self.interface)
+        else:
+            self.port = port
+
         self.home_address = "%s:%i" % (self.interface, self.port)
 
         self.logger.info("Setting up JobMonitor on %s", self.home_address)
@@ -868,7 +872,7 @@ def _append_job_to_session(session, job, temp_dir=DEFAULT_TEMP_DIR, quiet=True):
 
 
 def process_jobs(jobs, temp_dir=DEFAULT_TEMP_DIR, white_list=None, quiet=True,
-                 max_processes=1, local=False, require_cluster=False):
+                 max_processes=1, local=False, require_cluster=False, port=None):
     """
     Take a list of jobs and process them on the cluster.
 
@@ -905,7 +909,7 @@ def process_jobs(jobs, temp_dir=DEFAULT_TEMP_DIR, white_list=None, quiet=True,
 
     if not local:
         # initialize monitor to get port number
-        with JobMonitor(temp_dir=temp_dir) as monitor:
+        with JobMonitor(temp_dir=temp_dir, port=port) as monitor:
             # get interface and port
             home_address = monitor.home_address
 
