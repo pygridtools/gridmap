@@ -38,6 +38,9 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--engine', help='Name of the grid engine you are using. TOURQUE|PBS|SGE', default='SGE')
 parser.add_argument('--queue', help='Name of the queue you want to send jobs to.', default='all.q')
 parser.add_argument('--vmem', help='Amount of memory to use on a node.', default='200m')
+parser.add_argument('--port', help='The port through which to communicate with the JobMonitor', default=None, type=int)
+parser.add_argument('--local', help='Flag indicating whether the jobs should run locally instead of on the cluster', default=False, type=bool)
+parser.add_argument("--logging", type=str, choices=['INFO', 'DEBUG', 'WARN'], help='increase output verbosity', default='INFO')
 def sleep_walk(secs):
     '''
     Pass the time by adding numbers until the specified number of seconds has
@@ -97,10 +100,19 @@ def main():
     engine = args.engine
     queue = args.queue
     vmem = args.vmem
+    port = args.port
+    local =args.local
+    level = args.logging
+
+    if level is 'DEBUG':
+        level = logging.DEBUG
+    elif level is 'WARN':
+        level = logging.WARN
+    elif level is 'INFO':
+        level = logging.INFO
 
     logging.captureWarnings(True)
-    logging.basicConfig(format=('%(asctime)s - %(name)s - %(levelname)s - ' +
-                                '%(message)s'), level=logging.INFO)
+    logging.basicConfig(format=('%(asctime)s - %(name)s - %(levelname)s - ' +  '%(message)s'), level=level)
 
     print("=====================================")
     print("========   Submit and Wait   ========")
@@ -108,11 +120,13 @@ def main():
 
 
     functionJobs = make_jobs(engine, queue, vmem)
+    if local :
+        print('Running jobs locally')
+    else:
+        print("Sending function jobs to cluster engine: {}. Into queue: {} \n".format(engine, queue))
 
-    print("Sending function jobs to cluster engine: {}. Into queue: {} \n".format(engine, queue))
 
-
-    job_outputs = process_jobs(functionJobs, max_processes=4)
+    job_outputs = process_jobs(functionJobs, max_processes=4, port=port, local=local)
 
     print("results from each job")
     for (i, result) in enumerate(job_outputs):
