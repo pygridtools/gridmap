@@ -188,14 +188,18 @@ def _run_job(job_id, address):
     """
     # create heart beat process
     logger = logging.getLogger(__name__)
-    parent_pid = os.getpid()
-    log_path = ""
 
+    parent_pid = os.getpid()
+    log_path = None
     if 'SGE_STDERR_PATH' in os.environ:
         log_path = os.environ['SGE_STDERR_PATH']
 
-    if 'PBS_JOBDIR' in os.environ:
-        log_path = os.environ['PBS_JOBDIR']
+    if log_path is None and 'PBS_O_WORKDIR' in os.environ:
+        n = 'log_{}.out'.format(os.environ['PBS_JOBID'], )
+        log_path = os.path.join(os.environ['PBS_O_WORKDIR'], n)
+
+    if log_path is None:
+        log_path='./log.out'
 
     heart = multiprocessing.Process(target=_heart_beat,
                                     args=(job_id, address, parent_pid,
