@@ -500,8 +500,6 @@ class JobMonitor(object):
         for job in self.jobs:
 
             # noting was returned yet
-            print("checking: ")
-            print(job.ret)
             if isinstance(job.ret, basestring) and  job.ret == _JOB_NOT_FINISHED:
 
                 # exclude first-timers
