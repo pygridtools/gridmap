@@ -570,10 +570,6 @@ class JobMonitor(object):
         def condition(retval):
             return  (isinstance(retval, basestring) and retval == _JOB_NOT_FINISHED)
 
-        for j in self.jobs:
-            print(j.ret)
-            print(condition(j.ret))
-
         running_jobs = [ job for job in self.jobs if condition(job.ret) ]
         num_jobs = len(self.jobs)
 
