@@ -56,6 +56,11 @@ from smtplib import (SMTPRecipientsRefused, SMTPHeloError, SMTPSenderRefused,
                      SMTPDataError)
 
 import zmq
+#add this for chekcing of string instances in python 2 and 3
+try:
+  basestring
+except NameError:
+  basestring = str
 
 from gridmap.conf import (CHECK_FREQUENCY, CREATE_PLOTS, DEFAULT_QUEUE,
                           DRMAA_PRESENT, ERROR_MAIL_RECIPIENT,
@@ -495,7 +500,9 @@ class JobMonitor(object):
         for job in self.jobs:
 
             # noting was returned yet
-            if job.ret == _JOB_NOT_FINISHED:
+            print("checking: ")
+            print(job.ret)
+            if isinstance(job.ret, basestring) and  job.ret == _JOB_NOT_FINISHED:
 
                 # exclude first-timers
                 if job.timestamp is not None:
@@ -561,18 +568,23 @@ class JobMonitor(object):
         """
         checks for all jobs if they are done
         """
+
+        def condition(retval):
+            return  (isinstance(retval, basestring) and retval == _JOB_NOT_FINISHED)
+
+        for j in self.jobs:
+            print(j.ret)
+            print(condition(j.ret))
+
+        running_jobs = [ job for job in self.jobs if condition(job.ret) ]
+        num_jobs = len(self.jobs)
+
         if self.logger.getEffectiveLevel() == logging.DEBUG:
-            num_jobs = len(self.jobs)
-            num_completed = sum((job.ret != _JOB_NOT_FINISHED and
-                                 not isinstance(job.ret, Exception))
-                                for job in self.jobs)
-            self.logger.debug('%i out of %i jobs completed', num_completed,
+            self.logger.debug('%i out of %i jobs completed', num_jobs - len(running_jobs),
                               num_jobs)
 
         # exceptions will be handled in check_if_alive
-        return all((job.ret != _JOB_NOT_FINISHED and not isinstance(job.ret,
-                                                                    Exception))
-                   for job in self.jobs)
+        return len(running_jobs) == 0
 
 
 def _send_mail(subject, body_text, attachments=None):
