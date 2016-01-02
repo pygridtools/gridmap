@@ -348,7 +348,7 @@ class JobMonitor(object):
         # uninitialized field (set in check method)
         self.jobs = []
         self.ids = []
-        self.session_id = None
+        self.session = None
         self.id_to_job = {}
 
     def __enter__(self):
@@ -366,29 +366,33 @@ class JobMonitor(object):
         self.socket.close()
 
         # Clean up if we have a valid session
-        if self.session_id is not None:
-            with Session(self.session_id) as session:
+        if self.session is not None:
                 # If we encounter an exception, kill all jobs
-                if exc_type is not None:
-                    self.logger.info('Encountered %s, so killing all jobs.',
-                                     exc_type.__name__)
-                    # try to kill off all old jobs
-                    try:
-                        self.logger.info('Sending Terminate for all jobs on Session {} with id {}'.format(session, self.session_id))
-                        session.control(JOB_IDS_SESSION_ALL,
-                                        JobControlAction.TERMINATE)
-                    except InvalidJobException:
-                        self.logger.debug("Could not kill all jobs for " +
-                                          "session.", exc_info=True)
-
-                # Get rid of job info to prevent memory leak
+            if exc_type is not None:
+                self.logger.info('Encountered %s, so killing all jobs.',    exc_type.__name__)
+                # try to kill off all old jobs
                 try:
-                    session.synchronize([JOB_IDS_SESSION_ALL], TIMEOUT_NO_WAIT,
-                                        dispose=True)
-                except ExitTimeoutException:
-                    pass
+                    self.logger.info('Sending Terminate for all jobs on Session {} '.format(self.session))
+                    session.control(JOB_IDS_SESSION_ALL,  JobControlAction.TERMINATE)
 
-    def check(self, session_id, jobs):
+                except InvalidJobException:
+                    self.logger.debug("Could not kill all jobs for session.", exc_info=True)
+                finally:
+                    self.logger('Exiting drmaa session')
+                    self.session.exit()
+            else:
+                self.logger('Exiting drmaa session')
+                self.session.exit()
+            # Get rid of job info to prevent memory leak
+            try:
+                session.synchronize([JOB_IDS_SESSION_ALL], TIMEOUT_NO_WAIT,
+                                    dispose=True)
+            except ExitTimeoutException:
+                pass
+
+
+
+    def check(self, session, jobs):
         """
         serves input and output data
         """
@@ -396,8 +400,8 @@ class JobMonitor(object):
         self.jobs = jobs
         self.id_to_job = {job.id: job for job in self.jobs}
 
-        # keep track of DRMAA session_id (for resubmissions)
-        self.session_id = session_id
+        # keep track of DRMAA session (for resubmissions)
+        self.session = session
 
         # determines in which interval to check if jobs are alive
         self.logger.debug('Starting local hearbeat')
@@ -426,8 +430,7 @@ class JobMonitor(object):
                         if msg["command"] == "fetch_input":
                             return_msg = self.id_to_job[job_id]
                             job.timestamp = datetime.now()
-                            self.logger.debug("Received input request from %s",
-                                              job_id)
+                            self.logger.debug("Received input request from %s", job_id)
 
                         if msg["command"] == "store_output":
                             # be nice
@@ -439,13 +442,11 @@ class JobMonitor(object):
                                 # copy relevant fields
                                 job.ret = tmp_job.ret
                                 job.traceback = tmp_job.traceback
-                                self.logger.info("Received output from %s",
-                                                  job_id)
+                                self.logger.info("Received output from %s", job_id)
                             # Returned exception instead of job, so store that
                             elif isinstance(msg["data"], tuple):
                                 job.ret, job.traceback = msg["data"]
-                                self.logger.info("Received exception from %s",
-                                                  job_id)
+                                self.logger.info("Received exception from %s",  job_id)
                             else:
                                 self.logger.error(("Received message with " +
                                                    "invalid data: %s"), msg)
@@ -558,7 +559,7 @@ class JobMonitor(object):
                 old_id = job.id
                 job.track_cpu = []
                 job.track_mem = []
-                handle_resubmit(self.session_id, job, temp_dir=self.temp_dir)
+                handle_resubmit(self.session, job, temp_dir=self.temp_dir)
                 # Update job ID if successfully resubmitted
                 self.logger.info('Resubmitted job %s; it now has ID %s',
                                  old_id,
@@ -717,7 +718,7 @@ def send_error_mail(job):
         os.unlink(img_mem_fn)
 
 
-def handle_resubmit(session_id, job, temp_dir=DEFAULT_TEMP_DIR):
+def handle_resubmit(session, job, temp_dir=DEFAULT_TEMP_DIR):
     """
     heuristic to determine if the job should be resubmitted
 
@@ -744,7 +745,7 @@ def handle_resubmit(session_id, job, temp_dir=DEFAULT_TEMP_DIR):
         job.num_resubmits += 1
         job.cause_of_death = ""
 
-        _resubmit(session_id, job, temp_dir)
+        _resubmit(session, job, temp_dir)
     else:
         raise JobException(("Job {0} ({1}) failed after {2} " +
                             "resubmissions").format(job.name, job.id,
@@ -812,19 +813,19 @@ def _submit_jobs(jobs, home_address, temp_dir=DEFAULT_TEMP_DIR, white_list=None,
 
     :returns: Session ID
     """
-    with Session() as session:
-        for job in jobs:
-            # set job white list
-            job.white_list = white_list
+    session = Session()
+    session.initialize()
+    for job in jobs:
+        # set job white list
+        job.white_list = white_list
 
-            # remember address of submission host
-            job.home_address = home_address
+        # remember address of submission host
+        job.home_address = home_address
 
-            # append jobs
-            _append_job_to_session(session, job, temp_dir=temp_dir, quiet=quiet)
+        # append jobs
+        _append_job_to_session(session, job, temp_dir=temp_dir, quiet=quiet)
 
-        sid = session.contact
-    return sid
+    return session
 
 
 def _append_job_to_session(session, job, temp_dir=DEFAULT_TEMP_DIR, quiet=True):
@@ -927,19 +928,19 @@ def process_jobs(jobs, temp_dir=DEFAULT_TEMP_DIR, white_list=None, quiet=True,
             home_address = monitor.home_address
 
             # job_id field is attached to each job object
-            sid = _submit_jobs(jobs, home_address, temp_dir=temp_dir,
+            session = _submit_jobs(jobs, home_address, temp_dir=temp_dir,
                                white_list=white_list, quiet=quiet)
 
             # handling of inputs, outputs and heartbeats
-            logger.info("Started DRMAA session with ID: {}".format(sid))
-            monitor.check(sid, jobs)
+            logger.info("Started DRMAA session with Session {}".format(session))
+            monitor.check(session, jobs)
     else:
         _process_jobs_locally(jobs, max_processes=max_processes)
 
     return [job.ret for job in jobs]
 
 
-def _resubmit(session_id, job, temp_dir):
+def _resubmit(session, job, temp_dir):
     """
     Resubmit a failed job.
 
@@ -949,17 +950,15 @@ def _resubmit(session_id, job, temp_dir):
     logger.info("starting resubmission process")
 
     if DRMAA_PRESENT:
-        # append to session
-        with Session(session_id) as session:
             # try to kill off old job
-            try:
-                session.control(job.id, JobControlAction.TERMINATE)
-                logger.info("zombie job killed")
-            except Exception:
-                logger.error("Could not kill job with SGE id %s", job.id,
-                             exc_info=True)
-            # create new job
-            _append_job_to_session(session, job, temp_dir=temp_dir)
+        try:
+            session.control(job.id, JobControlAction.TERMINATE)
+            logger.info("zombie job killed")
+        except Exception:
+            logger.error("Could not kill job with SGE id %s", job.id,
+                         exc_info=True)
+        # create new job
+        _append_job_to_session(session, job, temp_dir=temp_dir)
     else:
         logger.error("Could not restart job because we're in local mode.")
 
