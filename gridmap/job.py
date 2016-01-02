@@ -374,6 +374,7 @@ class JobMonitor(object):
                                      exc_type.__name__)
                     # try to kill off all old jobs
                     try:
+                        self.logger.info('Sending Terminate for all jobs on Session {} with id {}'.format(session, self.session_id))
                         session.control(JOB_IDS_SESSION_ALL,
                                         JobControlAction.TERMINATE)
                     except InvalidJobException:
@@ -463,6 +464,12 @@ class JobMonitor(object):
                                                   exc_info=True)
                             return_msg = "all good"
                             job.timestamp = datetime.now()
+                            usage = 0
+                            for j in self.jobs:
+                                if len(j.track_cpu) > 0:
+                                    usage += j.track_cpu[-1][0]
+
+                            print("Total CPU usage: {} % for a total of {} submitted jobs.".format(usage, len(self.jobs)), end='\r')
 
                         if msg["command"] == "get_job":
                             # serve job for display
@@ -904,8 +911,8 @@ def process_jobs(jobs, temp_dir=DEFAULT_TEMP_DIR, white_list=None, quiet=True,
 
     :returns: List of Job results
     """
+    logger = logging.getLogger(__name__)
     if (not local and not DRMAA_PRESENT):
-        logger = logging.getLogger(__name__)
         if require_cluster:
             raise DRMAANotPresentException(
                 'Could not import drmaa, but cluster access required.'
@@ -924,6 +931,7 @@ def process_jobs(jobs, temp_dir=DEFAULT_TEMP_DIR, white_list=None, quiet=True,
                                white_list=white_list, quiet=quiet)
 
             # handling of inputs, outputs and heartbeats
+            logger.info("Started DRMAA session with ID: {}".format(sid))
             monitor.check(sid, jobs)
     else:
         _process_jobs_locally(jobs, max_processes=max_processes)
