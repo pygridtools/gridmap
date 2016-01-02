@@ -35,7 +35,7 @@ from gridmap import Job, process_jobs
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--engine', help='Name of the grid engine you are using. TOURQUE|PBS|SGE', default='SGE')
+parser.add_argument('--engine', help='Name of the grid engine you are using.', choices=['TOURQUE','PBS','SGE'], default='SGE')
 parser.add_argument('--queue', help='Name of the queue you want to send jobs to.', default='all.q')
 parser.add_argument('--vmem', help='Amount of memory to use on a node.', default='200m')
 parser.add_argument('--port', help='The port through which to communicate with the JobMonitor', default=None, type=int)

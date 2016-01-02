@@ -340,6 +340,7 @@ class JobMonitor(object):
             self.port = self.socket.bind_to_random_port(self.interface)
         else:
             self.port = port
+            self.socket.bind("{}:{}".format(self.interface, port))
 
         self.home_address = "%s:%i" % (self.interface, self.port)
 
@@ -373,22 +374,20 @@ class JobMonitor(object):
                 # try to kill off all old jobs
                 try:
                     self.logger.info('Sending Terminate for all jobs on Session {} '.format(self.session))
-                    session.control(JOB_IDS_SESSION_ALL,  JobControlAction.TERMINATE)
+                    self.session.control(JOB_IDS_SESSION_ALL,  JobControlAction.TERMINATE)
 
                 except InvalidJobException:
                     self.logger.debug("Could not kill all jobs for session.", exc_info=True)
-                finally:
-                    self.logger('Exiting drmaa session')
-                    self.session.exit()
-            else:
-                self.logger('Exiting drmaa session')
-                self.session.exit()
             # Get rid of job info to prevent memory leak
             try:
-                session.synchronize([JOB_IDS_SESSION_ALL], TIMEOUT_NO_WAIT,
+                self.session.synchronize([JOB_IDS_SESSION_ALL], TIMEOUT_NO_WAIT,
                                     dispose=True)
             except ExitTimeoutException:
                 pass
+
+            finally:
+                self.logger.info('Exiting drmaa session')
+                self.session.exit()
 
 
 
