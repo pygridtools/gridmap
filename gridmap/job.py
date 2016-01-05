@@ -82,6 +82,8 @@ if DRMAA_PRESENT:
                        JobControlAction, JOB_IDS_SESSION_ALL, Session,
                        TIMEOUT_NO_WAIT)
 
+    import drmaa.errors
+
 # Python 2.x backward compatibility
 if sys.version_info < (3, 0):
     range = xrange
@@ -377,7 +379,12 @@ class JobMonitor(object):
                     self.session.control(JOB_IDS_SESSION_ALL,  JobControlAction.TERMINATE)
 
                 except InvalidJobException:
-                    self.logger.debug("Could not kill all jobs for session.", exc_info=True)
+                    self.logger.warn("Could not kill all jobs for session.", exc_info=True)
+
+                except drmaa.errors.InternalException:
+                    #cleanup in finaly clause below
+                    self.logger.warn("Could not kill all jobs for session.")
+                    pass
             # Get rid of job info to prevent memory leak
             try:
                 self.session.synchronize([JOB_IDS_SESSION_ALL], TIMEOUT_NO_WAIT,
@@ -386,6 +393,14 @@ class JobMonitor(object):
                 pass
 
             finally:
+                #cleanup remaining jobs that cannot be kille by JOB_IDS_SESSION_ALL
+                for job in self.jobs:
+                    try:
+                        self.logger.info("Killing job {}".format(job.id))
+                        self.session.control(job.id,  JobControlAction.TERMINATE)
+                    except:
+                        pass
+
                 self.logger.info('Exiting drmaa session')
                 self.session.exit()
 
@@ -464,12 +479,10 @@ class JobMonitor(object):
                                                   exc_info=True)
                             return_msg = "all good"
                             job.timestamp = datetime.now()
-                            usage = 0
-                            for j in self.jobs:
-                                if len(j.track_cpu) > 0:
-                                    usage += j.track_cpu[-1][0]
 
-                            print("Total CPU usage: {} % for a total of {} submitted jobs.".format(usage, len(self.jobs)), end='\r')
+                            running_jobs = [ j for j in self.jobs if (len(j.track_cpu) > 0 and (isinstance(j.ret, basestring) and j.ret == _JOB_NOT_FINISHED))]
+                            usage = [j.track_cpu[-1][0]  for j in running_jobs]
+                            print("Total CPU usage: {} % for a total of {} running jobs.".format(sum(usage), len(running_jobs)), end='\r')
 
                         if msg["command"] == "get_job":
                             # serve job for display
@@ -611,7 +624,7 @@ def _send_mail(subject, body_text, attachments=None):
     msg["From"] = ERROR_MAIL_SENDER
     msg["To"] = ERROR_MAIL_RECIPIENT
 
-    logger.info('Email body: %s', body_text)
+    logger.info('Email Sent with subject : {}'.format(subject))
 
     body_msg = MIMEText(body_text)
     msg.attach(body_msg)
@@ -933,8 +946,14 @@ def process_jobs(jobs, temp_dir=DEFAULT_TEMP_DIR, white_list=None, quiet=True,
             # handling of inputs, outputs and heartbeats
             logger.info("Started DRMAA session with Session {}".format(session))
             monitor.check(session, jobs)
+
+        if SEND_ERROR_MAIL:
+            send_completion_mail(name="gridmap job", jobs=jobs)
+
+
     else:
         _process_jobs_locally(jobs, max_processes=max_processes)
+
 
     return [job.ret for job in jobs]
 
@@ -1045,12 +1064,12 @@ def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
 
     # send a completion mail (if requested and configured)
     if completion_mail and SEND_ERROR_MAIL:
-        send_completion_mail(name=name)
+        send_completion_mail(name=name,  jobs=jobs)
 
     return job_results
 
 
-def send_completion_mail(name):
+def send_completion_mail(name,  jobs):
     """
     send out success email
     """
@@ -1060,6 +1079,26 @@ def send_completion_mail(name):
     # compose error message
     body_text = ""
     body_text += "Job {}\n".format(name)
+    body_text += "Collected results from {} jobs \n \n".format(len(jobs))
 
+    for job in jobs:
+        if job.heart_beat:
+            body_text += "Last memory usage: {}\n".format(job.heart_beat["memory"])
+            body_text += "Mean cpu load: {}\n".format(sum(job.heart_beat["cpu_load"])/len(job.heart_beat["cpu_load"]))
+            body_text += ("Process was running at last check: " +
+                          "{}\n\n").format(job.heart_beat["cpu_load"][1])
+
+        body_text += "Host: {}\n\n".format(job.host_name)
+
+        if isinstance(job.ret, Exception):
+            body_text += "Job encountered exception: {}\n".format(job.ret)
+            body_text += "Stacktrace: {}\n\n".format(job.traceback)
+
+        # attach log file
+        if job.heart_beat and "log_file" in job.heart_beat:
+            log_file_attachement = MIMEText(job.heart_beat['log_file'])
+            log_file_attachement.add_header('Content-Disposition', 'attachment',
+                                            filename='{}_log.txt'.format(job.id))
+            attachments.append(log_file_attachement)
     # Send mail
     _send_mail(subject, body_text)
