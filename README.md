@@ -8,11 +8,15 @@ Jobs can only be submitted from nodes than are allowed to do that (i.e they can 
 
 A couple of environment variables need to be set in order to work.
 
-ERROR_MAIL_RECIPIENT =<your email address>
-DRMAA_LIBRARY_PATH = <like pbs_drmaa/libs/libdrmaa.so for pbs>
-DEFAULT_TEMP_DIR = <scratch space on the computing nodes>
+ERROR_MAIL_RECIPIENT = *your email address*
+
+DRMAA_LIBRARY_PATH = *like pbs_drmaa/libs/libdrmaa.so for pbs*
+
+DEFAULT_TEMP_DIR = *scratch space on the computing nodes*
+
 SEND_ERROR_MAIL=TRUE
-SMTP_SERVER = <your smtp server. like: unimail.tu-dortmund.de>
+
+SMTP_SERVER = *your smtp server. like: unimail.tu-dortmund.de*
 
 
 ### Python Requirements
