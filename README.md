@@ -10,14 +10,19 @@ A couple of environment variables need to be set in order to work.
 
 ERROR_MAIL_RECIPIENT = *your email address*
 
-DRMAA_LIBRARY_PATH = *like pbs_drmaa/libs/libdrmaa.so for pbs*
+export DRMAA_LIBRARY_PATH = *like pbs_drmaa/libs/libdrmaa.so for pbs*
 
-DEFAULT_TEMP_DIR = *scratch space on the computing nodes*
+export DEFAULT_TEMP_DIR="/local/$USER/"
 
-SEND_ERROR_MAIL=TRUE
+export USE_MEM_FREE=TRUE
 
-SMTP_SERVER = *your smtp server. like: unimail.tu-dortmund.de*
+export SMTP_SERVER="unimail.tu-dortmund.de"
 
+export ERROR_MAIL_RECIPIENT="your.email@address.com"
+
+export ERROR_MAIL_SENDER="torque@hpc-main3.phido.physik.tu-dortmund.de"
+
+export SEND_ERROR_MAIL=TRUE
 
 ### Python Requirements
 
