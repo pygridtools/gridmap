@@ -44,6 +44,7 @@ import smtplib
 import sys
 import traceback
 import functools
+import tempfile
 from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -692,7 +693,9 @@ def send_error_mail(job):
         time = [HEARTBEAT_FREQUENCY * i for i in range(len(job.track_mem))]
 
         # attack mem plot
-        img_mem_fn = os.path.join('/tmp', "{}_mem.png".format(job.id))
+        temp_dir = tempfile.mkdtemp()
+
+        img_mem_fn = os.path.join(temp_dir, "{}_mem.png".format(job.id))
         plt.figure(1)
         plt.plot(time, job.track_mem, "-o")
         plt.xlabel("time (s)")
@@ -707,7 +710,7 @@ def send_error_mail(job):
         attachments.append(img_mem_attachement)
 
         # attach cpu plot
-        img_cpu_fn = os.path.join("/tmp", "{}_cpu.png".format(job.id))
+        img_cpu_fn = os.path.join(temp_dir, "{}_cpu.png".format(job.id))
         plt.figure(2)
         plt.plot(time, [cpu_load for cpu_load, _ in job.track_cpu], "-o")
         plt.xlabel("time (s)")
@@ -1074,13 +1077,14 @@ def send_completion_mail(name,  jobs):
     send out success email
     """
     # create message
-    subject = "GridMap completed grid_map {}".format(name)
+    subject = "GridMap completed {}".format(name)
 
     # compose error message
     body_text = ""
     body_text += "Job {}\n".format(name)
     body_text += "Collected results from {} jobs \n \n".format(len(jobs))
 
+    attachments = []
     for job in jobs:
         if job.heart_beat:
             body_text += "Last memory usage: {}\n".format(job.heart_beat["memory"])
@@ -1101,4 +1105,4 @@ def send_completion_mail(name,  jobs):
                                             filename='{}_log.txt'.format(job.id))
             attachments.append(log_file_attachement)
     # Send mail
-    _send_mail(subject, body_text)
+    _send_mail(subject, body_text, attachments=attachments)
