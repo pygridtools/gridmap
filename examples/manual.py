@@ -53,11 +53,11 @@ def sleep_walk(secs):
         num = num + 1
 
 
-def compute_factorial(n):
+def compute_factorial(n, sleep=10):
     """
     computes factorial of n
     """
-    sleep_walk(10)
+    sleep_walk(sleep)
     ret = 1
     for i in range(n):
         ret = ret * (i + 1)
@@ -75,7 +75,7 @@ def make_jobs(engine, queue, vmem):
     """
 
     # set up list of arguments
-    inputvec = [[3], [5], [10], [20]]
+    inputvec = [[3, 10], [5, 20], [10, 10], [20, 20]]
 
     # create empty job vector
     jobs = []
