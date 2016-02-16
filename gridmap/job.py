@@ -458,6 +458,8 @@ class JobMonitor(object):
                                 job.ret = tmp_job.ret
                                 job.traceback = tmp_job.traceback
                                 self.logger.info("Received output from %s", job_id)
+                                if isinstance(job.ret, basestring) and len(job.ret) < 1000:
+                                    self.logger.info("Output was {}".format(job.ret) )
                             # Returned exception instead of job, so store that
                             elif isinstance(msg["data"], tuple):
                                 job.ret, job.traceback = msg["data"]
@@ -950,8 +952,12 @@ def process_jobs(jobs, temp_dir=DEFAULT_TEMP_DIR, white_list=None, quiet=True,
             logger.info("Started DRMAA session with Session {}".format(session))
             monitor.check(session, jobs)
 
+        print("JobMonitor killed.")
+
         if SEND_ERROR_MAIL:
             send_completion_mail(name="gridmap job", jobs=jobs)
+        print("returning results so far")
+        return [job.ret for job in jobs]
 
 
     else:
