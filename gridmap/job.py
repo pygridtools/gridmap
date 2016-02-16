@@ -45,6 +45,7 @@ import sys
 import traceback
 import functools
 import tempfile
+import signal
 from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -402,7 +403,7 @@ class JobMonitor(object):
                     except:
                         pass
 
-                self.logger.info('Exiting drmaa session')
+                self.logger.info('Exiting drmaa session {}'.format(self.session))
                 self.session.exit()
 
 
@@ -929,6 +930,7 @@ def process_jobs(jobs, temp_dir=DEFAULT_TEMP_DIR, white_list=None, quiet=True,
 
     :returns: List of Job results
     """
+
     logger = logging.getLogger(__name__)
     if (not local and not DRMAA_PRESENT):
         if require_cluster:
@@ -940,19 +942,22 @@ def process_jobs(jobs, temp_dir=DEFAULT_TEMP_DIR, white_list=None, quiet=True,
 
     if not local:
         # initialize monitor to get port number
-        with JobMonitor(temp_dir=temp_dir, port=port) as monitor:
-            # get interface and port
-            home_address = monitor.home_address
+        try:
+            with JobMonitor(temp_dir=temp_dir, port=port) as monitor:
+                # get interface and port
+                home_address = monitor.home_address
 
-            # job_id field is attached to each job object
-            session = _submit_jobs(jobs, home_address, temp_dir=temp_dir,
-                               white_list=white_list, quiet=quiet)
+                # job_id field is attached to each job object
+                session = _submit_jobs(jobs, home_address, temp_dir=temp_dir,
+                                   white_list=white_list, quiet=quiet)
 
-            # handling of inputs, outputs and heartbeats
-            logger.info("Started DRMAA session with Session {}".format(session))
-            monitor.check(session, jobs)
-
-        print("JobMonitor killed.")
+                # handling of inputs, outputs and heartbeats
+                logger.info("Started DRMAA session with Session {}".format(session))
+                monitor.check(session, jobs)
+        except KeyboardInterrupt:
+            print("JobMonitor killed.")
+            print("Caught KeyBoard interrupt. Returning intermediate results.")
+            return [job.ret for job in jobs]
 
         if SEND_ERROR_MAIL:
             send_completion_mail(name="gridmap job", jobs=jobs)
