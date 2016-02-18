@@ -3,6 +3,15 @@ python:
   - 2.7
   - 3.4
 
+sudo: required
+
+addons:
+  hostname: gridmap.travis-ci.org
+  hosts:
+    - localhost
+    - localhost.localdomain
+    - gridmap.travis-ci.org
+
 notifications:
   email: false
 
