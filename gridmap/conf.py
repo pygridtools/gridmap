@@ -75,10 +75,11 @@ from socket import gethostname
 try:
     import drmaa
     DRMAA_PRESENT = True
-except (ImportError, OSError, RuntimeError):
+except (ImportError, OSError, RuntimeError) as e:
     logger = logging.getLogger(__name__)
     logger.warning('Could not import drmaa. Only local multiprocessing ' +
                    'supported.')
+    logger.warning(str(e))
     DRMAA_PRESENT = False
 
 # plot cpu and mem usage and send via email

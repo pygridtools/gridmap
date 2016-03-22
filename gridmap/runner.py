@@ -188,10 +188,22 @@ def _run_job(job_id, address):
     """
     # create heart beat process
     logger = logging.getLogger(__name__)
+
     parent_pid = os.getpid()
+    log_path = None
+    if 'SGE_STDERR_PATH' in os.environ:
+        log_path = os.environ['SGE_STDERR_PATH']
+
+    if log_path is None and 'PBS_O_WORKDIR' in os.environ:
+        n = 'log_{}.out'.format(os.environ['PBS_JOBID'], )
+        log_path = os.path.join(os.environ['PBS_O_WORKDIR'], n)
+
+    if log_path is None:
+        log_path='./log.out'
+
     heart = multiprocessing.Process(target=_heart_beat,
                                     args=(job_id, address, parent_pid,
-                                          os.environ['SGE_STDERR_PATH'],
+                                          log_path,
                                           HEARTBEAT_FREQUENCY))
     logger.info("Starting heart beat")
     heart.start()
@@ -272,12 +284,17 @@ def _main():
     logger.info("Appended {0} to PYTHONPATH".format(args.module_dir))
     sys.path.insert(0, args.module_dir)
 
+    current_job_id = 0
+    if 'JOB_ID' in os.environ:
+        current_job_id = os.environ['JOB_ID']
+    else:
+        current_job_id = os.environ['PBS_JOBID']
     logger.debug("Job ID: %s\tHome address: %s\tModule dir: %s",
-                 os.environ['JOB_ID'],
+                 current_job_id,
                  args.home_address, args.module_dir)
 
     # Process the database and get job started
-    _run_job(os.environ['JOB_ID'], args.home_address)
+    _run_job(current_job_id, args.home_address)
 
 
 if __name__ == "__main__":
