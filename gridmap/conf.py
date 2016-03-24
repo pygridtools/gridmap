@@ -29,6 +29,8 @@ specifying environment variables with the same name.
 
 :var USE_MEM_FREE: Does your cluster support specifying how much memory a job
                    will use via mem_free? (Default: ``False``)
+:var USE_NUM_PROC: Does your cluster support specifying how many procs a job
+                   will use via num_proc? (Default: ``False``)
 :var DEFAULT_QUEUE: The default job scheduling queue to use.
                     (Default: ``all.q``)
 :var CREATE_PLOTS: Should we plot cpu and mem usage and send via email?
@@ -124,6 +126,9 @@ HEARTBEAT_FREQUENCY = int(os.getenv('HEARTBEAT_FREQUENCY', '10'))
 
 # Is mem_free configured properly on the cluster?
 USE_MEM_FREE = 'TRUE' == os.getenv('USE_MEM_FREE', 'False').upper()
+
+# Is num_proc configured properly on the cluster?
+USE_NUM_PROC = 'TRUE' == os.getenv('USE_NUM_PROC', 'False').upper()
 
 # Which queue should we use by default
 DEFAULT_QUEUE = os.getenv('DEFAULT_QUEUE', 'all.q')

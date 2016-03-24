@@ -29,6 +29,8 @@ in a more 'pythonic' fashion.
 
 :var USE_MEM_FREE: Does your cluster support specifying how much memory a job
                    will use via mem_free? (Default: ``False``)
+:var USE_NUM_PROC: Does your cluster support specifying how many procs a job
+                   will use via num_proc? (Default: ``False``)
 :var DEFAULT_QUEUE: The default job scheduling queue to use.
                     (Default: ``all.q``)
 :var DEFAULT_TEMP_DIR: The default temporary directory for job output.
@@ -73,7 +75,7 @@ from gridmap.conf import (CHECK_FREQUENCY, CREATE_PLOTS, DEFAULT_QUEUE,
                           HEARTBEAT_FREQUENCY, IDLE_THRESHOLD,
                           MAX_IDLE_HEARTBEATS, MAX_TIME_BETWEEN_HEARTBEATS,
                           NUM_RESUBMITS, SEND_ERROR_MAIL, SMTP_SERVER,
-                          USE_MEM_FREE, DEFAULT_TEMP_DIR)
+                          USE_MEM_FREE, USE_NUM_PROC, DEFAULT_TEMP_DIR)
 from gridmap.job import (Job, JobException, process_jobs, grid_map,
                          DRMAANotPresentException)
 from gridmap.version import __version__, VERSION
@@ -85,4 +87,4 @@ __all__ = ['Job', 'JobException', 'process_jobs', 'grid_map',
            'ERROR_MAIL_SENDER', 'HEARTBEAT_FREQUENCY', 'IDLE_THRESHOLD',
            'MAX_IDLE_HEARTBEATS', 'MAX_TIME_BETWEEN_HEARTBEATS',
            'NUM_RESUBMITS', 'SEND_ERROR_MAIL', 'SMTP_SERVER', 'USE_MEM_FREE',
-           'DEFAULT_TEMP_DIR']
+           'USE_NUM_PROC', 'DEFAULT_TEMP_DIR']
