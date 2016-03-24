@@ -63,7 +63,7 @@ from gridmap.conf import (CHECK_FREQUENCY, CREATE_PLOTS, DEFAULT_QUEUE,
                           IDLE_THRESHOLD, MAX_IDLE_HEARTBEATS,
                           MAX_TIME_BETWEEN_HEARTBEATS, NUM_RESUBMITS,
                           SEND_ERROR_MAIL, SMTP_SERVER, USE_MEM_FREE,
-                          DEFAULT_TEMP_DIR)
+                          USE_NUM_PROC, DEFAULT_TEMP_DIR)
 from gridmap.data import zdumps, zloads
 from gridmap.runner import _heart_beat
 
@@ -263,7 +263,7 @@ class Job(object):
             ret += " -S {}".format(self.interpreting_shell)
         ret += " -b yes"
 
-        if self.num_proc and self.num_proc > 1:
+        if self.num_proc and USE_NUM_PROC:
             ret += " -l num_proc={}".format(self.num_proc)
         if self.mem_free and USE_MEM_FREE:
             ret += " -l mem_free={}".format(self.mem_free)
