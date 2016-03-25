@@ -130,3 +130,6 @@ DEFAULT_QUEUE = os.getenv('DEFAULT_QUEUE', 'all.q')
 
 # Where shall we use as temporary_directory
 DEFAULT_TEMP_DIR = os.getenv('DEFAULT_TEMP_DIR', '/scratch/')
+
+# Which parallel environment to use by default
+DEFAULT_PE = "smp"
