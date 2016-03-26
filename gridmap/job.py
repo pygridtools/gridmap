@@ -149,7 +149,7 @@ class Job(object):
                         Overwrites variables which already exist due to
                         ``copy_env=True``.
         :type add_env: dict
-        :param par_env: parallel environment to use. default is "smp"
+        :param par_env: parallel environment to use.
         :type par_env: str
         """
         self.track_mem = []
@@ -981,6 +981,8 @@ def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
                     Overwrites variables which already exist due to
                     ``copy_env=True``.
     :type add_env: dict
+    :param par_env: parallel environment to use.
+    :type par_env: str
     :param completion_mail: whether to send an e-mail upon completion of all
                             jobs
     :type completion_mail: boolean
