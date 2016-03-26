@@ -62,6 +62,8 @@ specifying environment variables with the same name.
 :var HEARTBEAT_FREQUENCY: How many seconds pass before jobs on the cluster send
                           back heart beats to the submission host.
                           (Default: 10)
+:var DEFAULT_PAR_ENV: Default parallel environment to use 
+                      (Default: ``smp``)
 """
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
@@ -132,4 +134,4 @@ DEFAULT_QUEUE = os.getenv('DEFAULT_QUEUE', 'all.q')
 DEFAULT_TEMP_DIR = os.getenv('DEFAULT_TEMP_DIR', '/scratch/')
 
 # Which parallel environment to use by default
-DEFAULT_PE = os.getenv('DEFAULT_PE', "smp")
+DEFAULT_PAR_ENV = os.getenv('DEFAULT_PAR_ENV', "smp")
