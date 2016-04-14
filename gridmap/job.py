@@ -63,7 +63,7 @@ from gridmap.conf import (CHECK_FREQUENCY, CREATE_PLOTS, DEFAULT_QUEUE,
                           IDLE_THRESHOLD, MAX_IDLE_HEARTBEATS,
                           MAX_TIME_BETWEEN_HEARTBEATS, NUM_RESUBMITS,
                           SEND_ERROR_MAIL, SMTP_SERVER, USE_MEM_FREE,
-                          DEFAULT_TEMP_DIR)
+                          DEFAULT_TEMP_DIR, DEFAULT_PAR_ENV)
 from gridmap.data import zdumps, zloads
 from gridmap.runner import _heart_beat
 
@@ -116,11 +116,11 @@ class Job(object):
                  'cause_of_death', 'num_resubmits', 'home_address',
                  'log_stderr_fn', 'log_stdout_fn', 'timestamp', 'host_name',
                  'heart_beat', 'track_mem', 'track_cpu', 'interpreting_shell',
-                 'copy_env')
+                 'copy_env','par_env')
 
     def __init__(self, f, args, kwlist=None, cleanup=True, mem_free="1G",
                  name='gridmap_job', num_slots=1, queue=DEFAULT_QUEUE,
-                 interpreting_shell=None, copy_env=True, add_env=None):
+                 interpreting_shell=None, copy_env=True, add_env=None, par_env=DEFAULT_PAR_ENV):
         """
         Initializes a new Job.
 
@@ -149,6 +149,8 @@ class Job(object):
                         Overwrites variables which already exist due to
                         ``copy_env=True``.
         :type add_env: dict
+        :param par_env: parallel environment to use.
+        :type par_env: str
         """
         self.track_mem = []
         self.track_cpu = []
@@ -195,6 +197,7 @@ class Job(object):
         if add_env is not None:
             _add_env(add_env)
         self.working_dir = os.getcwd()
+        self.par_env = par_env
 
     @property
     def function(self):
@@ -263,7 +266,7 @@ class Job(object):
         if self.mem_free and USE_MEM_FREE:
             ret += " -l mem_free={}".format(self.mem_free)
         if self.num_slots and self.num_slots > 1:
-            ret += " -pe smp {}".format(self.num_slots)
+            ret += " -pe {} {}".format(self.par_env, self.num_slots)
         if self.white_list:
             ret += " -l h={}".format('|'.join(self.white_list))
         if self.queue:
@@ -929,7 +932,7 @@ def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
              num_slots=1, temp_dir=DEFAULT_TEMP_DIR, white_list=None,
              queue=DEFAULT_QUEUE, quiet=True, local=False, max_processes=1,
              interpreting_shell=None, copy_env=True, add_env=None,
-             completion_mail=False, require_cluster=False):
+             completion_mail=False, require_cluster=False, par_env=DEFAULT_PAR_ENV):
     """
     Maps a function onto the cluster.
 
@@ -978,6 +981,8 @@ def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
                     Overwrites variables which already exist due to
                     ``copy_env=True``.
     :type add_env: dict
+    :param par_env: parallel environment to use.
+    :type par_env: str
     :param completion_mail: whether to send an e-mail upon completion of all
                             jobs
     :type completion_mail: boolean
@@ -993,7 +998,7 @@ def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
                 cleanup=cleanup, mem_free=mem_free,
                 name='{}{}'.format(name, job_num), num_slots=num_slots,
                 queue=queue, interpreting_shell=interpreting_shell,
-                copy_env=copy_env, add_env=add_env)
+                copy_env=copy_env, add_env=add_env, par_env=par_env)
             for job_num, args in enumerate(args_list)]
 
     # process jobs
