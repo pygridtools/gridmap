@@ -116,11 +116,12 @@ class Job(object):
                  'cause_of_death', 'num_resubmits', 'home_address',
                  'log_stderr_fn', 'log_stdout_fn', 'timestamp', 'host_name',
                  'heart_beat', 'track_mem', 'track_cpu', 'interpreting_shell',
-                 'copy_env','par_env')
+                 'copy_env', 'par_env', 'gpu')
 
     def __init__(self, f, args, kwlist=None, cleanup=True, mem_free="1G",
                  name='gridmap_job', num_slots=1, queue=DEFAULT_QUEUE,
-                 interpreting_shell=None, copy_env=True, add_env=None, par_env=DEFAULT_PAR_ENV):
+                 interpreting_shell=None, copy_env=True, add_env=None,
+                 par_env=DEFAULT_PAR_ENV, gpu=0):
         """
         Initializes a new Job.
 
@@ -151,6 +152,8 @@ class Job(object):
         :type add_env: dict
         :param par_env: parallel environment to use.
         :type par_env: str
+        :param gpu: number of GPUs to request
+        :type gpu: int
         """
         self.track_mem = []
         self.track_cpu = []
@@ -198,6 +201,7 @@ class Job(object):
             _add_env(add_env)
         self.working_dir = os.getcwd()
         self.par_env = par_env
+        self.gpu = gpu
 
     @property
     def function(self):
@@ -271,6 +275,8 @@ class Job(object):
             ret += " -l h={}".format('|'.join(self.white_list))
         if self.queue:
             ret += " -q {}".format(self.queue)
+        if self.gpu:
+            ret += " -l gpu={}".format(self.gpu)
 
         return ret
 
@@ -931,7 +937,7 @@ def _resubmit(session_id, job, temp_dir):
 def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
              num_slots=1, temp_dir=DEFAULT_TEMP_DIR, white_list=None,
              queue=DEFAULT_QUEUE, quiet=True, local=False, max_processes=1,
-             interpreting_shell=None, copy_env=True, add_env=None,
+             interpreting_shell=None, copy_env=True, add_env=None, gpu=0,
              completion_mail=False, require_cluster=False, par_env=DEFAULT_PAR_ENV):
     """
     Maps a function onto the cluster.
@@ -981,6 +987,8 @@ def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
                     Overwrites variables which already exist due to
                     ``copy_env=True``.
     :type add_env: dict
+    :param gpu: number of GPUs to request
+    :type gpu: int
     :param par_env: parallel environment to use.
     :type par_env: str
     :param completion_mail: whether to send an e-mail upon completion of all
@@ -998,7 +1006,8 @@ def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
                 cleanup=cleanup, mem_free=mem_free,
                 name='{}{}'.format(name, job_num), num_slots=num_slots,
                 queue=queue, interpreting_shell=interpreting_shell,
-                copy_env=copy_env, add_env=add_env, par_env=par_env)
+                copy_env=copy_env, add_env=add_env, par_env=par_env,
+                gpu=gpu)
             for job_num, args in enumerate(args_list)]
 
     # process jobs
