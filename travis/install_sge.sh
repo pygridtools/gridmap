@@ -11,7 +11,7 @@ echo "gridengine-master shared/gridenginecell string default" | sudo debconf-set
 echo "gridengine-master shared/gridengineconfig boolean true" | sudo debconf-set-selections
 sudo apt-get install gridengine-common gridengine-master
 # Do this in a separate step to give master time to start
-sudo apt-get install libdrmaa1.0 gridengine-client gridengine-exec
+sudo apt-get install gridengine-drmaa1.0 gridengine-client gridengine-exec
 export CORES=$(grep -c '^processor' /proc/cpuinfo)
 sed -i -r "s/template/$USER/" user_template
 sudo qconf -Auser user_template
