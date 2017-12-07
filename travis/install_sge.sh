@@ -10,8 +10,9 @@ echo "gridengine-master shared/gridenginemaster string localhost" | sudo debconf
 echo "gridengine-master shared/gridenginecell string default" | sudo debconf-set-selections
 echo "gridengine-master shared/gridengineconfig boolean true" | sudo debconf-set-selections
 sudo apt-get install gridengine-common gridengine-master
+
 # Do this in a separate step to give master time to start
-sudo apt-get install gridengine-drmaa1.0 gridengine-client gridengine-exec
+sudo apt-get install gridengine-drmaa1.0 gridengine-client gridengine-exec gridengine-qmon
 export CORES=$(grep -c '^processor' /proc/cpuinfo)
 sed -i -r "s/template/$USER/" user_template
 sudo qconf -Auser user_template

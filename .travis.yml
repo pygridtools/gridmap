@@ -20,7 +20,7 @@ before_install:
   - travis/install_sge.sh
   - export SGE_ROOT=/var/lib/gridengine
   - export SGE_CELL=default
-  - export DRMAA_LIBRARY_PATH=/usr/lib/libdrmaa.so.1.0
+  - export DRMAA_LIBRARY_PATH=/usr/lib/gridengine-drmaa/lib/libdrmaa.so
   - export SEND_ERROR_MAIL=False
   - sudo mkdir /scratch/
   - sudo chmod 777 /scratch/
@@ -28,6 +28,7 @@ before_install:
   - sudo rm -rf /dev/shm
   - sudo ln -s /run/shm /dev/shm
 install:
+  - ls $DRMAA_LIBRARY_PATH
   - pip install -r requirements.txt
   - pip install python-coveralls
   - pip install nose-cov
