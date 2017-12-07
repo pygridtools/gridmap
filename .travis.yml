@@ -35,7 +35,7 @@ install:
 
 # Run test
 script:
-  -  travis_wait 30 nosetests -x -d -v --with-cov --cov gridmap --cov-config .coveragerc --logging-level=DEBUG
+  -  travis_wait 45 nosetests -x -d -v --with-cov --cov gridmap --cov-config .coveragerc --logging-level=DEBUG
 
 # Calculate coverage
 after_success:
