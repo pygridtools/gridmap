@@ -28,7 +28,8 @@ before_install:
   - sudo rm -rf /dev/shm
   - sudo ln -s /run/shm /dev/shm
 install:
-  - ls /usr/lib/libdrmaa*
+  - ls /usr/lib/gridengine-drmaa/*
+  - ls /usr/lib/lib*.so
   - pip install -r requirements.txt
   - pip install python-coveralls
   - pip install nose-cov
