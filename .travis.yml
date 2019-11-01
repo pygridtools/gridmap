@@ -1,7 +1,7 @@
 language: python
 python:
   - 2.7
-  - 3.4
+  - 3.6
 
 sudo: required
 
@@ -24,9 +24,6 @@ before_install:
   - export SEND_ERROR_MAIL=False
   - sudo mkdir /scratch/
   - sudo chmod 777 /scratch/
-  # Work around for multiprocessing permission bug with Travis
-  - sudo rm -rf /dev/shm
-  - sudo ln -s /run/shm /dev/shm
 install:
   - pip install -r requirements.txt
   - pip install python-coveralls
