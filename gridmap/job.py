@@ -110,7 +110,7 @@ class Job(object):
        are defined at the module or class level).
     """
 
-    __slots__ = ('_f', 'args', 'id', 'kwlist', 'cleanup', 'ret', 'traceback',
+    __slots__ = ('function', 'args', 'id', 'kwlist', 'cleanup', 'ret', 'traceback',
                  'num_slots', 'mem_free', 'white_list', 'path', 'uniq_id',
                  'name', 'queue', 'environment', 'working_dir',
                  'cause_of_death', 'num_resubmits', 'home_address',
