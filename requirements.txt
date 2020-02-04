@@ -1,4 +1,4 @@
-cloudpickle==1.2.2
+cloudpickle
 drmaa
 psutil>=2.0.0
 pyzmq
