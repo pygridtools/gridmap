@@ -164,7 +164,6 @@ class Job(object):
         self.num_resubmits = 0
         self.cause_of_death = ''
         self.path = None
-        self._f = None
         self.function = f
         self.args = args
         self.id = -1
@@ -198,44 +197,6 @@ class Job(object):
             _add_env(add_env)
         self.working_dir = os.getcwd()
         self.par_env = par_env
-
-    @property
-    def function(self):
-        ''' Function this job will execute. '''
-        return self._f
-
-    @function.setter
-    def function(self, f):
-        """
-        setter for function that carefully takes care of
-        namespace, avoiding __main__ as a module
-        """
-
-        m = inspect.getmodule(f)
-        try:
-            self.path = os.path.dirname(os.path.abspath(
-                inspect.getsourcefile(f)))
-        except TypeError:
-            self.path = ''
-
-        # if module is not __main__, all is good. If the function is a
-        #   partial function we'll take it as is also.
-        if isinstance(f, functools.partial) or m.__name__ != "__main__":
-            self._f = f
-
-        else:
-
-            # determine real module name
-            mn = os.path.splitext(os.path.basename(m.__file__))[0]
-
-            # make sure module is present
-            import_module(mn)
-
-            # get module
-            mod = sys.modules[mn]
-
-            # set function from module
-            self._f = getattr(mod, f.__name__)
 
     def execute(self):
         """
