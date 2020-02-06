@@ -36,6 +36,7 @@ try:
     import cPickle as pickle  # For Python 2.x
 except ImportError:
     import pickle
+import cloudpickle
 import re
 
 
@@ -48,7 +49,7 @@ def zdumps(obj):
 
     :returns: An bz2-compressed pickle of the given object.
     """
-    return bz2.compress(pickle.dumps(obj, pickle.HIGHEST_PROTOCOL), 9)
+    return bz2.compress(cloudpickle.dumps(obj, pickle.HIGHEST_PROTOCOL), 9)
 
 
 def zloads(pickled_data):
@@ -60,5 +61,5 @@ def zloads(pickled_data):
 
     :returns: An unpickled version of the compressed byte sequence.
     """
-    return pickle.loads(bz2.decompress(pickled_data))
+    return cloudpickle.loads(bz2.decompress(pickled_data))
 
