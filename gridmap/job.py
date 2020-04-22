@@ -116,9 +116,10 @@ class Job(object):
                  'cause_of_death', 'num_resubmits', 'home_address',
                  'log_stderr_fn', 'log_stdout_fn', 'timestamp', 'host_name',
                  'heart_beat', 'track_mem', 'track_cpu', 'interpreting_shell',
-                 'copy_env','par_env')
+                 'copy_env', 'par_env', 'pe', 'cpu', 'h_vmem', 'h_rt', 'resources')
 
     def __init__(self, f, args, kwlist=None, cleanup=True, mem_free="1G",
+                 pe='parallel', cpu=1, h_vmem="4G", h_rt='00:59:00', resources=[],
                  name='gridmap_job', num_slots=1, queue=DEFAULT_QUEUE,
                  interpreting_shell=None, copy_env=True, add_env=None, par_env=DEFAULT_PAR_ENV):
         """
@@ -177,6 +178,11 @@ class Job(object):
         self.queue = queue
         self.interpreting_shell = interpreting_shell
         self.copy_env = copy_env
+        self.pe = pe
+        self.cpu = cpu
+        self.h_vmem = h_vmem
+        self.h_rt = h_rt
+        self.resources = resources
         # Save copy of environment variables
         self.environment = {}
         def _add_env(env_vars):
@@ -232,7 +238,15 @@ class Job(object):
             ret += " -l h={}".format('|'.join(self.white_list))
         if self.queue:
             ret += " -q {}".format(self.queue)
-
+        if self.pe and self.cpu:
+            ret += " -pe {} {}".format(self.pe, self.cpu)
+        if self.h_vmem:
+            ret += " -l h_vmem={}".format(self.h_vmem)
+        if self.h_rt:
+            ret += " -l h_rt={}".format(self.h_rt)
+        if self.resources:
+            ret += " " + " ".join([" -l {}".format(x) for x in self.resources])
+            
         return ret
 
 
@@ -890,6 +904,7 @@ def _resubmit(session_id, job, temp_dir):
 # MapReduce Interface
 #####################
 def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
+             pe='parallel', cpu=1, h_vmem='4G', h_rt='00:59:00', resources=[],
              num_slots=1, temp_dir=DEFAULT_TEMP_DIR, white_list=None,
              queue=DEFAULT_QUEUE, quiet=True, local=False, max_processes=1,
              interpreting_shell=None, copy_env=True, add_env=None,
@@ -959,7 +974,8 @@ def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
                 cleanup=cleanup, mem_free=mem_free,
                 name='{}{}'.format(name, job_num), num_slots=num_slots,
                 queue=queue, interpreting_shell=interpreting_shell,
-                copy_env=copy_env, add_env=add_env, par_env=par_env)
+                copy_env=copy_env, add_env=add_env, par_env=par_env,
+                pe=pe, cpu=cpu, h_vmem=h_vmem, h_rt=h_rt, resources=resources)
             for job_num, args in enumerate(args_list)]
 
     # process jobs
