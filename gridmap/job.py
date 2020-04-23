@@ -116,12 +116,13 @@ class Job(object):
                  'cause_of_death', 'num_resubmits', 'home_address',
                  'log_stderr_fn', 'log_stdout_fn', 'timestamp', 'host_name',
                  'heart_beat', 'track_mem', 'track_cpu', 'interpreting_shell',
-                 'copy_env', 'par_env', 'gpu')
+                 'copy_env', 'par_env', 'gpu', 'h_vmem', 'h_rt', 'resources')
 
     def __init__(self, f, args, kwlist=None, cleanup=True, mem_free="1G",
                  name='gridmap_job', num_slots=1, queue=DEFAULT_QUEUE,
                  interpreting_shell=None, copy_env=True, add_env=None,
-                 par_env=DEFAULT_PAR_ENV, gpu=0):
+                 par_env=DEFAULT_PAR_ENV, gpu=0, h_vmem=None, h_rt=None,
+                 resources=None):
         """
         Initializes a new Job.
 
@@ -154,6 +155,12 @@ class Job(object):
         :type par_env: str
         :param gpu: number of GPUs to request
         :type gpu: int
+        :param h_vmem: hard virtual memory limit (e.g. "4G")
+        :type h_vmem: str, optional
+        :param h_rt: hard runtime limit (e.g. "00:59:00")
+        :type h_rt: str, optional
+        :param resources: list of additional custom resources specifications
+        :type resources: list of str, optional
         """
         self.track_mem = []
         self.track_cpu = []
@@ -201,6 +208,9 @@ class Job(object):
         self.working_dir = os.getcwd()
         self.par_env = par_env
         self.gpu = gpu
+        self.h_vmem = h_vmem
+        self.h_rt = h_rt
+        self.resources = resources
 
     def execute(self):
         """
@@ -238,6 +248,12 @@ class Job(object):
             ret += " -q {}".format(self.queue)
         if self.gpu:
             ret += " -l gpu={}".format(self.gpu)
+        if self.h_vmem:
+            ret += " -l h_vmem={}".format(self.h_vmem)
+        if self.h_rt:
+            ret += " -l h_rt={}".format(self.h_rt)
+        if self.resources:
+            ret += "".join([" -l {}".format(x) for x in self.resources])
 
         return ret
 
@@ -899,7 +915,8 @@ def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
              num_slots=1, temp_dir=DEFAULT_TEMP_DIR, white_list=None,
              queue=DEFAULT_QUEUE, quiet=True, local=False, max_processes=1,
              interpreting_shell=None, copy_env=True, add_env=None, gpu=0,
-             completion_mail=False, require_cluster=False, par_env=DEFAULT_PAR_ENV):
+             h_vmem=None, h_rt=None, resources=None, completion_mail=False,
+             require_cluster=False, par_env=DEFAULT_PAR_ENV):
     """
     Maps a function onto the cluster.
 
@@ -950,6 +967,12 @@ def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
     :type add_env: dict
     :param gpu: number of GPUs to request
     :type gpu: int
+    :param h_vmem: hard virtual memory limit (e.g. "4G")
+    :type h_vmem: str, optional
+    :param h_rt: hard runtime limit (e.g. "00:59:00")
+    :type h_rt: str, optional
+    :param resources: list of additional custom resources specifications
+    :type resources: list of str, optional
     :param par_env: parallel environment to use.
     :type par_env: str
     :param completion_mail: whether to send an e-mail upon completion of all
@@ -968,7 +991,7 @@ def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
                 name='{}{}'.format(name, job_num), num_slots=num_slots,
                 queue=queue, interpreting_shell=interpreting_shell,
                 copy_env=copy_env, add_env=add_env, par_env=par_env,
-                gpu=gpu)
+                gpu=gpu, h_vmem=h_vmem, h_rt=h_rt, resources=resources)
             for job_num, args in enumerate(args_list)]
 
     # process jobs
