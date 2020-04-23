@@ -253,7 +253,7 @@ class Job(object):
         if self.h_rt:
             ret += " -l h_rt={}".format(self.h_rt)
         if self.resources:
-            ret += " " + " ".join([" -l {}".format(x) for x in self.resources])
+            ret += "".join([" -l {}".format(x) for x in self.resources])
 
         return ret
 
