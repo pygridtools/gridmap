@@ -116,13 +116,16 @@ class Job(object):
                  'cause_of_death', 'num_resubmits', 'home_address',
                  'log_stderr_fn', 'log_stdout_fn', 'timestamp', 'host_name',
                  'heart_beat', 'track_mem', 'track_cpu', 'interpreting_shell',
-                 'copy_env', 'par_env', 'gpu', 'h_vmem', 'h_rt', 'resources')
+                 'copy_env', 'add_env', 'project', 'validation_level', 
+                 'os_distribution', 'os_minor', 'par_env', 'gpu', 'h_vmem', 'h_rt',
+                 'resources')
 
     def __init__(self, f, args, kwlist=None, cleanup=True, mem_free="1G",
                  name='gridmap_job', num_slots=1, queue=DEFAULT_QUEUE,
                  interpreting_shell=None, copy_env=True, add_env=None,
-                 par_env=DEFAULT_PAR_ENV, gpu=0, h_vmem=None, h_rt=None,
-                 resources=None):
+                 project=None, validation_level=None, os_distribution=None,
+                 os_minor=None, par_env=DEFAULT_PAR_ENV, gpu=0, h_vmem=None,
+                 h_rt=None, resources=None):
         """
         Initializes a new Job.
 
@@ -153,6 +156,14 @@ class Job(object):
         :type add_env: dict
         :param par_env: parallel environment to use.
         :type par_env: str
+        :param project: the project to which this job is assigned
+        :type project: str
+        :param validation_level: validation level for the job
+        :type validation_level: str value e|w|n|p|v
+        :param os_distribution: os that need job to run on machine
+        :type os_distribution: str
+        :param os_minor: os minor version that need job to run on machine
+        :type os_minor: str
         :param gpu: number of GPUs to request
         :type gpu: int
         :param h_vmem: hard virtual memory limit (e.g. "4G")
@@ -162,6 +173,7 @@ class Job(object):
         :param resources: list of additional custom resources specifications
         :type resources: list of str, optional
         """
+        avaliable_validation_levels = ['e', 'w', 'n', 'p', 'v'] 
         self.track_mem = []
         self.track_cpu = []
         self.heart_beat = None
@@ -207,6 +219,12 @@ class Job(object):
             _add_env(add_env)
         self.working_dir = os.getcwd()
         self.par_env = par_env
+        self.project = project
+        self.validation_level = validation_level
+        if self.validation_level and not self.validation_level in avaliable_validation_levels:
+            raise ValueError("Validation level can be only e|w|n|p|v")
+        self.os_distribution = os_distribution
+        self.os_minor = os_minor
         self.gpu = gpu
         self.h_vmem = h_vmem
         self.h_rt = h_rt
@@ -246,6 +264,14 @@ class Job(object):
             ret += " -l h={}".format('|'.join(self.white_list))
         if self.queue:
             ret += " -q {}".format(self.queue)
+        if self.project:
+            ret += " -P {}".format(self.project)
+        if self.validation_level:
+            ret += " -w {}".format(self.validation_level)
+        if self.os_distribution:
+            ret += " -l os_distribution={}".format(self.os_distribution)
+        if self.os_minor:
+            ret += " -l os_minor={}".format(self.os_minor)
         if self.gpu:
             ret += " -l gpu={}".format(self.gpu)
         if self.h_vmem:
@@ -914,7 +940,8 @@ def _resubmit(session_id, job, temp_dir):
 def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
              num_slots=1, temp_dir=DEFAULT_TEMP_DIR, white_list=None,
              queue=DEFAULT_QUEUE, quiet=True, local=False, max_processes=1,
-             interpreting_shell=None, copy_env=True, add_env=None, gpu=0,
+             interpreting_shell=None, copy_env=True, add_env=None, project=None,
+             validation_level=None, os_distribution=None, os_minor=None, gpu=0,
              h_vmem=None, h_rt=None, resources=None, completion_mail=False,
              require_cluster=False, par_env=DEFAULT_PAR_ENV):
     """
@@ -981,6 +1008,14 @@ def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
     :param require_cluster: Should we raise an exception if access to cluster
                             is not available?
     :type require_cluster: bool
+    :param project: project for the job
+    :type project: str
+    :param validation_level: validation level for the job
+    :type validation_level: str value e|w|n|p|v
+    :param os_distribution: os that need job to run on machine
+    :type os_distribution: str
+    :param os_minor: os minor version that need job to run on machine
+    :type os_minor: str
 
     :returns: List of Job results
     """
@@ -991,7 +1026,9 @@ def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
                 name='{}{}'.format(name, job_num), num_slots=num_slots,
                 queue=queue, interpreting_shell=interpreting_shell,
                 copy_env=copy_env, add_env=add_env, par_env=par_env,
-                gpu=gpu, h_vmem=h_vmem, h_rt=h_rt, resources=resources)
+                gpu=gpu, h_vmem=h_vmem, h_rt=h_rt, resources=resources,
+                project=project, validation_level=validation_level,
+                os_distribution=os_distribution, os_minor=os_minor)
             for job_num, args in enumerate(args_list)]
 
     # process jobs
