@@ -20,6 +20,7 @@
 # You should have received a copy of the GNU General Public License
 # along with GridMap.  If not, see <http://www.gnu.org/licenses/>.
 import sys
+
 from setuptools import setup
 
 # To get around the fact that you can't import stuff from packages in setup.py
@@ -63,5 +64,7 @@ setup(name='gridmap',
                    'Programming Language :: Python :: 2',
                    'Programming Language :: Python :: 2.7',
                    'Programming Language :: Python :: 3',
-                   'Programming Language :: Python :: 3.3'],
+                   'Programming Language :: Python :: 3.6',
+                   'Programming Language :: Python :: 3.7',
+                   'Programming Language :: Python :: 3.8'],
       zip_safe=False)
