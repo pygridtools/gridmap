@@ -34,8 +34,8 @@ an example of how you can create list of jobs yourself) in the examples folder.
 
 For complete documentation `read the docs <http://gridmap.readthedocs.org>`__.
 
-*NOTE*: You cannot use GridMap on a machine that is not allowed to submit jobs
-(e.g., slave nodes).
+*NOTE*: You cannot use GridMap on machines that are not allowed to submit jobs
+(e.g., worker or edge nodes).
 
 Requirements
 ~~~~~~~~~~~~
