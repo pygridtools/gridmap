@@ -21,7 +21,7 @@
 # along with GridMap.  If not, see <http://www.gnu.org/licenses/>.
 import sys
 
-from setuptools import setup
+from setuptools import find_packages, setup
 
 # To get around the fact that you can't import stuff from packages in setup.py
 exec(compile(open('gridmap/version.py').read(), 'gridmap/version.py', 'exec'))
@@ -49,7 +49,7 @@ setup(name='gridmap',
       author='Daniel Blanchard',
       author_email='dblanchard@ets.org',
       license='GPL',
-      packages=['gridmap'],
+      packages=find_packages(exclude=["tests"]),
       install_requires=requirements(),
       entry_points={'console_scripts': ['gridmap_web = gridmap.web:main']},
       classifiers=['Intended Audience :: Science/Research',

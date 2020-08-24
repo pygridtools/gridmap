@@ -1,0 +1,29 @@
+package:
+  name: gridmap
+  version: 0.15.0
+
+source:
+  path: ../../
+    
+build:
+  number: 0
+  script:
+    - cd $SRC_DIR
+    - {{ PYTHON }} -m pip install . --no-deps -vv
+  entry_points:
+    - gridmap_web = gridmap.web:main
+
+requirements:
+  host:
+    - python
+    - pip
+  run:
+    - python
+    - cloudpickle
+    - drmaa
+    - psutil >=2.0
+    - pyzmq
+
+test:
+  imports:
+    - gridmap
