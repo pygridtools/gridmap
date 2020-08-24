@@ -40,6 +40,7 @@ For complete documentation `read the docs <http://gridmap.readthedocs.org>`__.
 Requirements
 ~~~~~~~~~~~~
 
+-  `cloudpickle <https://github.com/cloudpipe/cloudpickle>`__
 -  `drmaa <https://github.com/drmaa-python/drmaa-python>`__
 -  `psutil <https://github.com/giampaolo/psutil>`__
 -  `pyzmq <https://github.com/zeromq/pyzmq>`__
@@ -48,7 +49,7 @@ Requirements
 Acknowledgments
 ~~~~~~~~~~~~~~~
 
-Thank you to `Max-Planck-Society <http://www.mpg.de/en>`__ and 
+Thank you to `Max-Planck-Society <http://www.mpg.de/en>`__ and
 `Educational Testing Service <https://github.com/EducationalTestingService>`__ for
 funding the development of GridMap.
 

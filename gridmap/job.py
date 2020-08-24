@@ -110,19 +110,22 @@ class Job(object):
        are defined at the module or class level).
     """
 
-    __slots__ = ('_f', 'args', 'id', 'kwlist', 'cleanup', 'ret', 'traceback',
+    __slots__ = ('function', 'args', 'id', 'kwlist', 'cleanup', 'ret', 'traceback',
                  'num_slots', 'mem_free', 'white_list', 'path', 'uniq_id',
                  'name', 'queue', 'environment', 'working_dir',
                  'cause_of_death', 'num_resubmits', 'home_address',
                  'log_stderr_fn', 'log_stdout_fn', 'timestamp', 'host_name',
                  'heart_beat', 'track_mem', 'track_cpu', 'interpreting_shell',
-                 'copy_env','par_env', 'project', 'validation_level', 
-                 'os_distribution', 'os_minor')
+                 'copy_env', 'add_env', 'project', 'validation_level', 
+                 'os_distribution', 'os_minor', 'par_env', 'gpu', 'h_vmem', 'h_rt',
+                 'resources')
 
     def __init__(self, f, args, kwlist=None, cleanup=True, mem_free="1G",
                  name='gridmap_job', num_slots=1, queue=DEFAULT_QUEUE,
-                 interpreting_shell=None, copy_env=True, add_env=None, par_env=DEFAULT_PAR_ENV,
-                 project=None, validation_level=None, os_distribution=None, os_minor=None):
+                 interpreting_shell=None, copy_env=True, add_env=None,
+                 project=None, validation_level=None, os_distribution=None,
+                 os_minor=None, par_env=DEFAULT_PAR_ENV, gpu=0, h_vmem=None,
+                 h_rt=None, resources=None):
         """
         Initializes a new Job.
 
@@ -161,7 +164,14 @@ class Job(object):
         :type os_distribution: str
         :param os_minor: os minor version that need job to run on machine
         :type os_minor: str
-        
+        :param gpu: number of GPUs to request
+        :type gpu: int
+        :param h_vmem: hard virtual memory limit (e.g. "4G")
+        :type h_vmem: str, optional
+        :param h_rt: hard runtime limit (e.g. "00:59:00")
+        :type h_rt: str, optional
+        :param resources: list of additional custom resources specifications
+        :type resources: list of str, optional
         """
         avaliable_validation_levels = ['e', 'w', 'n', 'p', 'v'] 
         self.track_mem = []
@@ -176,7 +186,6 @@ class Job(object):
         self.num_resubmits = 0
         self.cause_of_death = ''
         self.path = None
-        self._f = None
         self.function = f
         self.args = args
         self.id = -1
@@ -216,44 +225,10 @@ class Job(object):
             raise ValueError("Validation level can be only e|w|n|p|v")
         self.os_distribution = os_distribution
         self.os_minor = os_minor
-
-    @property
-    def function(self):
-        ''' Function this job will execute. '''
-        return self._f
-
-    @function.setter
-    def function(self, f):
-        """
-        setter for function that carefully takes care of
-        namespace, avoiding __main__ as a module
-        """
-
-        m = inspect.getmodule(f)
-        try:
-            self.path = os.path.dirname(os.path.abspath(
-                inspect.getsourcefile(f)))
-        except TypeError:
-            self.path = ''
-
-        # if module is not __main__, all is good. If the function is a
-        #   partial function we'll take it as is also.
-        if isinstance(f, functools.partial) or m.__name__ != "__main__":
-            self._f = f
-
-        else:
-
-            # determine real module name
-            mn = os.path.splitext(os.path.basename(m.__file__))[0]
-
-            # make sure module is present
-            import_module(mn)
-
-            # get module
-            mod = sys.modules[mn]
-
-            # set function from module
-            self._f = getattr(mod, f.__name__)
+        self.gpu = gpu
+        self.h_vmem = h_vmem
+        self.h_rt = h_rt
+        self.resources = resources
 
     def execute(self):
         """
@@ -297,6 +272,15 @@ class Job(object):
             ret += " -l os_distribution={}".format(self.os_distribution)
         if self.os_minor:
             ret += " -l os_minor={}".format(self.os_minor)
+        if self.gpu:
+            ret += " -l gpu={}".format(self.gpu)
+        if self.h_vmem:
+            ret += " -l h_vmem={}".format(self.h_vmem)
+        if self.h_rt:
+            ret += " -l h_rt={}".format(self.h_rt)
+        if self.resources:
+            ret += "".join([" -l {}".format(x) for x in self.resources])
+
         return ret
 
 
@@ -956,10 +940,10 @@ def _resubmit(session_id, job, temp_dir):
 def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
              num_slots=1, temp_dir=DEFAULT_TEMP_DIR, white_list=None,
              queue=DEFAULT_QUEUE, quiet=True, local=False, max_processes=1,
-             interpreting_shell=None, copy_env=True, add_env=None,
-             completion_mail=False, require_cluster=False, par_env=DEFAULT_PAR_ENV,
-             project=None, validation_level=None, os_distribution=None,
-             os_minor=None):
+             interpreting_shell=None, copy_env=True, add_env=None, project=None,
+             validation_level=None, os_distribution=None, os_minor=None, gpu=0,
+             h_vmem=None, h_rt=None, resources=None, completion_mail=False,
+             require_cluster=False, par_env=DEFAULT_PAR_ENV):
     """
     Maps a function onto the cluster.
 
@@ -1008,6 +992,14 @@ def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
                     Overwrites variables which already exist due to
                     ``copy_env=True``.
     :type add_env: dict
+    :param gpu: number of GPUs to request
+    :type gpu: int
+    :param h_vmem: hard virtual memory limit (e.g. "4G")
+    :type h_vmem: str, optional
+    :param h_rt: hard runtime limit (e.g. "00:59:00")
+    :type h_rt: str, optional
+    :param resources: list of additional custom resources specifications
+    :type resources: list of str, optional
     :param par_env: parallel environment to use.
     :type par_env: str
     :param completion_mail: whether to send an e-mail upon completion of all
@@ -1034,6 +1026,7 @@ def grid_map(f, args_list, cleanup=True, mem_free="1G", name='gridmap_job',
                 name='{}{}'.format(name, job_num), num_slots=num_slots,
                 queue=queue, interpreting_shell=interpreting_shell,
                 copy_env=copy_env, add_env=add_env, par_env=par_env,
+                gpu=gpu, h_vmem=h_vmem, h_rt=h_rt, resources=resources,
                 project=project, validation_level=validation_level,
                 os_distribution=os_distribution, os_minor=os_minor)
             for job_num, args in enumerate(args_list)]
